@@ -1,6 +1,0 @@
-[Thu, 23 Nov 2023 14:05:45] [INFO    ] [topostats] [io.py] [879] Extracting image from /Users/Maxgamill/Desktop/Uni/PhD/napari/argwhere.spm
-[Thu, 23 Nov 2023 14:05:45] [INFO    ] [topostats] [io.py] [483] Loading image from : /Users/Maxgamill/Desktop/Uni/PhD/napari/argwhere.spm
-[Thu, 23 Nov 2023 14:05:45] [INFO    ] [topostats] [io.py] [486] [argwhere] : Loaded image from : /Users/Maxgamill/Desktop/Uni/PhD/napari/argwhere.spm
-[Thu, 23 Nov 2023 14:05:45] [INFO    ] [topostats] [io.py] [488] [argwhere] : Extracted channel Height
-[Thu, 23 Nov 2023 14:05:45] [INFO    ] [topostats] [io.py] [530] [argwhere] : Pixel to nm scaling : 0.9765625
-[Thu, 23 Nov 2023 14:05:45] [INFO    ] [topostats] [io.py] [909] [argwhere] Image added to processing.

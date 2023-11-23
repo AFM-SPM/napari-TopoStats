@@ -1,6 +1,0 @@
-[Thu, 23 Nov 2023 14:17:26] [INFO    ] [topostats] [io.py] [879] Extracting image from /Users/Maxgamill/Desktop/Uni/PhD/napari/clustered_cat.spm
-[Thu, 23 Nov 2023 14:17:26] [INFO    ] [topostats] [io.py] [483] Loading image from : /Users/Maxgamill/Desktop/Uni/PhD/napari/clustered_cat.spm
-[Thu, 23 Nov 2023 14:17:26] [INFO    ] [topostats] [io.py] [486] [clustered_cat] : Loaded image from : /Users/Maxgamill/Desktop/Uni/PhD/napari/clustered_cat.spm
-[Thu, 23 Nov 2023 14:17:26] [INFO    ] [topostats] [io.py] [488] [clustered_cat] : Extracted channel Height
-[Thu, 23 Nov 2023 14:17:26] [INFO    ] [topostats] [io.py] [530] [clustered_cat] : Pixel to nm scaling : 0.5859375
-[Thu, 23 Nov 2023 14:17:26] [INFO    ] [topostats] [io.py] [909] [clustered_cat] Image added to processing.
