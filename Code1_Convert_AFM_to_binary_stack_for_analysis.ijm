@@ -38,35 +38,35 @@ print("  ");
 
 for(i=0;i<number_slides;i++){
 	
-//Open image already transformed into grey-scale
-open(dir1+name1);
+	//Open image already transformed into grey-scale
+	open(dir1+name1);
 
-//Convert image to 8 bit so it can be thresholded.
-run("8-bit");
+	//Convert image to 8 bit so it can be thresholded.
+	run("8-bit");
 
-//threshold image (image in binary slices where the areas where there is no material are considered pores).
-setAutoThreshold("Otsu");
+	//threshold image (image in binary slices where the areas where there is no material are considered pores).
+	setAutoThreshold("Otsu");
 
-//define variables
+	//define variables
 
-a = 0;
-b = number_slides-i;
+	a = 0;
+	b = number_slides-i;
 
-setThreshold(a, b);
+	setThreshold(a, b);
 
-//apply the threshold, select false to put holes in black and true to put them in white
+	//apply the threshold, select false to put holes in black and true to put them in white
 
-setOption("BlackBackground", true);
-run("Convert to Mask");
+	setOption("BlackBackground", true);
+	run("Convert to Mask");
 
-//clean up the binary image 
-//run("Fill Holes");
-//run("Open");
+	//clean up the binary image 
+	//run("Fill Holes");
+	//run("Open");
 
-//separate holes by erode
-//run("Dilate");
-//run("Watershed");
-//run("Erode");
+	//separate holes by erode
+	//run("Dilate");
+	//run("Watershed");
+	//run("Erode");
 }
 print(" ______________ ");
 print("  ");
