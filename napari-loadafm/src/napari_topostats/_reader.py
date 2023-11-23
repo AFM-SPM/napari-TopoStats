@@ -81,27 +81,23 @@ def reader_function(path):
             else:
                 message = f"Available channels: {available_channels}"
             
-            userInput, _ = QInputDialog.getText(None, "Input Channel", message)
-
-            all_scans = io.LoadScans(paths, userInput) #
+            userInput, ok = QInputDialog.getText(None, "Input Channel", message)
+            if not ok:
+                return None
+            all_scans = io.LoadScans(paths, userInput)
             all_scans.get_data()
             scan_data_dict = all_scans.img_dict
-
-            arrays = []
-            for filename, values in scan_data_dict.items():
-                print("SHAPE: ", values["image_original"].shape)
-                arrays.append(values["image_original"])
-                if values["image_original"] is None:
-                    raise ValueError
-
-
-            print("ERROR: ", values["image_original"].shape)
-
+            if not scan_data_dict:
+                raise ValueError
+            
             break
         except Exception as e:
             available_channels = "Check console"
 
     # stack arrays into single array
+    arrays = []
+    for filename, values in scan_data_dict.items():
+        arrays.append(values["image_original"])
     data = np.squeeze(np.stack(arrays))
 
     # optional kwargs for the corresponding viewer.add_* method
