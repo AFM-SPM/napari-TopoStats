@@ -1,0 +1,48 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.egg-info/*
+
+# Build directory
+build/*
+
+# User-Specific config file
+output/config.yaml
+
+# Source / output data
+.dropbox
+*.png
+*.jpeg
+*.tiff
+
+*.*[0-9]
+*.gwy
+*.txt
+*.rtf
+*.json
+*.npy
+*.csv
+*.spm
+
+# Example Data
+!cat.spm
+
+# IDE
+.vscode/
+.idea/
+*~
+
+# Documentation
+_build/
+
+# MacOS
+.DS_Store
+
+# vscode develop in container settings
+!.devcontainer/devcontainer.json
+
+# log files
+*.log
+
+# Tests and docs
+.coverage
