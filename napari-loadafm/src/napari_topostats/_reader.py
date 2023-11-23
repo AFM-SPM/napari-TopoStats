@@ -8,7 +8,6 @@ https://napari.org/stable/plugins/guides.html?#readers
 import numpy as np
 from topostats import io
 from pathlib import Path
-#from magicgui import magic_factory, magicgui
 from PyQt5.QtWidgets import QInputDialog
 
 def napari_get_reader(path):
@@ -69,10 +68,6 @@ def reader_function(path):
     # handle both a string and a list of strings
     paths = [Path(path)] if isinstance(path, str) else Path(path)
     # load all files into array
-    #arrays = [io.LoadScans(_path, "Height").load_spm()[0] for _path in paths]
-    # launch a magic gui and wait for user input
-    #channel = choose_channel()
-
     available_channels = None
     while True:
         try:
@@ -80,19 +75,18 @@ def reader_function(path):
                 message = "Channel Name: "
             else:
                 message = f"Available channels: {available_channels}"
-            
-            userInput, ok = QInputDialog.getText(None, "Input Channel", message)
+            # adds dialog box for channel input
+            user_input, ok = QInputDialog.getText(None, "Input Channel", message)
             if not ok:
                 return None
-            all_scans = io.LoadScans(paths, userInput)
+            all_scans = io.LoadScans(paths, user_input)
             all_scans.get_data()
             scan_data_dict = all_scans.img_dict
             if not scan_data_dict:
                 raise ValueError
-            
             break
         except Exception as e:
-            available_channels = "Check console"
+            available_channels = "Check console error message."
 
     # stack arrays into single array
     arrays = []
