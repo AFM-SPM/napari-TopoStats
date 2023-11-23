@@ -2,7 +2,7 @@
 __pycache__/
 *.py[cod]
 *.egg-info/*
-*.cpython*
+./napari-loadafm/src/napari_topostats/__pycache__/**
 
 # Build directory
 build/*
