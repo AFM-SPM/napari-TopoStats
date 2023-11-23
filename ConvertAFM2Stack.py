@@ -3,26 +3,26 @@ from skimage.io import imread
 import numpy
 import copy
 
-viewer = napari.Viewer()
+def AFM2Stack(
+		image: "Napari.types.ImageData",
+		numslices: int
+		):
+	shape = image.shape
 
-original = imread("H:\\NapariWorkshop\\firezproject.tif") # To replace with input
-viewer.add_image(original) # Remove in final
+	output = numpy.empty((numslices, shape[0], shape[1]))
+	minval = image.min()
+	maxval = image.max()
+	totalrange = maxval - minval
+	increment = totalrange / numslices
 
-numslices = 256 # To replace with input
+	currentZ = minval
+	for z in range(0, numslices):
+		dup = copy.deepcopy(image)
+		dup[dup > z] = currentZ
+		output[z,:,:] = dup
+		currentZ += increment
 
-shape = original.shape
-# print(shape)
-stacked = numpy.empty((numslices, shape[0], shape[1]))
-# print(stacked.shape)
-
-# Iterates through each slice in 
-for z in range(0, numslices):
-	dup = copy.deepcopy(original)
-	dup[dup > z] = z
-	stacked[z,:,:] = dup
-
-# Displays the stacked image
-viewer.add_image(stacked, name='Output from load AFM', colormap='inferno')
+	return output
 
 
 
