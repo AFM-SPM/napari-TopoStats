@@ -36,7 +36,7 @@ from qtpy.QtWidgets import QHBoxLayout, QPushButton, QWidget
 from skimage.util import img_as_float
 from napari.layers import Image
 from napari import Viewer
-from napari-loadafm.src.napari-topostats.utils import afm2stack
+from napari_topostats.utils import afm2stack
 
 if TYPE_CHECKING:
     import napari
@@ -45,12 +45,6 @@ if TYPE_CHECKING:
 # Uses the `autogenerate: true` flag in the plugin manifest
 # to indicate it should be wrapped as a magicgui to autogenerate
 # a widget.
-def threshold_autogenerate_widget(
-    img: "napari.types.ImageData",
-    threshold: "float",
-) -> "napari.types.LabelsData":
-    return img_as_float(img) > threshold
-
 def show_3d_autogenerate_widget(
     img: "napari.types.ImageData",
     bySlices: bool = True,
@@ -58,12 +52,6 @@ def show_3d_autogenerate_widget(
     resolution: float = 1.0
 ) -> "napari.types.ImageData":
     return afm2stack(img, bySlices, min_slices, resolution)
-
-"""
-viewer = Viewer()
-viewer.window.add_dock_widget(show_3d, area = 'right')
-show_3d(viewer.layers.selection.active)
-"""
 
 
 # the magic_factory decorator lets us customize aspects of our widget

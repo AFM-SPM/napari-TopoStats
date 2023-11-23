@@ -29,10 +29,6 @@ contributions:
       python_name: napari_topostats:threshold_magic_widget
       title: Make threshold magic widget
 
-    - id: napari-loadafm.make_function_widget
-      python_name: napari_topostats:threshold_autogenerate_widget
-      title: Make threshold function widget
-
     - id: napari-loadafm.make_qwidget
       python_name: napari_topostats:ExampleQWidget
       title: Make example QWidget
@@ -53,9 +49,6 @@ contributions:
       display_name: Container Threshold
     - command: napari-loadafm.make_magic_widget
       display_name: Magic Threshold
-    - command: napari-loadafm.make_function_widget
-      autogenerate: true
-      display_name: Autogenerate Threshold
 
     - command: napari-loadafm.make_3d_widget
       autogenerate: true
