@@ -38,6 +38,7 @@ from napari.layers import Image
 from napari import Viewer
 
 import numpy as np
+import copy
 
 if TYPE_CHECKING:
     import napari
@@ -54,9 +55,26 @@ def threshold_autogenerate_widget(
 
 
 
-def get_3d(image):
-    image3d = np.repeat(image[:, :, np.newaxis], 255, axis=2)
-    return image3d
+def AFM2Stack(
+		image: "Napari.types.ImageData",
+		numslices: int
+		):
+	shape = image.shape
+
+	output = np.empty((numslices, shape[0], shape[1]))
+	minval = image.min()
+	maxval = image.max()
+	totalrange = maxval - minval
+	increment = totalrange / numslices
+
+	currentZ = minval
+	for z in range(0, numslices):
+		dup = copy.deepcopy(image)
+		dup[dup > z] = currentZ
+		output[z,:,:] = dup
+		currentZ += increment
+
+	return output
 
 #@magicgui(call_button = 'Show 3D image')
 
@@ -64,7 +82,7 @@ def show_3d_autogenerate_widget(
     img: "napari.types.ImageData",
     min_slices: float,
 ) -> "napari.types.ImageData":
-    return get_3d(img)
+    return AFM2Stack(img)
 
 """
 viewer = Viewer()
