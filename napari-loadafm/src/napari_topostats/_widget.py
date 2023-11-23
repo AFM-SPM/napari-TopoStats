@@ -70,7 +70,7 @@ def AFM2Stack(
     currentZ = minval
     for z in range(0, numslices):
         dup = copy.deepcopy(image)
-        dup[dup > z] = currentZ
+        dup[dup > currentZ] = currentZ
         output[z,:,:] = dup
         currentZ += increment
 
