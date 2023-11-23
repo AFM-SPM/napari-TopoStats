@@ -8,7 +8,8 @@ https://napari.org/stable/plugins/guides.html?#readers
 import numpy as np
 from topostats import io
 from pathlib import Path
-from magicgui import magic_factory, magicgui
+#from magicgui import magic_factory, magicgui
+from PyQt5.QtWidgets import QInputDialog
 
 def napari_get_reader(path):
     """A basic implementation of a Reader contribution.
@@ -37,10 +38,11 @@ def napari_get_reader(path):
     # otherwise we return the *function* that can read ``path``.
     return reader_function
 
-@magicgui
-def choose_channel():
-    channel = input("Channel: ")
-    return channel
+#@magicgui
+#def choose_channel():
+
+    #channel = input("Channel: ")
+#    return channel
 
 def reader_function(path):
     """Take a path or list of paths and return a list of LayerData tuples.
@@ -70,15 +72,36 @@ def reader_function(path):
     #arrays = [io.LoadScans(_path, "Height").load_spm()[0] for _path in paths]
     # launch a magic gui and wait for user input
     #channel = choose_channel()
-    all_scans = io.LoadScans(paths, "Height") #
-    all_scans.get_data()
-    scan_data_dict = all_scans.img_dict
+
+    available_channels = None
+    while True:
+        try:
+            if available_channels is None:
+                message = "Channel Name: "
+            else:
+                message = f"Available channels: {available_channels}"
+            
+            userInput, _ = QInputDialog.getText(None, "Input Channel", message)
+
+            all_scans = io.LoadScans(paths, userInput) #
+            all_scans.get_data()
+            scan_data_dict = all_scans.img_dict
+
+            arrays = []
+            for filename, values in scan_data_dict.items():
+                print("SHAPE: ", values["image_original"].shape)
+                arrays.append(values["image_original"])
+                if values["image_original"] is None:
+                    raise ValueError
+
+
+            print("ERROR: ", values["image_original"].shape)
+
+            break
+        except Exception as e:
+            available_channels = "Check console"
 
     # stack arrays into single array
-    arrays = []
-    for filename, values in scan_data_dict.items():
-        print("SHAPE: ", values["image_original"].shape)
-        arrays.append(values["image_original"])
     data = np.squeeze(np.stack(arrays))
 
     # optional kwargs for the corresponding viewer.add_* method
