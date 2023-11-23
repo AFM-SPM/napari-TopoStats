@@ -39,8 +39,8 @@ def afm2stack(
     current_z = minval
     for z in range(0, numslices):
         dup = copy.deepcopy(image)
-        dup[dup >= currentZ] = currentZ
-        dup[dup < currentZ] = 0
+        dup[dup >= current_z] = current_z
+        dup[dup < current_z] = 0
         output[z,:,:] = dup
         current_z += increment
 
