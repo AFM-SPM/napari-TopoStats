@@ -36,9 +36,7 @@ from qtpy.QtWidgets import QHBoxLayout, QPushButton, QWidget
 from skimage.util import img_as_float
 from napari.layers import Image
 from napari import Viewer
-
-import numpy as np
-import copy
+from napari-loadafm.src.napari-topostats.utils import afm2stack
 
 if TYPE_CHECKING:
     import napari
@@ -53,41 +51,13 @@ def threshold_autogenerate_widget(
 ) -> "napari.types.LabelsData":
     return img_as_float(img) > threshold
 
-
-
-def AFM2Stack(
-        image: "Napari.types.ImageData",
-        bySlices: bool = True,
-        numslices: int = 255,
-        resolution: float = 1.0
-        ):
-    shape = image.shape
-    minval = image.min()
-    maxval = image.max()
-    totalrange = maxval - minval
-    if not bySlices:
-        numslices = int(totalrange / resolution)
-    increment = totalrange / numslices
-    output = np.empty((numslices, shape[0], shape[1]))
-    currentZ = minval
-    for z in range(0, numslices):
-        dup = copy.deepcopy(image)
-        dup[dup >= currentZ] = currentZ
-        dup[dup < currentZ] = 0
-        output[z,:,:] = dup
-        currentZ += increment
-
-    return output
-
-#@magicgui(call_button = 'Show 3D image')
-
 def show_3d_autogenerate_widget(
     img: "napari.types.ImageData",
     bySlices: bool = True,
     min_slices: int = 255,
     resolution: float = 1.0
 ) -> "napari.types.ImageData":
-    return AFM2Stack(img, bySlices, min_slices, resolution)
+    return afm2stack(img, bySlices, min_slices, resolution)
 
 """
 viewer = Viewer()
