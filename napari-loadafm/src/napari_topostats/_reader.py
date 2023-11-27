@@ -5,10 +5,12 @@ It implements the Reader specification, but your plugin may choose to
 implement multiple readers or even other plugin contributions. see:
 https://napari.org/stable/plugins/guides.html?#readers
 """
-import numpy as np
-from topostats import io
 from pathlib import Path
+
+import numpy as np
 from PyQt5.QtWidgets import QInputDialog
+from topostats import io
+
 
 def napari_get_reader(path):
     """A basic implementation of a Reader contribution.
@@ -37,11 +39,13 @@ def napari_get_reader(path):
     # otherwise we return the *function* that can read ``path``.
     return reader_function
 
-#@magicgui
-#def choose_channel():
 
-    #channel = input("Channel: ")
+# @magicgui
+# def choose_channel():
+
+# channel = input("Channel: ")
 #    return channel
+
 
 def reader_function(path):
     """Take a path or list of paths and return a list of LayerData tuples.
@@ -76,7 +80,9 @@ def reader_function(path):
             else:
                 message = f"Available channels: {available_channels}"
             # adds dialog box for channel input
-            user_input, ok = QInputDialog.getText(None, "Input Channel", message)
+            user_input, ok = QInputDialog.getText(
+                None, "Input Channel", message
+            )
             if not ok:
                 return None
             all_scans = io.LoadScans(paths, user_input)
@@ -85,7 +91,7 @@ def reader_function(path):
             if not scan_data_dict:
                 raise ValueError
             break
-        except Exception as e:
+        except Exception:
             available_channels = "Check console error message."
 
     # stack arrays into single array

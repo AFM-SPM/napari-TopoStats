@@ -1,14 +1,70 @@
 [build-system]
-requires = ["setuptools>=42.0.0", "wheel", "setuptools_scm"]
+requires = [
+  "setuptools>=45",
+  "wheel",
+  "setuptools_scm[toml]>=6.2"
+]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "napari-TopoStats"
+description = "Napari plugin for TopoStats a suite of tools for working with Atomic Force Microscopy Images."
+readme = "README.md"
+license = {text = "GNU GPLv3 only"}
+dynamic = ["version"]
+authors = [
+  {name = "TopoStats Team", email = "topostats@sheffield.ac.uk"},
+  {name = "Max Gamill", email = "mcgamill1@sheffield.ac.uk"},
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Framework :: napari",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering :: Image Processing",
+]
+keywords = [
+  "afm",
+  "image processing",
+]
+requires-python = ">=3.8"
+dependencies = [
+  "magicgui",
+  "napari",
+  "qtpy",
+  "topostats",
+  "tox"
+]
+
+[project.optional-dependencies]
+tests = [
+  "pytest",
+  "pytest-cov",
+  "pytest-qt",
+  "pyqt5"
+]
+dev = [
+  "black",
+  # "codespell",
+  "pre-commit",
+  "pylint",
+  "ruff",
+]
 
 [tool.setuptools_scm]
 write_to = "_version.py"
 
 [tool.black]
 line-length = 79
-target-version = ['py38', 'py39', 'py310']
+target-version = ['py38', 'py39', 'py310', 'py311']
 
 
 [tool.ruff]
@@ -56,3 +112,7 @@ exclude = [
 
 target-version = "py38"
 fix = true
+
+[project.entry-points."napari.manifest"]
+#napari-loadafm = "napari-loadafm.napari.yaml"
+#napari-saveafm = "napari-saveafm.napari.yaml"

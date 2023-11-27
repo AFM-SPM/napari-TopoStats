@@ -7,6 +7,9 @@ __pycache__/
 # Build directory
 build/*
 
+# Auto-generated setuptools-scm version file
+_version.py
+
 # User-Specific config file
 output/config.yaml
 
@@ -47,3 +50,7 @@ _build/
 
 # Tests and docs
 .coverage
+
+# Emacs
+\#*
+*~

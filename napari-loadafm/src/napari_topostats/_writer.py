@@ -8,16 +8,16 @@ Replace code below according to your needs.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Sequence, Tuple, Union
 
 if TYPE_CHECKING:
     DataType = Union[Any, Sequence[Any]]
     FullLayerData = Tuple[DataType, dict, str]
 
 
-def write_single_image(path: str, data: Any, meta: dict) -> List[str]:
+def write_single_image(path: str, data: Any, meta: dict) -> list[str]:
     """Writes a single image layer.
-    
+
     Parameters
     ----------
     path : str
@@ -39,9 +39,9 @@ def write_single_image(path: str, data: Any, meta: dict) -> List[str]:
     return [path]
 
 
-def write_multiple(path: str, data: List[FullLayerData]) -> List[str]:
+def write_multiple(path: str, data: list[FullLayerData]) -> list[str]:
     """Writes multiple layers of different types.
-    
+
     Parameters
     ----------
     path : str
