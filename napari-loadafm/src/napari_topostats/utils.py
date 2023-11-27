@@ -1,14 +1,16 @@
 """Contains functions surrounding utilities and cosmetics."""
 
-import numpy as np
 import copy
 
+import numpy as np
+
+
 def afm2stack(
-        image: "Napari.types.ImageData",
-        by_slices: bool = True,
-        numslices: int = 255,
-        resolution: float = 1.0
-        ):
+    image: "Napari.types.ImageData",
+    by_slices: bool = True,
+    numslices: int = 255,
+    resolution: float = 1.0,
+):
     """Turns a 2D AFM image to a 3D stack where the stack is separated
     by either specifying the number of slices, or the resolution of the
     split.
@@ -37,11 +39,11 @@ def afm2stack(
     increment = totalrange / numslices
     output = np.empty((numslices, shape[0], shape[1]))
     current_z = minval
-    for z in range(0, numslices):
+    for z in range(numslices):
         dup = copy.deepcopy(image)
         dup[dup >= current_z] = current_z
         dup[dup < current_z] = 0
-        output[z,:,:] = dup
+        output[z, :, :] = dup
         current_z += increment
 
     return output

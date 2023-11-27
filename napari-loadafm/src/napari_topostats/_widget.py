@@ -30,12 +30,11 @@ Replace code below according to your needs.
 """
 from typing import TYPE_CHECKING
 
-from magicgui import magic_factory, magicgui
+from magicgui import magic_factory
 from magicgui.widgets import CheckBox, Container, create_widget
 from qtpy.QtWidgets import QHBoxLayout, QPushButton, QWidget
 from skimage.util import img_as_float
-from napari.layers import Image
-from napari import Viewer
+
 from napari_topostats.utils import afm2stack
 
 if TYPE_CHECKING:
@@ -49,7 +48,7 @@ def show_3d_autogenerate_widget(
     img: "napari.types.ImageData",
     bySlices: bool = True,
     min_slices: int = 255,
-    resolution: float = 1.0
+    resolution: float = 1.0,
 ) -> "napari.types.ImageData":
     return afm2stack(img, bySlices, min_slices, resolution)
 
