@@ -92,16 +92,22 @@ def reader_function(path):
                 raise ValueError
             break
         except Exception:
-            available_channels = "Check console error message."
+            available_channels = "Check console error message for available channel names."
 
     # stack arrays into single array
     arrays = []
-    for filename, values in scan_data_dict.items():
+    for _, values in scan_data_dict.items():
+        print("Image dict keys (seen to change - maybe fix TS verison?):\n", values.keys())
         arrays.append(values["image_original"])
+    
+    # metadata should be the same for all images in a stack
+    metadata = {"image_path": values["img_path"],
+                "px2nm": values["pixel_to_nm_scaling"]
+                }
     data = np.squeeze(np.stack(arrays))
 
     # optional kwargs for the corresponding viewer.add_* method
-    add_kwargs = {}
+    add_kwargs = {"metadata": metadata}
 
     layer_type = "image"  # optional, default is "image"
     return [(data, add_kwargs, layer_type)]
