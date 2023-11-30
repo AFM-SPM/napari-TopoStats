@@ -8,7 +8,7 @@ https://napari.org/stable/plugins/guides.html?#readers
 from pathlib import Path
 
 import numpy as np
-from PyQt5.QtWidgets import QInputDialog
+from qtpy.QtWidgets import QInputDialog
 from topostats import io
 
 
