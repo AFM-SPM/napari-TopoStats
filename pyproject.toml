@@ -113,6 +113,6 @@ exclude = [
 target-version = "py38"
 fix = true
 
-[project.entry-points."napari.manifest"]
+#[project.entry-points."napari.manifest"]
 #napari-loadafm = "napari-loadafm.napari.yaml"
 #napari-saveafm = "napari-saveafm.napari.yaml"
