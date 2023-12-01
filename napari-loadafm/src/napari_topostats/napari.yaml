@@ -16,7 +16,19 @@ contributions:
 
     - id: napari-TopoStats.flatten
       python_name: napari_topostats:flatten
-      title: Run TopoStats filtering
+      title: Run TopoStats flattening
+
+    - id: napari-TopoStats.untilt
+      python_name: napari_topostats:untilt
+      title: Run TopoStats tilt removal
+
+    - id: napari-TopoStats.quadratic
+      python_name: napari_topostats:quadratic
+      title: Run TopoStats quadratic polynomial removal
+
+    - id: napari-TopoStats.nonlinear
+      python_name: napari_topostats:nonlinear
+      title: Run TopoStats nonlinear polynomial removal
 
     - id: napari-TopoStats.write_multiple
       python_name: napari_topostats._writer:write_multiple
@@ -67,6 +79,18 @@ contributions:
     - command: napari-TopoStats.flatten
       autogenerate: true
       display_name: Flatten image
+
+    - command: napari-TopoStats.untilt
+      autogenerate: true
+      display_name: Apply tilt removal
+
+    - command: napari-TopoStats.quadratic
+      autogenerate: true
+      display_name: Remove quadratic polynomial
+
+    - command: napari-TopoStats.nonlinear
+      autogenerate: true
+      display_name: Remove nonlinear polynomial
 
     - command: napari-TopoStats.make_qwidget
       display_name: Example QWidget
