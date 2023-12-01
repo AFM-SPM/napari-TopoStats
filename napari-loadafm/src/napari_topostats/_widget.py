@@ -35,7 +35,7 @@ from magicgui.widgets import CheckBox, Container, create_widget
 from qtpy.QtWidgets import QHBoxLayout, QPushButton, QWidget
 from skimage.util import img_as_float
 
-from napari_topostats.utils import afm2stack, call_filters
+from napari_topostats.utils import afm2stack, median_flattened
 
 if TYPE_CHECKING:
     import napari
@@ -44,11 +44,11 @@ if TYPE_CHECKING:
 # Uses the `autogenerate: true` flag in the plugin manifest
 # to indicate it should be wrapped as a magicgui to autogenerate
 # a widget.
-def filters(
+def flatten(
     img: "napari.types.ImageData",
     row_alignment_quantile: float = 0.5,
 ) -> "napari.types.ImageData":
-    return call_filters(image = img, row_alignment_quantile = row_alignment_quantile)
+    return median_flattened(image = img, row_alignment_quantile = row_alignment_quantile)
 
 def show_3d_autogenerate_widget(
     img: "napari.types.ImageData",

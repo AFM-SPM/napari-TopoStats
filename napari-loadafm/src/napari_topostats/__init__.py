@@ -9,7 +9,7 @@ from ._widget import (
     ExampleQWidget,
     ImageThreshold,
     show_3d_autogenerate_widget,
-    filters,
+    flatten,
     threshold_magic_widget,
 )
 from ._writer import write_multiple, write_single_image
