@@ -3,6 +3,7 @@
 import copy
 
 import numpy as np
+from topostats.filters import Filters
 
 
 def afm2stack(
@@ -47,3 +48,18 @@ def afm2stack(
         current_z += increment
 
     return output
+
+def call_filters(
+    image: "Napari.types.ImageData",
+    row_alignment_quantile: float = 0.5
+):
+    filtered_image = Filters(
+        image=image, 
+        filename="FILE", 
+        pixel_to_nm_scaling=1, 
+        row_alignment_quantile=row_alignment_quantile
+        )
+    flattened = filtered_image.median_flatten(image=image, row_alignment_quantile=row_alignment_quantile)
+    return flattened
+
+

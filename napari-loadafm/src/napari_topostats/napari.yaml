@@ -9,22 +9,31 @@ contributions:
     - id: napari-TopoStats.get_reader
       python_name: napari_topostats._reader:napari_get_reader
       title: Open data with TopoStats
+
     - id: napari-TopoStats.make_3d_widget
       python_name: napari_topostats:show_3d_autogenerate_widget
       title: Turn 2D image into 3D stack
 
+    - id: napari-TopoStats.filters
+      python_name: napari_topostats:filters
+      title: Run TopoStats filtering
+
     - id: napari-TopoStats.write_multiple
       python_name: napari_topostats._writer:write_multiple
       title: Save multi-layer data with TopoStats
+
     - id: napari-TopoStats.write_single_image
       python_name: napari_topostats._writer:write_single_image
       title: Save image data with TopoStats
+
     - id: napari-TopoStats.make_sample_data
       python_name: napari_topostats._sample_data:make_sample_data
       title: Load sample data from TopoStats
+
     - id: napari-TopoStats.make_container_widget
       python_name: napari_topostats:ImageThreshold
       title: Make threshold Container widget
+
     - id: napari-TopoStats.make_magic_widget
       python_name: napari_topostats:threshold_magic_widget
       title: Make threshold magic widget
@@ -32,6 +41,7 @@ contributions:
     - id: napari-TopoStats.make_qwidget
       python_name: napari_topostats:ExampleQWidget
       title: Make example QWidget
+
   readers:
     - command: napari-TopoStats.get_reader
       accepts_directories: false
@@ -53,6 +63,10 @@ contributions:
     - command: napari-TopoStats.make_3d_widget
       autogenerate: true
       display_name: 3D-ify Image
+
+    - command: napari-TopoStats.filters
+      autogenerate: true
+      display_name: Filters
 
     - command: napari-TopoStats.make_qwidget
       display_name: Example QWidget
