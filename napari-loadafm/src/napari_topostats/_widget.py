@@ -35,7 +35,7 @@ from magicgui.widgets import CheckBox, Container, create_widget
 from qtpy.QtWidgets import QHBoxLayout, QPushButton, QWidget
 from skimage.util import img_as_float
 
-from napari_topostats.utils import afm2stack, median_flattened
+from napari_topostats.utils import afm2stack, median_flattened, remove_tilt, remove_quadratic, remove_nonlinear
 
 if TYPE_CHECKING:
     import napari
@@ -49,6 +49,21 @@ def flatten(
     row_alignment_quantile: float = 0.5,
 ) -> "napari.types.ImageData":
     return median_flattened(image = img, row_alignment_quantile = row_alignment_quantile)
+
+def untilt(
+    img: "napari.types.ImageData",
+) -> "napari.types.ImageData":
+    return remove_tilt(image = img)
+
+def quadratic(
+    img: "napari.types.ImageData",
+) -> "napari.types.ImageData":
+    return remove_quadratic(image = img)
+
+def nonlinear(
+    img: "napari.types.ImageData",
+) -> "napari.types.ImageData":
+    return remove_nonlinear(image = img)
 
 def show_3d_autogenerate_widget(
     img: "napari.types.ImageData",

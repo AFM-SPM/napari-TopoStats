@@ -10,6 +10,9 @@ from ._widget import (
     ImageThreshold,
     show_3d_autogenerate_widget,
     flatten,
+    untilt,
+    quadratic,
+    nonlinear,
     threshold_magic_widget,
 )
 from ._writer import write_multiple, write_single_image
@@ -23,5 +26,8 @@ __all__ = (
     "ImageThreshold",
     "threshold_magic_widget",
     "show_3d_autogenerate_widget",
-    "filters"
+    "flatten",
+    "untilt",
+    "quadratic",
+    "nonlinear"
 )

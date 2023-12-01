@@ -66,7 +66,58 @@ def median_flattened(
         gaussian_mode="nearest"
         )
     median_flattened = filtered_image.median_flatten(image=image, row_alignment_quantile=row_alignment_quantile)
-    #remove_tilt = filtered_image.median_flatten(image=image)
     return median_flattened
 
+def remove_tilt(
+    image: "Napari.types.ImageData",
+):
+    filtered_image = Filters(
+        image=image, 
+        filename="FILE", 
+        pixel_to_nm_scaling=1, 
+        row_alignment_quantile=0.5,
+        threshold_method="std_dev",
+        otsu_threshold_multiplier=1.0,
+        threshold_std_dev=1.0,
+        threshold_absolute=1.0,
+        gaussian_size=1.0121397464510862,
+        gaussian_mode="nearest"
+        )
+    tilt_removed = filtered_image.remove_tilt(image=image)
+    return tilt_removed
 
+def remove_quadratic(
+    image: "Napari.types.ImageData",
+):
+    filtered_image = Filters(
+        image=image, 
+        filename="FILE", 
+        pixel_to_nm_scaling=1, 
+        row_alignment_quantile=0.5,
+        threshold_method="std_dev",
+        otsu_threshold_multiplier=1.0,
+        threshold_std_dev=1.0,
+        threshold_absolute=1.0,
+        gaussian_size=1.0121397464510862,
+        gaussian_mode="nearest"
+        )
+    removed_quadratic = filtered_image.remove_quadratic(image=image)
+    return removed_quadratic
+
+def remove_nonlinear(
+    image: "Napari.types.ImageData",
+):
+    filtered_image = Filters(
+        image=image, 
+        filename="FILE", 
+        pixel_to_nm_scaling=1, 
+        row_alignment_quantile=0.5,
+        threshold_method="std_dev",
+        otsu_threshold_multiplier=1.0,
+        threshold_std_dev=1.0,
+        threshold_absolute=1.0,
+        gaussian_size=1.0121397464510862,
+        gaussian_mode="nearest"
+        )
+    removed_nonlinear = filtered_image.remove_nonlinear_polynomial(image=image)
+    return removed_nonlinear
