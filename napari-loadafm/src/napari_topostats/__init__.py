@@ -9,6 +9,7 @@ from ._widget import (
     ExampleQWidget,
     ImageThreshold,
     show_3d_autogenerate_widget,
+    filters,
     threshold_magic_widget,
 )
 from ._writer import write_multiple, write_single_image
@@ -22,4 +23,5 @@ __all__ = (
     "ImageThreshold",
     "threshold_magic_widget",
     "show_3d_autogenerate_widget",
+    "filters"
 )
