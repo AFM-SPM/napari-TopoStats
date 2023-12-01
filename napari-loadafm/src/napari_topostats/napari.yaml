@@ -14,8 +14,8 @@ contributions:
       python_name: napari_topostats:show_3d_autogenerate_widget
       title: Turn 2D image into 3D stack
 
-    - id: napari-TopoStats.filters
-      python_name: napari_topostats:filters
+    - id: napari-TopoStats.flatten
+      python_name: napari_topostats:flatten
       title: Run TopoStats filtering
 
     - id: napari-TopoStats.write_multiple
@@ -64,9 +64,9 @@ contributions:
       autogenerate: true
       display_name: 3D-ify Image
 
-    - command: napari-TopoStats.filters
+    - command: napari-TopoStats.flatten
       autogenerate: true
-      display_name: Filters
+      display_name: Flatten image
 
     - command: napari-TopoStats.make_qwidget
       display_name: Example QWidget

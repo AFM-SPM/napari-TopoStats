@@ -49,7 +49,7 @@ def afm2stack(
 
     return output
 
-def call_filters(
+def median_flattened(
     image: "Napari.types.ImageData",
     row_alignment_quantile: float = 0.5
 ):
@@ -57,9 +57,16 @@ def call_filters(
         image=image, 
         filename="FILE", 
         pixel_to_nm_scaling=1, 
-        row_alignment_quantile=row_alignment_quantile
+        row_alignment_quantile=row_alignment_quantile,
+        threshold_method="std_dev",
+        otsu_threshold_multiplier=1.0,
+        threshold_std_dev=1.0,
+        threshold_absolute=1.0,
+        gaussian_size=1.0121397464510862,
+        gaussian_mode="nearest"
         )
-    flattened = filtered_image.median_flatten(image=image, row_alignment_quantile=row_alignment_quantile)
-    return flattened
+    median_flattened = filtered_image.median_flatten(image=image, row_alignment_quantile=row_alignment_quantile)
+    #remove_tilt = filtered_image.median_flatten(image=image)
+    return median_flattened
 
 
