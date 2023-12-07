@@ -97,7 +97,6 @@ def reader_function(path):
     # stack arrays into single array
     arrays = []
     for _, values in scan_data_dict.items():
-        print("Image dict keys (seen to change - maybe fix TS verison?):\n", values.keys())
         arrays.append(values["image_original"])
     
     # metadata should be the same for all images in a stack
