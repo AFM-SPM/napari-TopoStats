@@ -18,6 +18,10 @@ contributions:
       python_name: napari_topostats:flatten
       title: Run TopoStats flattening
 
+    - id: napari-TopoStats.otsu
+      python_name: napari_topostats:otsu
+      title: Run TopoStats otsu thresholding
+
     - id: napari-TopoStats.untilt
       python_name: napari_topostats:untilt
       title: Run TopoStats tilt removal
@@ -54,6 +58,10 @@ contributions:
       python_name: napari_topostats:ExampleQWidget
       title: Make example QWidget
 
+    - id: napari-TopoStats.do_threshold
+      title: Perform threshold on image, return new image
+      python_name: napari_topostats:threshold
+
   readers:
     - command: napari-TopoStats.get_reader
       accepts_directories: false
@@ -83,6 +91,14 @@ contributions:
     - command: napari-TopoStats.untilt
       autogenerate: true
       display_name: Apply tilt removal
+
+    - command: napari-TopoStats.otsu
+      autogenerate: true
+      display_name: Apply Otsu Thresholding
+
+    - command: napari-TopoStats.do_threshold
+      display_name: Threshold
+      autogenerate: true
 
     - command: napari-TopoStats.quadratic
       autogenerate: true

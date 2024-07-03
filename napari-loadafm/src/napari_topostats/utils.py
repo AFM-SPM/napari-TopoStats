@@ -4,6 +4,7 @@ import copy
 
 import numpy as np
 from topostats.filters import Filters
+from topostats.utils import get_mask, get_thresholds
 
 
 def afm2stack(
@@ -121,3 +122,9 @@ def remove_nonlinear(
         )
     removed_nonlinear = filtered_image.remove_nonlinear_polynomial(image=image)
     return removed_nonlinear
+
+def threshold_image(image: "Napari.types.ImageData",
+    otsu_threshold_multiplier: float = 1.0,
+):
+    thresholds = get_thresholds(image = image, threshold_method = "otsu", otsu_threshold_multiplier = otsu_threshold_multiplier)
+    return get_mask(image=image, thresholds=thresholds)

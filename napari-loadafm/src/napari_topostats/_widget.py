@@ -35,7 +35,8 @@ from magicgui.widgets import CheckBox, Container, create_widget
 from qtpy.QtWidgets import QHBoxLayout, QPushButton, QWidget
 from skimage.util import img_as_float
 
-from napari_topostats.utils import afm2stack, median_flattened, remove_tilt, remove_quadratic, remove_nonlinear
+from napari_topostats.utils import afm2stack, median_flattened, remove_tilt, remove_quadratic, remove_nonlinear, threshold_image
+
 
 if TYPE_CHECKING:
     import napari
@@ -64,6 +65,22 @@ def nonlinear(
     img: "napari.types.ImageData",
 ) -> "napari.types.ImageData":
     return remove_nonlinear(image = img)
+
+def otsu(
+    img: "napari.types.ImageData",
+    otsu_threshold_multiplier: float = 1.0,
+) -> "napari.types.ImageData":
+    
+    return threshold_image(img = img, otsu_threshold_multiplier = otsu_threshold_multiplier)
+
+def threshold(
+    image: "napari.types.ImageData", threshold: int
+) -> "napari.types.LabelsData":
+    """Generate thresholded image.
+
+    This function will be turned into a widget using `autogenerate: true`.
+    """
+    return (image > threshold).astype(int)
 
 def show_3d_autogenerate_widget(
     img: "napari.types.ImageData",
