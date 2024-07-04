@@ -22,6 +22,14 @@ contributions:
       python_name: napari_topostats:otsu
       title: Run TopoStats otsu thresholding
 
+    - id: napari-TopoStats.scars_removal
+      python_name: napari_topostats:scars_removal
+      title: Run TopoStats scars removal
+
+    - id: napari-TopoStats.background_average
+      python_name: napari_topostats:background_average
+      title: Run TopoStats background averaging
+
     - id: napari-TopoStats.untilt
       python_name: napari_topostats:untilt
       title: Run TopoStats tilt removal
@@ -58,10 +66,6 @@ contributions:
       python_name: napari_topostats:ExampleQWidget
       title: Make example QWidget
 
-    - id: napari-TopoStats.do_threshold
-      title: Perform threshold on image, return new image
-      python_name: napari_topostats:threshold
-
   readers:
     - command: napari-TopoStats.get_reader
       accepts_directories: false
@@ -96,9 +100,13 @@ contributions:
       autogenerate: true
       display_name: Apply Otsu Thresholding
 
-    - command: napari-TopoStats.do_threshold
-      display_name: Threshold
+    - command: napari-TopoStats.scars_removal
       autogenerate: true
+      display_name: Remove Scars
+
+    - command: napari-TopoStats.background_average
+      autogenerate: true
+      display_name: Average Background
 
     - command: napari-TopoStats.quadratic
       autogenerate: true

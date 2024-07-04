@@ -3,8 +3,10 @@
 import copy
 
 import numpy as np
+import numpy.typing as npt
 from topostats.filters import Filters
 from topostats.utils import get_mask, get_thresholds
+from topostats import scars
 
 
 def afm2stack(
@@ -52,7 +54,8 @@ def afm2stack(
 
 def median_flattened(
     image: "Napari.types.ImageData",
-    row_alignment_quantile: float = 0.5
+    mask: "Napari.types.LabelsData",
+    row_alignment_quantile: float = 0.5,
 ):
     filtered_image = Filters(
         image=image, 
@@ -66,7 +69,7 @@ def median_flattened(
         gaussian_size=1.0121397464510862,
         gaussian_mode="nearest"
         )
-    median_flattened = filtered_image.median_flatten(image=image, row_alignment_quantile=row_alignment_quantile)
+    median_flattened = filtered_image.median_flatten(image=image, mask=mask, row_alignment_quantile=row_alignment_quantile)
     return median_flattened
 
 def remove_tilt(
@@ -122,6 +125,38 @@ def remove_nonlinear(
         )
     removed_nonlinear = filtered_image.remove_nonlinear_polynomial(image=image)
     return removed_nonlinear
+
+def remove_scars(
+    image : "Napari.types.ImageData",
+    filename = "FILE",
+    removal_iterations: int = 2,
+    threshold_low: float = 0.250,
+    threshold_high: float = 0.666,
+    max_scar_width: int = 4,
+    min_scar_length: int = 16,
+
+):
+    removed_scars, _ = scars.remove_scars(img = image, filename = filename, removal_iterations = removal_iterations, threshold_low = threshold_low, threshold_high = threshold_high, max_scar_width = max_scar_width, min_scar_length = min_scar_length)
+    return removed_scars.astype(np.float32)
+    
+def average_background(
+        image : "Napari.types.ImageData",
+        mask: "Napari.types.LabelsData" = None):
+    filtered_image = Filters(
+        image=image, 
+        filename="FILE", 
+        pixel_to_nm_scaling=1, 
+        row_alignment_quantile=0.5,
+        threshold_method="std_dev",
+        otsu_threshold_multiplier=1.0,
+        threshold_std_dev=1.0,
+        threshold_absolute=1.0,
+        gaussian_size=1.0121397464510862,
+        gaussian_mode="nearest"
+        )
+    averaged_background = filtered_image.average_background(image = image, mask = mask)
+    return averaged_background
+
 
 def threshold_image(image: "Napari.types.ImageData",
     otsu_threshold_multiplier: float = 1.0,

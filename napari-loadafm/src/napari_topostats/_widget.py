@@ -29,13 +29,14 @@ References:
 Replace code below according to your needs.
 """
 from typing import TYPE_CHECKING
+import numpy.typing as npt
 
 from magicgui import magic_factory
 from magicgui.widgets import CheckBox, Container, create_widget
 from qtpy.QtWidgets import QHBoxLayout, QPushButton, QWidget
 from skimage.util import img_as_float
 
-from napari_topostats.utils import afm2stack, median_flattened, remove_tilt, remove_quadratic, remove_nonlinear, threshold_image
+from napari_topostats.utils import afm2stack, median_flattened, remove_tilt, remove_quadratic, remove_nonlinear, threshold_image, remove_scars, average_background
 
 
 if TYPE_CHECKING:
@@ -47,9 +48,27 @@ if TYPE_CHECKING:
 # a widget.
 def flatten(
     img: "napari.types.ImageData",
+    mask: "napari.types.LabelsData" = None,
     row_alignment_quantile: float = 0.5,
 ) -> "napari.types.ImageData":
-    return median_flattened(image = img, row_alignment_quantile = row_alignment_quantile)
+    return median_flattened(image = img, mask = mask, row_alignment_quantile = row_alignment_quantile)
+
+def scars_removal(
+    img: "napari.types.ImageData",
+    removal_iterations: int = 2,
+    threshold_low: float = 0.250,
+    threshold_high: float = 0.666,
+    max_scar_width: int = 4,
+    min_scar_length: int = 16,
+) -> "napari.types.ImageData":
+    return remove_scars(image = img, removal_iterations = removal_iterations, threshold_low = threshold_low, threshold_high = threshold_high, max_scar_width = max_scar_width, min_scar_length = min_scar_length)
+
+def background_average(
+    img: "napari.types.ImageData",
+    mask: "napari.types.LabelsData" = None,
+) -> "napari.types.ImageData":
+    return average_background(image = img, mask = mask)
+
 
 def untilt(
     img: "napari.types.ImageData",
@@ -69,18 +88,9 @@ def nonlinear(
 def otsu(
     img: "napari.types.ImageData",
     otsu_threshold_multiplier: float = 1.0,
-) -> "napari.types.ImageData":
-    
-    return threshold_image(img = img, otsu_threshold_multiplier = otsu_threshold_multiplier)
-
-def threshold(
-    image: "napari.types.ImageData", threshold: int
 ) -> "napari.types.LabelsData":
-    """Generate thresholded image.
-
-    This function will be turned into a widget using `autogenerate: true`.
-    """
-    return (image > threshold).astype(int)
+    
+    return threshold_image(image = img, otsu_threshold_multiplier = otsu_threshold_multiplier)
 
 def show_3d_autogenerate_widget(
     img: "napari.types.ImageData",

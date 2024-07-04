@@ -11,6 +11,9 @@ from ._widget import (
     show_3d_autogenerate_widget,
     flatten,
     untilt,
+    otsu,
+    scars_removal,
+    background_average,
     quadratic,
     nonlinear,
     threshold_magic_widget,
@@ -27,6 +30,9 @@ __all__ = (
     "threshold_magic_widget",
     "show_3d_autogenerate_widget",
     "flatten",
+    "otsu",
+    "scars_removal",
+    "background_average"
     "untilt",
     "quadratic",
     "nonlinear"
