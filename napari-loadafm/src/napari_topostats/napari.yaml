@@ -46,14 +46,6 @@ contributions:
       python_name: napari_topostats:ImageThreshold
       title: Make threshold Container widget
 
-    - id: napari-TopoStats.make_magic_widget
-      python_name: napari_topostats:threshold_magic_widget
-      title: Make threshold magic widget
-
-    - id: napari-TopoStats.make_qwidget
-      python_name: napari_topostats:ExampleQWidget
-      title: Make example QWidget
-
   readers:
     - command: napari-TopoStats.get_reader
       accepts_directories: false
@@ -69,8 +61,6 @@ contributions:
   widgets:
     - command: napari-TopoStats.make_container_widget
       display_name: Container Threshold
-    - command: napari-loadafm.make_magic_widget
-      display_name: Magic Threshold
 
     - command: napari-TopoStats.make_3d_widget
       autogenerate: true
@@ -92,5 +82,3 @@ contributions:
       autogenerate: true
       display_name: Remove nonlinear polynomial
 
-    - command: napari-TopoStats.make_qwidget
-      display_name: Example QWidget
