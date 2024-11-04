@@ -51,6 +51,7 @@ def afm2stack(
 
 def median_flattened(
     image: "Napari.types.ImageData",
+    mask: "Napari.types.LabelsData"=None,
     row_alignment_quantile: float = 0.5
 ):
     filtered_image = Filters(
@@ -65,11 +66,12 @@ def median_flattened(
         gaussian_size=1.0121397464510862,
         gaussian_mode="nearest"
         )
-    median_flattened = filtered_image.median_flatten(image=image, row_alignment_quantile=row_alignment_quantile)
+    median_flattened = filtered_image.median_flatten(image=image, mask=mask, row_alignment_quantile=row_alignment_quantile)
     return median_flattened
 
 def remove_tilt(
     image: "Napari.types.ImageData",
+    mask: "Napari.types.LabelsData"=None,
 ):
     filtered_image = Filters(
         image=image, 
@@ -83,11 +85,12 @@ def remove_tilt(
         gaussian_size=1.0121397464510862,
         gaussian_mode="nearest"
         )
-    tilt_removed = filtered_image.remove_tilt(image=image)
+    tilt_removed = filtered_image.remove_tilt(image=image, mask=mask)
     return tilt_removed
 
 def remove_quadratic(
     image: "Napari.types.ImageData",
+    mask: "Napari.types.LabelsData"=None,
 ):
     filtered_image = Filters(
         image=image, 
@@ -101,11 +104,12 @@ def remove_quadratic(
         gaussian_size=1.0121397464510862,
         gaussian_mode="nearest"
         )
-    removed_quadratic = filtered_image.remove_quadratic(image=image)
+    removed_quadratic = filtered_image.remove_quadratic(image=image, mask=mask)
     return removed_quadratic
 
 def remove_nonlinear(
     image: "Napari.types.ImageData",
+    mask: "Napari.types.LabelsData"=None,
 ):
     filtered_image = Filters(
         image=image, 
@@ -119,5 +123,5 @@ def remove_nonlinear(
         gaussian_size=1.0121397464510862,
         gaussian_mode="nearest"
         )
-    removed_nonlinear = filtered_image.remove_nonlinear_polynomial(image=image)
+    removed_nonlinear = filtered_image.remove_nonlinear_polynomial(image=image, mask=mask)
     return removed_nonlinear

@@ -46,24 +46,28 @@ if TYPE_CHECKING:
 # a widget.
 def flatten(
     img: "napari.types.ImageData",
+    mask: "napari.types.LabelsData"=None,
     row_alignment_quantile: float = 0.5,
-) -> "napari.types.ImageData":
-    return median_flattened(image = img, row_alignment_quantile = row_alignment_quantile)
+) -> "napari.types.LayerDataTuple":
+    return (median_flattened(image = img, mask=mask, row_alignment_quantile = row_alignment_quantile), {}, "image")
 
 def untilt(
     img: "napari.types.ImageData",
-) -> "napari.types.ImageData":
-    return remove_tilt(image = img)
+    mask: "napari.types.LabelsData"=None,
+) -> "napari.types.LayerDataTuple":
+    return (remove_tilt(image=img, mask=mask), {}, "image")
 
 def quadratic(
     img: "napari.types.ImageData",
-) -> "napari.types.ImageData":
-    return remove_quadratic(image = img)
+    mask: "napari.types.LabelsData"=None,
+) -> "napari.types.LayerDataTuple":
+    return (remove_quadratic(image=img, mask=mask), {}, "image")
 
 def nonlinear(
     img: "napari.types.ImageData",
-) -> "napari.types.ImageData":
-    return remove_nonlinear(image = img)
+    mask: "napari.types.LabelsData"=None,
+) -> "napari.types.LayerDataTuple":
+    return (remove_nonlinear(image=img, mask=mask), {}, "image")
 
 def show_3d_autogenerate_widget(
     img: "napari.types.ImageData",
@@ -71,7 +75,7 @@ def show_3d_autogenerate_widget(
     min_slices: int = 255,
     resolution: float = 1.0,
 ) -> "napari.types.ImageData":
-    return afm2stack(img, bySlices, min_slices, resolution)
+    return (afm2stack(img, bySlices, min_slices, resolution), {}, "image")
 
 # if we want even more control over our widget, we can use
 # magicgui `Container`
