@@ -30,7 +30,7 @@ Replace code below according to your needs.
 """
 from typing import TYPE_CHECKING
 
-from magicgui import magic_factory
+from magicgui import magicgui
 from magicgui.widgets import CheckBox, Container, create_widget
 from qtpy.QtWidgets import QHBoxLayout, QPushButton, QWidget
 from skimage.util import img_as_float
@@ -44,38 +44,142 @@ if TYPE_CHECKING:
 # Uses the `autogenerate: true` flag in the plugin manifest
 # to indicate it should be wrapped as a magicgui to autogenerate
 # a widget.
+#@magicgui(
+#    auto_call=True,
+#    row_alignment_quantile={"widget_type": "FloatSlider", "min": 0, "max": 1}
+#)
 def median_align_rows(
-    img: "napari.types.ImageData",
+    image: "napari.types.ImageData",
     mask: "napari.types.LabelsData"=None,
     row_alignment_quantile: float = 0.5,
 ) -> "napari.types.LayerDataTuple":
-    return (median_flattened(image = img, mask=mask, row_alignment_quantile = row_alignment_quantile), {}, "image")
+    """
+    Flatten images using median differences.
+
+    Flatten the rows of an image, aligning the rows and centering the median around zero. When used with a mask,
+    this has the effect of centering the background data on zero.
+
+    Note this function does not handle scars.
+
+    Parameters
+    ----------
+    image : napari.types.ImageData
+        2-D image of the data to align the rows of.
+    mask : napari.types.ImageData
+        Boolean array of points to mask (ignore).
+    row_alignment_quantile : float
+        Quantile (in the range 0.0 to 1.0) used for defining the average background, by default 0.5.
+
+    Returns
+    -------
+    npt.NDArray
+        Copy of the input image with rows aligned.
+    """
+    return (median_flattened(image=image, mask=mask, row_alignment_quantile=row_alignment_quantile), {}, "image")
 
 def remove_planar_tilt(
-    img: "napari.types.ImageData",
+    image: "napari.types.ImageData",
     mask: "napari.types.LabelsData"=None,
 ) -> "napari.types.LayerDataTuple":
-    return (remove_tilt(image=img, mask=mask), {}, "image")
+    """
+    Remove the planar tilt from an image (linear in 2D spaces).
+
+    Uses a linear fit of the medians of the rows and columns to determine the linear slants in x and y directions
+    and then subtracts the fit from the columns.
+
+    Parameters
+    ----------
+    image : napari.types.ImageData
+        2-D image of the data to remove the planar tilt from.
+    mask : napari.types.ImageData
+        Boolean array of points to mask (ignore).
+
+    Returns
+    -------
+    napari.types.LayerDataTuple
+        Numpy array of image with tilt removed.
+    """
+    return (remove_tilt(image=image, mask=mask), {}, "image")
 
 def remove_quadratic_background(
-    img: "napari.types.ImageData",
+    image: "napari.types.ImageData",
     mask: "napari.types.LabelsData"=None,
 ) -> "napari.types.LayerDataTuple":
-    return (remove_quadratic(image=img, mask=mask), {}, "image")
+    """
+    Remove the quadratic bowing that can be seen in some large-scale AFM images.
+
+    Use a simple quadratic fit on the medians of the columns of the image and then subtracts the calculated
+    quadratic from the columns.
+
+    Parameters
+    ----------
+    image : napari.types.ImageData
+        2-D image of the data to remove the quadratic from.
+    mask : napari.types.LabelsData, optional
+        Boolean array of points to mask (ignore), by default None.
+
+    Returns
+    -------
+    napari.types.LayerDataTuple
+        Image with the quadratic bowing removed.
+    """
+    return (remove_quadratic(image=image, mask=mask), {}, "image")
 
 def remove_nonlinear_background(
-    img: "napari.types.ImageData",
+    image: "napari.types.ImageData",
     mask: "napari.types.LabelsData"=None,
 ) -> "napari.types.LayerDataTuple":
-    return (remove_nonlinear(image=img, mask=mask), {}, "image")
+    """
+    Fit and remove a "saddle" shaped nonlinear polynomial from the image.
+
+    "Saddles" with the form a + b * x * y - c * x - d * y from the supplied image. AFM images sometimes contain a
+    "saddle" shape trend to their background, and so to remove them we fit a nonlinear polynomial of x and y and
+    then subtract the fit from the image.
+
+    If these trends are not removed, then the image will not flatten properly and will leave opposite diagonal
+    corners raised or lowered.
+
+    Parameters
+    ----------
+    image : napari.types.ImageData
+        2-D numpy height-map array of floats with a polynomial trend to remove.
+    mask : napari.types.ImageData, optional
+        2-D Numpy boolean array used to mask any points in the image that are deemed not to be part of the
+        height-map's background data, by default None
+
+    Returns
+    -------
+    napari.types.LayerDataTuple
+        Image with the polynomial trend subtracted.
+    """
+    return (remove_nonlinear(image=image, mask=mask), {}, "image")
 
 def show_3d_autogenerate_widget(
-    img: "napari.types.ImageData",
+    image: "napari.types.ImageData",
     bySlices: bool = True,
     min_slices: int = 255,
     resolution: float = 1.0,
 ) -> "napari.types.ImageData":
-    return (afm2stack(img, bySlices, min_slices, resolution), {}, "image")
+    """
+    Convert an AFM height image into a pseudo volume by via the pixel values.
+
+    Parameters
+    ----------
+    image : napari.types.ImageData
+        2-D numpy height-map array.
+    bySlices : bool, optional
+        Convert to voxels by creating N slices or cut at a Z resolution, by default True.
+    min_slices : int, optional
+        Number of voxel slices, by default 255
+    resolution : float, optional
+        Size of voxel height, by default 1.0
+
+    Returns
+    -------
+    napari.types.ImageData
+        3-D slices of the AFM height image.
+    """
+    return (afm2stack(image, bySlices, min_slices, resolution), {}, "image")
 
 # if we want even more control over our widget, we can use
 # magicgui `Container`
