@@ -8,6 +8,7 @@ from ._sample_data import make_sample_data
 from ._widget import (
     ImageThreshold,
     show_3d_autogenerate_widget,
+    remove_scars_from_image,
     median_align_rows,
     remove_planar_tilt,
     remove_quadratic_background,
@@ -22,6 +23,7 @@ __all__ = (
     "make_sample_data",
     "ImageThreshold",
     "show_3d_autogenerate_widget",
+    "remove_scars_from_image",
     "median_align_rows",
     "remove_planar_tilt",
     "remove_quadratic_background",

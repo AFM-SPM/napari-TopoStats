@@ -35,15 +35,63 @@ from magicgui.widgets import CheckBox, Container, create_widget
 from qtpy.QtWidgets import QHBoxLayout, QPushButton, QWidget
 from skimage.util import img_as_float
 
-from napari_topostats.utils import afm2stack, median_flattened, remove_tilt, remove_quadratic, remove_nonlinear
+from napari_topostats.utils import afm2stack, median_flattened, remove_tilt, remove_quadratic, remove_nonlinear, remove_scars
 
 if TYPE_CHECKING:
     import napari
 
 
-# Uses the `autogenerate: true` flag in the plugin manifest
-# to indicate it should be wrapped as a magicgui to autogenerate
-# a widget.
+def remove_scars_from_image(
+    image: "napari.types.ImageData",
+    removal_iterations: int = 2,
+    threshold_low: float = 0.250,
+    threshold_high: float = 0.666,
+    max_scar_width: int = 4,
+    min_scar_length: int = 16,
+) -> "napari.types.LayerDataTuple":
+    """
+    Remove scars from an image.
+
+    Scars are long, typically 1-4 pixels wide streaks of high or low data in AFM images. They are a problem
+    resulting from random errors in the AFM data collection process and are hard to avoid. This function
+    detects and removes these artefacts by interpolating over them between the pixels above and below them.
+    This method takes no parameters as it uses parameters already established as instance variables when the
+    class was instantiated.
+
+    Parameters
+    ----------
+    img : npt.NDArray
+        A 2-D image to remove scars from.
+    filename : str
+        The filename (used for logging outputs only).
+    removal_iterations : int
+        The number of times the scar removal should run on the image.
+        Running just once sometimes isn't enough to remove some of the
+        more difficult to remove scars.
+    threshold_low : float
+        A value that when multiplied with the standard deviation, acts as a threshold to determine if an increase
+        or decrease in height might constitute the top or bottom of a scar.
+    threshold_high : float
+        A floating point value that is used similarly to threshold_low, however sharp inclines or descents
+        that result in values in the mask higher than this threshold are automatically considered scars.
+    max_scar_width : int
+        A value that dictates the maximum width that a scar can be. Note that this does not mean horizontal width,
+        rather vertical, this is because we consider scars to be laying flat, horizontally, so their width is
+        vertical and their length is horizontal.
+    min_scar_length : int
+        An integer that restricts the algorithm to only mark scars that are as long or longer than this length.
+        This is important for ensuring that noise or legitimate but sharp datapoints do not get detected as scars.
+        Note that length here is horizontal, as scars are thin, horizontal features.
+
+    Returns
+    -------
+    self.img
+        The original 2-D image with scars removed, unless the config has run set to False, in which case it
+        will not remove the scars.
+    """
+    return (remove_scars(image, removal_iterations, threshold_low, threshold_high, max_scar_width, min_scar_length), {}, "image")
+
+
 #@magicgui(
 #    auto_call=True,
 #    row_alignment_quantile={"widget_type": "FloatSlider", "min": 0, "max": 1}

@@ -4,6 +4,7 @@ import copy
 
 import numpy as np
 from topostats.filters import Filters
+from topostats import scars
 
 
 def afm2stack(
@@ -48,6 +49,24 @@ def afm2stack(
         current_z += increment
 
     return output
+
+def remove_scars(
+    image: np.ndarray,
+    removal_iterations: int = 2,
+    threshold_low: float = 0.250,
+    threshold_high: float = 0.666,
+    max_scar_width: int = 4,
+    min_scar_length: int = 16,
+):
+    return scars.remove_scars(
+        img=image,
+        filename=None,
+        removal_iterations=removal_iterations,
+        threshold_low=threshold_low,
+        threshold_high=threshold_high,
+        max_scar_width=max_scar_width,
+        min_scar_length=min_scar_length,
+    )
 
 def median_flattened(
     image: "Napari.types.ImageData",

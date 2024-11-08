@@ -13,10 +13,14 @@ contributions:
     - id: napari-TopoStats.make_3d_widget
       python_name: napari_topostats:show_3d_autogenerate_widget
       title: Turn 2D image into 3D stack
+    
+    - id: napari-TopoStats.remove_scars_from_image
+      python_name: napari_topostats:remove_scars_from_image
+      title: Remove scars from image
 
     - id: napari-TopoStats.median_align_rows
       python_name: napari_topostats:median_align_rows
-      title: Align rows by median
+      title: Align rows by row median
 
     - id: napari-TopoStats.remove_planar_tilt
       python_name: napari_topostats:remove_planar_tilt
@@ -65,6 +69,10 @@ contributions:
     - command: napari-TopoStats.make_3d_widget
       autogenerate: true
       display_name: 3D-ify Image
+
+    - command: napari-TopoStats.remove_scars_from_image
+      autogenerate: true
+      display_name: Remove scars
 
     - command: napari-TopoStats.median_align_rows
       autogenerate: true
