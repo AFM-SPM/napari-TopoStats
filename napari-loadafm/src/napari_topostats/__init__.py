@@ -13,6 +13,7 @@ from ._widget import (
     remove_planar_tilt,
     remove_quadratic_background,
     remove_nonlinear_background,
+    zero_average_background
 )
 from ._writer import write_multiple, write_single_image
 
@@ -27,5 +28,6 @@ __all__ = (
     "median_align_rows",
     "remove_planar_tilt",
     "remove_quadratic_background",
-    "remove_nonlinear_background"
+    "remove_nonlinear_background",
+    "zero_average_background"
 )

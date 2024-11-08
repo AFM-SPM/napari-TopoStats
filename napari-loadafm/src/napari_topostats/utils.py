@@ -51,7 +51,7 @@ def afm2stack(
     return output
 
 def remove_scars(
-    image: np.ndarray,
+    image: "Napari.types.ImageData",
     removal_iterations: int = 2,
     threshold_low: float = 0.250,
     threshold_high: float = 0.666,
@@ -143,4 +143,24 @@ def remove_nonlinear(
         gaussian_mode="nearest"
         )
     removed_nonlinear = filtered_image.remove_nonlinear_polynomial(image=image, mask=mask)
+    return removed_nonlinear
+
+def average_background(
+    image: "Napari.types.ImageData",
+    mask: "Napari.types.LabelsData"=None,
+):
+    filtered_image = Filters(
+    image=image, 
+    filename="FILE", 
+    pixel_to_nm_scaling=1, 
+    row_alignment_quantile=0.5,
+    threshold_method="std_dev",
+    otsu_threshold_multiplier=1.0,
+    threshold_std_dev=1.0,
+    threshold_absolute=1.0,
+    gaussian_size=1.0121397464510862,
+    gaussian_mode="nearest"
+    )
+
+    removed_nonlinear = filtered_image.average_background(image=image, mask=mask)
     return removed_nonlinear
