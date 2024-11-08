@@ -44,26 +44,26 @@ if TYPE_CHECKING:
 # Uses the `autogenerate: true` flag in the plugin manifest
 # to indicate it should be wrapped as a magicgui to autogenerate
 # a widget.
-def flatten(
+def median_align_rows(
     img: "napari.types.ImageData",
     mask: "napari.types.LabelsData"=None,
     row_alignment_quantile: float = 0.5,
 ) -> "napari.types.LayerDataTuple":
     return (median_flattened(image = img, mask=mask, row_alignment_quantile = row_alignment_quantile), {}, "image")
 
-def untilt(
+def remove_planar_tilt(
     img: "napari.types.ImageData",
     mask: "napari.types.LabelsData"=None,
 ) -> "napari.types.LayerDataTuple":
     return (remove_tilt(image=img, mask=mask), {}, "image")
 
-def quadratic(
+def remove_quadratic_background(
     img: "napari.types.ImageData",
     mask: "napari.types.LabelsData"=None,
 ) -> "napari.types.LayerDataTuple":
     return (remove_quadratic(image=img, mask=mask), {}, "image")
 
-def nonlinear(
+def remove_nonlinear_background(
     img: "napari.types.ImageData",
     mask: "napari.types.LabelsData"=None,
 ) -> "napari.types.LayerDataTuple":

@@ -14,21 +14,21 @@ contributions:
       python_name: napari_topostats:show_3d_autogenerate_widget
       title: Turn 2D image into 3D stack
 
-    - id: napari-TopoStats.flatten
-      python_name: napari_topostats:flatten
-      title: Run TopoStats flattening
+    - id: napari-TopoStats.median_align_rows
+      python_name: napari_topostats:median_align_rows
+      title: Align rows by median
 
-    - id: napari-TopoStats.untilt
-      python_name: napari_topostats:untilt
-      title: Run TopoStats tilt removal
+    - id: napari-TopoStats.remove_planar_tilt
+      python_name: napari_topostats:remove_planar_tilt
+      title: Planar tilt removal
 
-    - id: napari-TopoStats.quadratic
-      python_name: napari_topostats:quadratic
-      title: Run TopoStats quadratic polynomial removal
+    - id: napari-TopoStats.remove_quadratic_background
+      python_name: napari_topostats:remove_quadratic_background
+      title: Remove quadratic background
 
-    - id: napari-TopoStats.nonlinear
-      python_name: napari_topostats:nonlinear
-      title: Run TopoStats nonlinear polynomial removal
+    - id: napari-TopoStats.remove_nonlinear_background
+      python_name: napari_topostats:remove_nonlinear_background
+      title: Remove nonlinear background
 
     - id: napari-TopoStats.write_multiple
       python_name: napari_topostats._writer:write_multiple
@@ -66,19 +66,19 @@ contributions:
       autogenerate: true
       display_name: 3D-ify Image
 
-    - command: napari-TopoStats.flatten
+    - command: napari-TopoStats.median_align_rows
       autogenerate: true
-      display_name: Flatten image
+      display_name: Align rows
 
-    - command: napari-TopoStats.untilt
+    - command: napari-TopoStats.remove_planar_tilt
       autogenerate: true
-      display_name: Apply tilt removal
+      display_name: Remove planar tilt
 
-    - command: napari-TopoStats.quadratic
+    - command: napari-TopoStats.remove_quadratic_background
       autogenerate: true
-      display_name: Remove quadratic polynomial
+      display_name: Remove quadratic background
 
-    - command: napari-TopoStats.nonlinear
+    - command: napari-TopoStats.remove_nonlinear_background
       autogenerate: true
-      display_name: Remove nonlinear polynomial
+      display_name: Remove nonlinear background
 

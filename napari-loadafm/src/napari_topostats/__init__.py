@@ -8,10 +8,10 @@ from ._sample_data import make_sample_data
 from ._widget import (
     ImageThreshold,
     show_3d_autogenerate_widget,
-    flatten,
-    untilt,
-    quadratic,
-    nonlinear,
+    median_align_rows,
+    remove_planar_tilt,
+    remove_quadratic_background,
+    remove_nonlinear_background,
 )
 from ._writer import write_multiple, write_single_image
 
@@ -22,8 +22,8 @@ __all__ = (
     "make_sample_data",
     "ImageThreshold",
     "show_3d_autogenerate_widget",
-    "flatten",
-    "untilt",
-    "quadratic",
-    "nonlinear"
+    "median_align_rows",
+    "remove_planar_tilt",
+    "remove_quadratic_background",
+    "remove_nonlinear_background"
 )
