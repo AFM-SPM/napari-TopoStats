@@ -35,7 +35,7 @@ from magicgui.widgets import CheckBox, Container, create_widget
 from qtpy.QtWidgets import QHBoxLayout, QPushButton, QWidget
 from skimage.util import img_as_float
 
-from napari_topostats.utils import afm2stack, median_flattened, remove_tilt, remove_quadratic, remove_nonlinear, remove_scars, average_background
+from napari_topostats.utils import afm2stack, median_flattened, remove_tilt, remove_quadratic, remove_nonlinear, remove_scars, average_background, gaussian_filter
 
 if TYPE_CHECKING:
     import napari
@@ -203,7 +203,7 @@ def remove_nonlinear_background(
     return (remove_nonlinear(image=image, mask=mask), {}, "image")
 
 def zero_average_background(
-    image: "napari.types.LabelsData",
+    image: "napari.types.ImageData",
     mask: "napari.types.LabelsData"=None,
 ) -> "napari.types.LayerDataTuple":
     """
@@ -211,17 +211,38 @@ def zero_average_background(
 
         Parameters
         ----------
-        image : npt.NDArray
+        image : napari.types.ImageData
             Numpy array representing the image.
-        mask : npt.NDArray
+        mask : napari.types.LabelsData
             Mask of the array, should have the same dimensions as image.
 
         Returns
         -------
-        npt.NDArray
+        napari.types.LayerDataTuple
             Numpy array of image zero averaged.
     """
     return (average_background(image=image, mask=mask), {}, "image")
+
+def gaussian_filter_image(
+    image: "napari.types.ImageData",
+    sigma: float = 2.0,
+) -> "napari.types.LayerDataTuple":
+    """
+    Apply Gaussian filter to an image.
+
+    Parameters
+    ----------
+    image : "napari.types.ImageData"
+        Numpy array representing the image.
+    sigma : float
+        The standard deviation for the gaussian kernel in the skimage.filters.gaussian() function.
+
+    Returns
+    -------
+    napari.types.LayerDataTuple
+        Numpy array that represent the image after Gaussian filtering.
+    """
+    return (gaussian_filter(image=image, sigma=sigma), {}, "image")
 
 def show_3d_autogenerate_widget(
     image: "napari.types.ImageData",

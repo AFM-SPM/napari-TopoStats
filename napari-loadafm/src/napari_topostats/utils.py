@@ -6,7 +6,7 @@ import numpy as np
 from topostats.filters import Filters
 from topostats import scars
 
-
+# ------- Misc -------
 def afm2stack(
     image: "Napari.types.ImageData",
     by_slices: bool = True,
@@ -50,6 +50,7 @@ def afm2stack(
 
     return output
 
+# ------- Filters -------
 def remove_scars(
     image: "Napari.types.ImageData",
     removal_iterations: int = 2,
@@ -164,3 +165,23 @@ def average_background(
 
     removed_nonlinear = filtered_image.average_background(image=image, mask=mask)
     return removed_nonlinear
+
+def gaussian_filter(
+    image: "Napari.types.ImageData",
+    sigma: float = 2.0,
+):
+    filtered_image = Filters(
+    image=image, 
+    filename="FILE", 
+    pixel_to_nm_scaling=1, 
+    row_alignment_quantile=0.5,
+    threshold_method="std_dev",
+    otsu_threshold_multiplier=1.0,
+    threshold_std_dev=1.0,
+    threshold_absolute=1.0,
+    gaussian_size=sigma,
+    gaussian_mode="nearest"
+    )
+
+    gaussian = filtered_image.gaussian_filter(image=image)
+    return gaussian
