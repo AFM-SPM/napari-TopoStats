@@ -80,28 +80,28 @@ contributions:
 
     - command: napari-TopoStats.remove_scars_from_image
       autogenerate: true
-      display_name: Remove scars
+      display_name: Filters - Remove scars
 
     - command: napari-TopoStats.median_align_rows
       autogenerate: true
-      display_name: Align rows
+      display_name: Filters - Align rows
 
     - command: napari-TopoStats.remove_planar_tilt
       autogenerate: true
-      display_name: Remove planar tilt
+      display_name: Filters - Remove planar tilt
 
     - command: napari-TopoStats.remove_quadratic_background
       autogenerate: true
-      display_name: Remove quadratic background
+      display_name: Filters - Remove quadratic background
 
     - command: napari-TopoStats.remove_nonlinear_background
       autogenerate: true
-      display_name: Remove nonlinear background
+      display_name: Filters - Remove nonlinear background
 
     - command: napari-TopoStats.zero_average_background
       autogenerate: true
-      display_name: Zero background
+      display_name: Filters - Zero background
 
     - command: napari-TopoStats.gaussian_filter_image
       autogenerate: true
-      display_name: Gaussian filter
+      display_name: Filters - Gaussian filter
