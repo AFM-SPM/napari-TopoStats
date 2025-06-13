@@ -486,7 +486,7 @@ def open_config_editor(viewer: Viewer):
     # Keys to include
     EDITABLE_TOP_LEVEL_KEYS = {"filter", "grains"}
 
-    # Exact keys to exclude
+    # Keys to exclude
     EXCLUDED_KEYS = {"filter.run", "grains.run"}
 
     filtered_flat_config = {

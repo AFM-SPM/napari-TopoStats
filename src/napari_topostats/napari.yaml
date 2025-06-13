@@ -6,9 +6,6 @@ visibility: public
 categories: ["Annotation", "Segmentation", "Acquisition"]
 contributions:
   commands:
-    - id: napari-TopoStats.get_reader
-      python_name: napari_topostats._reader:napari_get_reader
-      title: Open data with TopoStats
 
     - id: napari-TopoStats.get_topostats_filter_widget
       python_name: napari_topostats._widget:get_topostats_filter_widget
@@ -42,10 +39,6 @@ contributions:
       python_name: napari_topostats:ImageThreshold
       title: Make threshold Container widget
 
-  readers:
-    - command: napari-TopoStats.get_reader
-      accepts_directories: false
-      filename_patterns: ['*.spm', '*.jpk', '*.ibw', '*.gwy', '*.topostats']
   writers:
     - command: napari-TopoStats.write_multiple
       layer_types: ['image*','labels*']
