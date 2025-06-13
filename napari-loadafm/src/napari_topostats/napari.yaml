@@ -10,37 +10,21 @@ contributions:
       python_name: napari_topostats._reader:napari_get_reader
       title: Open data with TopoStats
 
+    - id: napari-TopoStats.get_topostats_filter_widget
+      python_name: napari_topostats._widget:get_topostats_filter_widget
+      title: Run Filters
+
     - id: napari-TopoStats.make_3d_widget
       python_name: napari_topostats:show_3d_autogenerate_widget
       title: Turn 2D image into 3D stack
     
-    - id: napari-TopoStats.remove_scars_from_image
-      python_name: napari_topostats:remove_scars_from_image
-      title: Remove scars from image
+    - id: napari-TopoStats.load_grains_config_widget
+      python_name: napari_topostats._widget:get_load_config_widget
+      title: Load TopoStats Config
 
-    - id: napari-TopoStats.median_align_rows
-      python_name: napari_topostats:median_align_rows
-      title: Align rows by row median
-
-    - id: napari-TopoStats.remove_planar_tilt
-      python_name: napari_topostats:remove_planar_tilt
-      title: Planar tilt removal
-
-    - id: napari-TopoStats.remove_quadratic_background
-      python_name: napari_topostats:remove_quadratic_background
-      title: Remove quadratic background
-
-    - id: napari-TopoStats.remove_nonlinear_background
-      python_name: napari_topostats:remove_nonlinear_background
-      title: Remove nonlinear background
-
-    - id: napari-TopoStats.zero_average_background
-      python_name: napari_topostats:zero_average_background
-      title: Zero average the background
-
-    - id: napari-TopoStats.gaussian_filter_image
-      python_name: napari_topostats:gaussian_filter_image
-      title: Gaussian filter
+    - id: napari-TopoStats.run_grains_widget
+      python_name: napari_topostats._widget:get_grains_widget
+      title: Run Grains
 
     - id: napari-TopoStats.write_multiple
       python_name: napari_topostats._writer:write_multiple
@@ -78,30 +62,11 @@ contributions:
       autogenerate: true
       display_name: 3D-ify Image
 
-    - command: napari-TopoStats.remove_scars_from_image
-      autogenerate: true
-      display_name: Filters - Remove scars
+    - command: napari-TopoStats.load_grains_config_widget
+      display_name: Load TopoStats Config
 
-    - command: napari-TopoStats.median_align_rows
-      autogenerate: true
-      display_name: Filters - Align rows
+    - command: napari-TopoStats.get_topostats_filter_widget
+      display_name: Run Filters
 
-    - command: napari-TopoStats.remove_planar_tilt
-      autogenerate: true
-      display_name: Filters - Remove planar tilt
-
-    - command: napari-TopoStats.remove_quadratic_background
-      autogenerate: true
-      display_name: Filters - Remove quadratic background
-
-    - command: napari-TopoStats.remove_nonlinear_background
-      autogenerate: true
-      display_name: Filters - Remove nonlinear background
-
-    - command: napari-TopoStats.zero_average_background
-      autogenerate: true
-      display_name: Filters - Zero background
-
-    - command: napari-TopoStats.gaussian_filter_image
-      autogenerate: true
-      display_name: Filters - Gaussian filter
+    - command: napari-TopoStats.run_grains_widget
+      display_name: Run Grains
