@@ -486,19 +486,19 @@ def open_config_editor(viewer: Viewer):
     # Keys to include
     EDITABLE_TOP_LEVEL_KEYS = {"filter", "grains"}
 
-    # Keys to exclude
-    EXCLUDED_SUFFIXES = {".run"}
+    # Exact keys to exclude
+    EXCLUDED_KEYS = {"filter.run", "grains.run"}
 
     filtered_flat_config = {
         k: v for k, v in config_wrapper.flat.items()
         if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS)
-        and not any(k.endswith(suffix) for suffix in EXCLUDED_SUFFIXES)
+        and k not in EXCLUDED_KEYS
     }
 
     filtered_descriptions = {
         k: v for k, v in comment_descriptions.items()
         if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS)
-        and not any(k.endswith(suffix) for suffix in EXCLUDED_SUFFIXES)
+        and k not in EXCLUDED_KEYS
     }
 
     fresh_container = build_dynamic_widget(filtered_flat_config, filtered_descriptions)
