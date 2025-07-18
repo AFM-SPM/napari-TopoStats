@@ -49,6 +49,7 @@ from qtpy.QtWidgets import (
 )
 from scipy.ndimage import label
 from skimage.util import img_as_float
+from ._button_grid import ButtonGrid
 import topostats.run_modules as rm
 from topostats.filters import Filters
 from topostats.grains import Grains
@@ -610,7 +611,6 @@ def get_load_config_widget():
     filename={"label": "Filename"},
     pixel_to_nm_scaling={"label": "Pixel to nm scaling"},
 )
-
 def run_grains_widget(
     viewer: Viewer,
     napari_img_layer: ImageData,
@@ -729,6 +729,7 @@ class ImageThreshold(Container):
         self._threshold_slider.max = 1
         # use magicgui widgets directly
         self._invert_checkbox = CheckBox(text="Keep pixels below threshold")
+        Image(self._viewer, self._image_layer_combo.value)
 
         # connect your own callbacks
         self._threshold_slider.changed.connect(self._threshold_im)
@@ -759,3 +760,22 @@ class ImageThreshold(Container):
             self._viewer.layers[name].data = thresholded
         else:
             self._viewer.add_labels(thresholded, name=name)
+
+class TopoStatsRootWidget(QWidget):
+    def __init__(self, viewer: "napari.viewer.Viewer"):
+        super().__init__()
+        self._viewer = viewer
+        self.function_grid = ButtonGrid(
+            self,
+            functions={
+                "Load Config": get_load_config_widget(),
+                "Run Filters": get_topostats_filter_widget(),
+                "Run Grains": get_grains_widget(),
+                "3D-ify Image": show_3d_autogenerate_widget,
+                "Container Threshold": ImageThreshold,
+            },
+            viewer=self._viewer
+        )
+        # self.setLayout(QVBoxLayout())
+
+

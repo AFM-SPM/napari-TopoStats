@@ -38,6 +38,10 @@ contributions:
     - id: napari-TopoStats.make_container_widget
       python_name: napari_topostats:ImageThreshold
       title: Make threshold Container widget
+    
+    - id: napari-TopoStats.make_root_widget
+      python_name: napari_topostats:TopoStatsRootWidget
+      title: TopoStats!
 
   writers:
     - command: napari-TopoStats.write_multiple
@@ -48,18 +52,5 @@ contributions:
       display_name: TopoStats
       key: unique_id.1
   widgets:
-    - command: napari-TopoStats.make_container_widget
-      display_name: Container Threshold
-
-    - command: napari-TopoStats.make_3d_widget
-      autogenerate: true
-      display_name: 3D-ify Image
-
-    - command: napari-TopoStats.load_grains_config_widget
-      display_name: Load TopoStats Config
-
-    - command: napari-TopoStats.get_topostats_filter_widget
-      display_name: Run Filters
-
-    - command: napari-TopoStats.run_grains_widget
-      display_name: Run Grains
+    - command: napari-TopoStats.make_root_widget
+      display_name: Open TopoStats

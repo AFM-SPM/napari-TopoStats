@@ -14,7 +14,8 @@ from ._widget import (
     remove_quadratic_background,
     remove_nonlinear_background,
     zero_average_background,
-    gaussian_filter_image
+    gaussian_filter_image,
+    TopoStatsRootWidget
 )
 from ._writer import write_multiple, write_single_image
 
@@ -31,5 +32,6 @@ __all__ = (
     "remove_quadratic_background",
     "remove_nonlinear_background",
     "zero_average_background",
-    "gaussian_filter_image"
+    "gaussian_filter_image",
+    "TopoStatsRootWidget",
 )
