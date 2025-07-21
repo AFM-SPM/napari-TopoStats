@@ -635,7 +635,89 @@ def load_config(viewer: Viewer, config_path: Path):
 def get_load_config_widget():
     return load_config
 
+def get_widget(key: str, function_to_run: Callable, type_class: type = None, requires_config: bool = True):
+    global config_wrapper, full_config_container
 
+    if config_wrapper is None or full_config_container is None:
+        print("Please load a config file first using 'Load Config'.")
+        return
+
+    try:
+        updated_values = collect_values(full_config_container)
+        config_wrapper.flat.update(updated_values)
+
+        full_current_config = config_wrapper.unflatten()
+        config = full_current_config.get(key, {})
+        parameters_from_function = [
+            p for name, p in inspect.signature(function_to_run).parameters.items()
+        ]
+        
+        if type_class is not None:
+            sig = inspect.signature(type_class.__init__)
+            parameters_from_class = [
+                p for name, p in sig.parameters.items()
+                if name != "self"
+            ]
+            all_parameters = parameters_from_class + parameters_from_function
+        else:
+            sig = inspect.signature(function_to_run)
+            all_parameters = parameters_from_function
+        # Hopefully this will get the parameters from both the class and the function which aren't defined in config
+        filtered_config = {}
+        for param_name in [p.name for p in all_parameters]:
+            if param_name in config:
+                filtered_config[param_name] = config[param_name]
+
+            for flat_key, flat_val in config_wrapper.flat.items():
+                if flat_key.startswith(f"{key}.") and flat_key[len(f"{key}."):] == param_name:
+                    filtered_config[param_name] = flat_val
+                    break
+
+            if param_name in config and isinstance(config[param_name], dict):
+                filtered_config[param_name] = config[param_name]
+        if type_class is not None:
+            def func(**filtered_config):
+                class_args = {k: v for k, v in filtered_config.items() if k in parameters_from_class}
+                instance = type_class(**class_args)
+                method_args = {k: v for k, v in filtered_config.items() if k in parameters_from_function}
+                method = getattr(instance, function_to_run.__name__, None)
+                if method:
+                    return method(**method_args)
+        else:
+            def func(**filtered_config):
+                # Replace any parameters of the type ImageData with np ndarray
+                for key, value in filtered_config.items():
+                    if isinstance(value, ImageData):
+                        filtered_config[key] = np.asarray(value.data)
+                return function_to_run(**filtered_config)
+
+        return magicgui()(func)
+
+        try:
+            merged = grains_obj.mask_images["above"]["merged_classes"][:, :, 1]
+
+            # Label each grain individually
+            labeled_grains, num_grains = label(merged.astype(bool))
+
+            # Simple properties with grain_id
+            grain_ids = list(range(1, num_grains + 1))
+            properties = {"grain_id": grain_ids}
+
+            # Add labeled mask to napari with grain properties
+            viewer.add_labels(
+                labeled_grains.astype(np.uint16),
+                name="Grain Mask",
+                properties=properties
+            )
+
+        except Exception as e:
+            print(f"Failed to add merged_classes mask: {e}")
+
+    except Exception as e:
+        print(f"Grain detection failed: {e}")
+        import traceback
+        traceback.print_exc()
+    
 @magicgui(
     call_button="Run Grains",
     filename={"label": "Filename"},
