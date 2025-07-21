@@ -750,8 +750,6 @@ def show_3d_autogenerate_widget(
         numslices=min_slices,
         resolution=resolution,
     )
-    print(stack.shape)          # Should be (Z, Y, X)
-    print(stack.min(), stack.max())  # What is the value range?
     viewer.add_image(stack,
                     name=f"{filename} - 3D-ified",
                     contrast_limits=(-1, 5),)
