@@ -713,12 +713,17 @@ def run_grains_widget(
 def get_grains_widget():
     return run_grains_widget
 
+@magicgui(
+    call_button="3D-ify Image",
+)
 def show_3d_autogenerate_widget(
-    image: "napari.types.ImageData",
+    viewer: Viewer,
+    image: ImageData,
+    filename: str = "image",
     bySlices: bool = True,
     min_slices: int = 255,
     resolution: float = 1.0,
-) -> "napari.types.ImageData":
+) -> ImageData:
     """
     Convert an AFM height image into a pseudo volume by via the pixel values.
 
@@ -738,7 +743,18 @@ def show_3d_autogenerate_widget(
     napari.types.ImageData
         3-D slices of the AFM height image.
     """
-    return (afm2stack(image, bySlices, min_slices, resolution), {}, "image")
+    stack = afm2stack(
+        image=image,
+        by_slices=bySlices,
+        numslices=min_slices,
+        resolution=resolution,
+    )
+    print(stack.shape)          # Should be (Z, Y, X)
+    print(stack.min(), stack.max())  # What is the value range?
+    viewer.add_image(stack,
+                    name=f"{filename} - 3D-ified",
+                    contrast_limits=(-1, 5),)
+    viewer.dims.ndisplay = 3
 
 # if we want even more control over our widget, we can use
 # magicgui `Container`
