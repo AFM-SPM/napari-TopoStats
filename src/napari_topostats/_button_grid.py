@@ -4,14 +4,25 @@ from qtpy.QtWidgets import QListWidget, QListWidgetItem
 from pathlib import Path
 from magicgui.widgets import FunctionGui
 from napari.viewer import Viewer
+import inspect
+from napari.types import ImageData
 import typing
+from napari.layers import Image
+from napari.types import ImageData
+import numpy as np
+import dask.array as da
 
+RUN_IMMEDIATELY_EXEMPTIONS = {
+    "Load Config"
+}
 ICON_ROOT = Path(__file__).parent / "icons"
 STYLES = r"""
     QListWidget{
-        min-width: 340;
+        min-width: 200;
         background: none;
         font-size: 14pt;
+        margin: 0;
+        padding: 0;
         color: #eee;
     }
     QListWidget::item {
@@ -60,7 +71,7 @@ class ButtonGrid(QListWidget):
         self.setViewMode(self.IconMode)  # make items icons
         self.setResizeMode(self.Adjust)  # relayout when view is resized.
         self.setUniformItemSizes(True)  # better performance
-        self.setIconSize(QSize(100, 80))
+        self.setIconSize(QSize(90, 40))
         self.setWordWrap(True)
         self.setStyleSheet(STYLES)
         self.setSpacing(2)

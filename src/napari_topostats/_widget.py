@@ -710,6 +710,7 @@ def run_grains_widget(
         import traceback
         traceback.print_exc()
 
+
 def get_grains_widget():
     return run_grains_widget
 
@@ -809,6 +810,7 @@ class TopoStatsRootWidget(QWidget):
     def __init__(self, viewer: "napari.viewer.Viewer"):
         super().__init__()
         self._viewer = viewer
+        layout = QVBoxLayout(self)
         self.function_grid = ButtonGrid(
             self,
             functions={
@@ -816,10 +818,13 @@ class TopoStatsRootWidget(QWidget):
                 "Run Filters": get_topostats_filter_widget(),
                 "Run Grains": get_grains_widget(),
                 "3D-ify Image": show_3d_autogenerate_widget,
-                "Container Threshold": ImageThreshold,
             },
             viewer=self._viewer
         )
-        # self.setLayout(QVBoxLayout())
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.addWidget(self.function_grid)
+        self.setLayout(layout)
 
 

@@ -5,10 +5,11 @@ import copy
 import numpy as np
 from topostats.filters import Filters
 from topostats import scars
+from napari.types import ImageData
 
 # ------- Misc -------
 def afm2stack(
-    image: "Napari.types.ImageData",
+    image: ImageData,
     by_slices: bool = True,
     numslices: int = 255,
     resolution: float = 1.0,
