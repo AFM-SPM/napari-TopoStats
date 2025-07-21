@@ -329,7 +329,7 @@ def run_topostats_filter_widget(
 
         filtered = filter_obj.images.get("gaussian_filtered")
         if filtered is not None:
-            viewer.add_image(filtered, name=f"{filename} - filtered")
+            viewer.add_image(filtered, name="Filtered Image")
         else:
             print("No filtered image found in output.")
 
