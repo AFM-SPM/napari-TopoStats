@@ -682,14 +682,14 @@ def get_widget(key: str, function_to_run: Callable, type_class: type = None, req
                 method_args = {k: v for k, v in filtered_config.items() if k in parameters_from_function}
                 method = getattr(instance, function_to_run.__name__, None)
                 if method:
-                    return method(**method_args)
+                    method(**method_args)
         else:
             def func(**filtered_config):
                 # Replace any parameters of the type ImageData with np ndarray
                 for key, value in filtered_config.items():
                     if isinstance(value, ImageData):
                         filtered_config[key] = np.asarray(value.data)
-                return function_to_run(**filtered_config)
+                function_to_run(**filtered_config)
 
         return magicgui()(func)
 
