@@ -28,46 +28,74 @@ References:
 
 Replace code below according to your needs.
 """
+from qtpy.QtCore import Qt
+from qtpy.QtGui import QIcon, QMovie
+from qtpy.QtWidgets import (
+    QDialog, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel,
+    QPushButton, QScrollArea, QToolButton, QVBoxLayout, QWidget, QSizePolicy, QApplication
+)
+class LoadingDialog(QDialog):
+    def __init__(self, text="Loading..."):
+        super().__init__()
+        self.setWindowTitle("Please wait")
+        layout = QVBoxLayout()
+
+        self.label_text = QLabel(text)
+        layout.addWidget(self.label_text)
+
+        self.spinner_label = QLabel()
+        layout.addWidget(self.spinner_label)
+
+        self.setLayout(layout)
+        self.setModal(True)
+
+        # Load the spinner GIF
+        self.movie = QMovie("icons/spinner.gif")  # Path to your spinner gif file
+        self.spinner_label.setMovie(self.movie)
+        self.movie.start()
+
+        self.adjustSize()
+
+loading_dialog = LoadingDialog("Loading TopoStats...")
+loading_dialog.show()
+QApplication.processEvents() 
 import inspect
 import json
 import re
 from argparse import Namespace
 from pathlib import Path
 from typing import Any, Dict, TYPE_CHECKING
+
 import numpy as np
 import yaml
+
 from magicgui import magicgui
 from magicgui.widgets import CheckBox, Container, create_widget
+
 from napari import current_viewer
 from napari.types import ImageData
 from napari.viewer import Viewer
-from qtpy.QtCore import Qt
-from qtpy.QtGui import QIcon, QPixmap
-from qtpy.QtWidgets import (
-    QDialog, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel,
-    QPushButton, QScrollArea, QToolButton, QVBoxLayout, QWidget
-)
+
+
 from scipy.ndimage import label
 from skimage.util import img_as_float
-from ._button_grid import ButtonGrid
-import topostats.run_modules as rm
-from topostats.filters import Filters
-from topostats.grains import Grains
+
+
 from napari_topostats.utils import (
-    afm2stack,
-    average_background,
-    gaussian_filter,
-    median_flattened,
-    remove_nonlinear,
-    remove_quadratic,
-    remove_scars,
-    remove_tilt,
+    afm2stack, average_background, gaussian_filter,
+    median_flattened, remove_nonlinear, remove_quadratic,
+    remove_scars, remove_tilt,
 )
-from typing import TYPE_CHECKING
+
+from topostats.grains import Grains
+from topostats.filters import Filters
+loading_dialog.close()
+
+
+from ._button_grid import ButtonGrid
 
 if TYPE_CHECKING:
     import napari
-
 def remove_scars_from_image(
     image: "napari.types.ImageData",
     removal_iterations: int = 2,
