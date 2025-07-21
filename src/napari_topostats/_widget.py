@@ -28,6 +28,7 @@ References:
 
 Replace code below according to your needs.
 """
+import sys
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QIcon, QMovie
 from qtpy.QtWidgets import (
@@ -64,13 +65,13 @@ import json
 import re
 from argparse import Namespace
 from pathlib import Path
-from typing import Any, Dict, TYPE_CHECKING
+from typing import Any, Callable, Dict, TYPE_CHECKING
 
 import numpy as np
 import yaml
 
 from magicgui import magicgui
-from magicgui.widgets import CheckBox, Container, create_widget
+from magicgui.widgets import CheckBox, Container, create_widget, FunctionGui
 
 from napari import current_viewer
 from napari.types import ImageData
@@ -90,7 +91,7 @@ from napari_topostats.utils import (
 from topostats.grains import Grains
 from topostats.filters import Filters
 loading_dialog.close()
-
+AVAILABLE_FUNCTIONS = ["load_config", "run_filters", "run_grains", "make_3d"]
 
 from ._button_grid import ButtonGrid
 
@@ -304,7 +305,7 @@ def gaussian_filter_image(
     filename={"label": "Filename"},
     pixel_to_nm_scaling={"label": "Pixel to nm scaling"},
 )
-def run_topostats_filter_widget(
+def run_filters(
     viewer: Viewer,
     napari_img_layer: ImageData,
     filename: str = "image",
@@ -601,9 +602,10 @@ def open_config_editor(viewer: Viewer):
 
 @magicgui(
     config_path={"label": "Config file", "mode": "r", "filter": "*.yaml;*.json"}, # Added .json filter
-    call_button="Load Config"
+    call_button="Load Config",
+    auto_call=True,
 )
-def load_config_widget(viewer: Viewer, config_path: Path):
+def load_config(viewer: Viewer, config_path: Path):
     global config_wrapper, full_config_container, comment_descriptions # Updated global name
 
     try:
@@ -631,7 +633,7 @@ def load_config_widget(viewer: Viewer, config_path: Path):
 
 
 def get_load_config_widget():
-    return load_config_widget
+    return load_config
 
 
 @magicgui(
@@ -639,7 +641,7 @@ def get_load_config_widget():
     filename={"label": "Filename"},
     pixel_to_nm_scaling={"label": "Pixel to nm scaling"},
 )
-def run_grains_widget(
+def run_grains(
     viewer: Viewer,
     napari_img_layer: ImageData,
     filename: str = "image",
@@ -660,7 +662,7 @@ def run_grains_widget(
 
         sig = inspect.signature(Grains.__init__)
         accepted_params = set(sig.parameters.keys()) - {"self", "image", "filename", "pixel_to_nm_scaling"}
-        
+        print(f"Accepted parameters for Grains: {accepted_params}")
         filtered_grains_config = {}
         for param_name in accepted_params:
             if param_name in grains_config:
@@ -712,12 +714,12 @@ def run_grains_widget(
 
 
 def get_grains_widget():
-    return run_grains_widget
+    return run_grains
 
 @magicgui(
     call_button="3D-ify Image",
 )
-def show_3d_autogenerate_widget(
+def make_3d(
     viewer: Viewer,
     image: ImageData,
     filename: str = "image",
@@ -805,18 +807,13 @@ class ImageThreshold(Container):
             self._viewer.add_labels(thresholded, name=name)
 
 class TopoStatsRootWidget(QWidget):
-    def __init__(self, viewer: "napari.viewer.Viewer"):
+    def __init__(self, viewer: Viewer):
         super().__init__()
         self._viewer = viewer
         layout = QVBoxLayout(self)
         self.function_grid = ButtonGrid(
             self,
-            functions={
-                "Load Config": get_load_config_widget(),
-                "Run Filters": get_topostats_filter_widget(),
-                "Run Grains": get_grains_widget(),
-                "3D-ify Image": show_3d_autogenerate_widget,
-            },
+            functions=self.get_functions(),
             viewer=self._viewer
         )
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -824,5 +821,17 @@ class TopoStatsRootWidget(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.addWidget(self.function_grid)
         self.setLayout(layout)
+    
+    def get_functions(self):
+        functions = {}
+        for function_name in AVAILABLE_FUNCTIONS:
+            func = getattr(sys.modules[__name__], function_name, None)
+            print(f"Function {function_name} found: {func}")
+            title = function_name.replace("_", " ").title()
+            if isinstance(func, FunctionGui):
+                functions[title] = func
+            elif callable(func):
+                functions[title] = magicgui(func)
+        return functions
 
 

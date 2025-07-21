@@ -1,5 +1,5 @@
 name: napari-TopoStats
-display_name: TopoStats
+display_name: napari-topostats
 # use 'hidden' to remove plugin from napari hub search results
 visibility: public
 # see https://napari.org/stable/plugins/manifest.html for valid categories
@@ -12,7 +12,7 @@ contributions:
       title: Run Filters
 
     - id: napari-TopoStats.make_3d_widget
-      python_name: napari_topostats:show_3d_autogenerate_widget
+      python_name: napari_topostats:make_3d
       title: Turn 2D image into 3D stack
     
     - id: napari-TopoStats.load_grains_config_widget
@@ -53,4 +53,4 @@ contributions:
       key: unique_id.1
   widgets:
     - command: napari-TopoStats.make_root_widget
-      display_name: Open TopoStats
+      display_name: TopoStats
