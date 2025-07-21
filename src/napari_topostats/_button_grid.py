@@ -76,7 +76,42 @@ class ButtonGrid(QListWidget):
         Handle the click event on a list item.
         """
         widget = self.functions.get(item.text())
-        self.viewer.window.add_dock_widget(widget, name=item.text())
+        if item.text() not in self.viewer.window._dock_widgets:
+            self.viewer.window.add_dock_widget(widget, name=item.text())
+        if item.text() not in RUN_IMMEDIATELY_EXEMPTIONS:
+            sig = inspect.signature(widget._function)
+            kwargs = {}
+
+            for name, param in sig.parameters.items():
+                if param.annotation == ImageData:
+                    selected = self.get_selected_image_data(self.viewer)
+                    if selected is None:
+                        print(f"No valid image data selected for {name}.")
+                    else:
+                        kwargs[name] = self.get_selected_image_data(self.viewer)
+                if param.annotation == Viewer:
+                    kwargs[name] = self.viewer
+            widget._function(**kwargs)
+
+    @staticmethod
+    def get_selected_image_data(viewer) -> ImageData | None:
+        selected = list(viewer.layers.selection)
+
+        if not selected:
+            print("No layer selected.")
+            return None
+
+        layer = selected[0]
+        if isinstance(layer, Image):
+            data = layer.data
+            if isinstance(data, (np.ndarray, da.Array)):  # conforms to ImageData
+                return data
+            else:
+                print("Layer data is not valid ImageData.")
+        else:
+            print("Selected layer is not an Image layer.")
+
+        return None
 
 
     def addItem(self, label : str, tool_tip : str = None):
