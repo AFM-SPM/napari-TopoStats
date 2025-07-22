@@ -41,7 +41,7 @@ contributions:
     
     - id: napari-TopoStats.make_root_widget
       python_name: napari_topostats:TopoStatsRootWidget
-      title: TopoStats!
+      title: TopoStats
 
   writers:
     - command: napari-TopoStats.write_multiple

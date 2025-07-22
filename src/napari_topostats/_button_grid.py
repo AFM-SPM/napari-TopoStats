@@ -76,8 +76,13 @@ class ButtonGrid(QListWidget):
         self.setStyleSheet(STYLES)
         self.setSpacing(2)
         self.item_mapping = {}
-        self.functions = functions or {}
         self.viewer = viewer
+        self.update_functions(functions)
+
+    
+    def update_functions(self, functions: dict[str, FunctionGui]):
+        self.functions = functions or {}
+        self.remove_all_items()  # Clear existing items
         for label in functions or {}:
             self.addItem(label)
         self.itemClicked.connect(self.add_function_as_widget)
@@ -143,4 +148,10 @@ class ButtonGrid(QListWidget):
                 self.addItem(label, labels[label].tool_tip)
             else:
                 self.addItem(label)
+    def remove_all_items(self):
+        """
+        Remove all items from the QListWidget and clear the item mapping.
+        """
+        self.clear()            # Clears all QListWidgetItems from the widget
+        self.item_mapping.clear()  # Clear the dictionary tracking the items
 
