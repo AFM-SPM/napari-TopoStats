@@ -60,6 +60,7 @@ class LoadingDialog(QDialog):
 
 loading_dialog = LoadingDialog("Loading TopoStats...")
 loading_dialog.show()
+current_error_dialog = None
 QApplication.processEvents() 
 import inspect
 import json
@@ -99,6 +100,16 @@ from ._button_grid import ButtonGrid
 if TYPE_CHECKING:
     import napari
 
+class ErrorDialog(QDialog):
+    def __init__(self, message: str):
+        super().__init__()
+        self.setWindowTitle("Error")
+        layout = QVBoxLayout()
+        self.label = QLabel(message)
+        layout.addWidget(self.label)
+        self.setLayout(layout)
+        self.setModal(True)
+
 #Class representation of each AVAILABLE_FUNCTIONS entry
 class WidgetFunction:
     def __init__(self, name: str, function_key: str | None = None, function_to_run: Callable | None = None, type_class: Any | None = None, path_to_data: str | None = None, uses_config: bool = False, ndims: int = 2):
@@ -130,6 +141,15 @@ AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config"),
                                        function_key="3d",
                                        function_to_run=afm2stack,
                                        ndims=3)]
+def show_error_dialog(message: str):
+    global current_error_dialog
+    print(f"Error: {message}")
+    if current_error_dialog is not None:
+        current_error_dialog.close()
+    current_error_dialog = ErrorDialog(message)
+    current_error_dialog.show()
+
+    QApplication.processEvents()  # Ensure the dialog is shown immediately
 
 def remove_scars_from_image(
     image: "napari.types.ImageData",
@@ -368,7 +388,7 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> Dict[
     key_stack = [] 
 
     if not yaml_path.exists():
-        print(f"Error: YAML file not found at {yaml_path}")
+        show_error_dialog(f"Error: YAML file not found at {yaml_path}")
         return {}
 
     with open(yaml_path, "r") as f:
@@ -469,12 +489,13 @@ config_wrapper = None
 full_config_container = None
 comment_descriptions = {}
 topostats_widget = None
+docked_widgets = []
 
 def open_config_editor(viewer: Viewer):
     global config_wrapper, full_config_container, comment_descriptions
 
     if config_wrapper is None:
-        print("No config loaded.")
+        show_error_dialog("No config loaded.")
         return
     
     # Keys to include
@@ -579,10 +600,10 @@ def load_config(viewer: Viewer, config_path: Path):
             elif config_path.suffix.lower() == ".json":
                 config = json.load(f)
             else:
-                print("Unsupported config format.")
+                show_error_dialog("Unsupported config format.")
                 return
     except Exception as e:
-        print(f"Failed to load config: {e}")
+        show_error_dialog(f"Failed to load config: {e}")
         return
 
     comment_descriptions = extract_inline_comments(config_path)
@@ -590,18 +611,17 @@ def load_config(viewer: Viewer, config_path: Path):
     config_wrapper = ConfigWrapper(config) 
     
     full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
-    print(config)
-    print(config_wrapper)
     if full_config_container is None:
-        print("Failed to create full config container.")
+        show_error_dialog("Failed to create full config container.")
         return
-    if "Edit Full Config" not in viewer.window._dock_widgets:
+    if "Edit Full Config" not in docked_widgets:
         btn = QPushButton("Edit Config")
         btn.clicked.connect(lambda: open_config_editor(viewer))
-        viewer.window.add_dock_widget(btn, name="Edit Full Config") # Updated dock widget name
-    if topostats_widget is None:
-        print("No TopoStatsRootWidget found in viewer.")
+        viewer.window.add_dock_widget(btn, name="Edit Full Config")
+        docked_widgets.append("Edit Full Config")  # Updated dock widget name
     if topostats_widget is not None:
+        topostats_widget.layout().removeWidget(topostats_widget.load_config_message)
+        topostats_widget.load_config_message.setText("")
         topostats_widget.function_grid.update_functions(topostats_widget.get_functions())
 
 
@@ -665,95 +685,64 @@ def add_values_to_dict_from_config(
             args[param_name] = config[param_name]
     return args
 
-def show_warning(message: str, time_displayed: float = 3.0):
-    """
-    Show a warning message in the console and optionally display it in the GUI.
-    """
-    print(f"Warning: {message}")
-    if hasattr(current_viewer(), 'window'):
-        current_viewer().window.status = message
-        QApplication.processEvents()
-        QTimer.singleShot(int(time_displayed * 1000), lambda: current_viewer().window.status = "")
 
 def _eval(obj: Any, string: str) -> Any:
-    print(f"Entering _eval with object type: {type(obj)} and string: '{string}'")
 
     string = string.replace(" ", "")
     if string == "":
-        print("Empty string, returning object.")
         return obj
 
     if string[0] == "[":
-        print("Detected indexing...")
         next_punc = next_punctuation(string, 1, checking_for=",()[].")
-        print(f"Next punctuation: '{string[next_punc]}' at index {next_punc}" if next_punc != -1 else "No valid punctuation found")
         if next_punc != -1 and string[next_punc] == ",":
             axes = []
-            print("Multi-axis indexing detected")
             for i in string[1:string.index("]", 1)].split(","):
                 if i == ":":
                     axes.append(slice(None))
-                    print("Adding full slice ':'")
                 elif i.isdigit():
                     axes.append(int(i))
-                    print(f"Adding int index: {i}")
             subscript = tuple(axes)
-            print(f"Using subscript tuple: {subscript}")
             obj = obj[subscript]
         else:
             subscript = string[1:string.index("]", 1)]
-            print(f"Single subscript: {subscript}")
             if subscript.isdigit():
                 obj = obj[int(subscript)]
-                print(f"Indexing with integer: {int(subscript)}")
             else:
                 key = subscript.replace("'", "").replace('"', '')
                 obj = obj[key]
-                print(f"Indexing with key: {key}")
         remaining = string[string.index("]", 1) + 1:]
-        print(f"Continuing evaluation with remaining string: '{remaining}'")
         return _eval(obj, remaining)
 
     elif string[0] == ".":
-        print("Detected attribute or method access")
         index = next_punctuation(string, 1)
         if index == -1:
             attr = string[1:]
-            print(f"Attempting final attribute access: {attr}")
             if hasattr(obj, attr):
-                print(f"Attribute '{attr}' found.")
                 return getattr(obj, attr)
             else:
                 raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{attr}'")
 
         if string[index] == "(":
             func_name = string[1:index]
-            print(f"Function call detected: {func_name}")
             if hasattr(obj, func_name):
                 func = getattr(obj, func_name)
                 args_str = string[index + 1:string.index(")", index + 1)]
                 args = [arg.strip() for arg in args_str.split(",") if arg.strip()]
-                print(f"Calling function '{func_name}' with args: {args}")
                 result = func(*args)
                 remaining = string[string.index(")", index + 1) + 1:]
-                print(f"Function call result: {result}, continuing with '{remaining}'")
                 return _eval(result, remaining)
             else:
                 raise AttributeError(f"'{type(obj).__name__}' object has no callable '{func_name}'")
         else:
             attr = string[1:index]
-            print(f"Accessing attribute: {attr}")
             if hasattr(obj, attr):
                 obj = getattr(obj, attr)
-                print(f"Attribute '{attr}' value: {obj}")
             else:
                 raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{attr}'")
             remaining = string[index:]
-            print(f"Continuing evaluation with remaining string: '{remaining}'")
             return _eval(obj, remaining)
 
     else:
-        print(f"Unknown string start character: '{string[0]}', returning object unchanged.")
         return obj
 
 
@@ -791,7 +780,6 @@ def render_return_value(return_value: Any,
     viewer: Viewer = None,
     original: Image = None,
     ndims: int = 2) -> None:
-    print(f"Adding return_value to viewer. Type: {type(return_value)}")
     if isinstance(return_value, np.ndarray):
         if is_binary_image(return_value):
             labels, num_labels = label(return_value.astype(bool))
@@ -803,7 +791,6 @@ def render_return_value(return_value: Any,
                 properties=properties
             )
         else:
-            print(f"Metadata: {original.metadata if original else 'No metadata available'}")
             name = f"{original.name} {function_key.title()} Image"
             name = remove_all_but_last("Image", name)
             viewer.add_image(
@@ -876,6 +863,10 @@ def get_widget(widget_function: WidgetFunction) -> FunctionGui:
             def func(**kwargs):
                 class_args = {}
                 method_args = {}
+                if "image" in [p.name for p in including_config_params_from_class + including_config_params_from_function]:
+                    if kwargs["image"] is None:
+                        show_error_dialog("Please select an image before running this function.")
+                        return
                 if (
                     "pixel_to_nm_scaling" in [p.name for p in including_config_params_from_class + including_config_params_from_function]
                     and "pixel_to_nm_scaling" not in kwargs
@@ -934,7 +925,7 @@ def get_widget(widget_function: WidgetFunction) -> FunctionGui:
                     viewer = kwargs["viewer"] if "viewer" in kwargs else current_viewer()
                     render_return_value(return_value, function_key, viewer, original=kwargs.get("image", None), ndims=ndims)
                 else:
-                    print(f"Function {function_to_run.__name__} returned None.") 
+                    show_error_dialog(f"Function {function_to_run.__name__} returned None.") 
         new_parameters = []
         for p in (parameters_from_function + parameters_from_class) if type_class is not None else parameters_from_function:
             if p.name == "image":
@@ -953,7 +944,7 @@ def get_widget(widget_function: WidgetFunction) -> FunctionGui:
         return magicgui()(wrapped_func)
 
     except Exception as e:
-        print(f"❌ Exception in get_widget: {e}")
+        show_error_dialog(f"❌ Exception in get_widget: {e}")
         raise
 
     
@@ -1020,14 +1011,16 @@ class TopoStatsRootWidget(QWidget):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.setContentsMargins(5, 5, 5, 5)
+        self.load_config_message = QLabel("Load config to see more functions.")
+        layout.addWidget(self.load_config_message)
         layout.addWidget(self.function_grid)
+
         self.setLayout(layout)
         topostats_widget = self
         
     
     def get_functions(self):
         functions = {}
-        print(AVAILABLE_FUNCTIONS)
         for function in AVAILABLE_FUNCTIONS:
             function_name = function.name
             title = function_name.replace("_", " ").title()

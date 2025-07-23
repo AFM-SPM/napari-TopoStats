@@ -78,6 +78,7 @@ class ButtonGrid(QListWidget):
         self.item_mapping = {}
         self.viewer = viewer
         self.update_functions(functions)
+        self.docked_functions = []
 
     
     def update_functions(self, functions: dict[str, FunctionGui]):
@@ -96,8 +97,9 @@ class ButtonGrid(QListWidget):
         Handle the click event on a list item.
         """
         widget = self.functions.get(item.text())
-        if item.text() not in self.viewer.window._dock_widgets:
+        if item.text() not in self.docked_functions:
             self.viewer.window.add_dock_widget(widget, name=item.text())
+            self.docked_functions.append(item.text())
         if item.text() not in RUN_IMMEDIATELY_EXEMPTIONS:
             sig = inspect.signature(widget._function)
             kwargs = {}
