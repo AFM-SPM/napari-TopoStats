@@ -85,6 +85,10 @@ class ButtonGrid(QListWidget):
         self.remove_all_items()  # Clear existing items
         for label in functions or {}:
             self.addItem(label)
+        try:
+            self.itemClicked.disconnect()
+        except TypeError:
+            pass
         self.itemClicked.connect(self.add_function_as_widget)
 
     def add_function_as_widget(self, item):
@@ -100,17 +104,25 @@ class ButtonGrid(QListWidget):
 
             for name, param in sig.parameters.items():
                 if param.annotation == ImageData:
-                    selected = self.get_selected_image_data(self.viewer)
+                    selected = self.get_selected_image(self.viewer)
                     if selected is None:
                         print(f"No valid image data selected for {name}.")
                     else:
-                        kwargs[name] = self.get_selected_image_data(self.viewer)
+                        kwargs[name] = self.get_selected_image(self.viewer).data
+                if param.annotation == Image:
+                    selected = self.get_selected_image(self.viewer)
+                    if selected is None:
+                        print(f"No valid image layer selected for {name}.")
+                    else:
+                        kwargs[name] = self.get_selected_image(self.viewer)
+
                 if param.annotation == Viewer:
                     kwargs[name] = self.viewer
+            print(f"Running {widget._function.__name__} with parameters: {kwargs}")
             widget._function(**kwargs)
 
     @staticmethod
-    def get_selected_image_data(viewer) -> ImageData | None:
+    def get_selected_image(viewer) -> Image | None:
         selected = list(viewer.layers.selection)
 
         if not selected:
@@ -121,7 +133,7 @@ class ButtonGrid(QListWidget):
         if isinstance(layer, Image):
             data = layer.data
             if isinstance(data, (np.ndarray, da.Array)):  # conforms to ImageData
-                return data
+                return layer
             else:
                 print("Layer data is not valid ImageData.")
         else:

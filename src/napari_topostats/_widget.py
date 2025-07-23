@@ -76,6 +76,7 @@ from magicgui.widgets import CheckBox, Container, create_widget, FunctionGui
 
 from napari import current_viewer
 from napari.types import ImageData
+from napari.layers import Image
 from napari.viewer import Viewer
 
 
@@ -92,15 +93,45 @@ from napari_topostats.utils import (
 from topostats.grains import Grains
 from topostats.filters import Filters
 loading_dialog.close()
-AVAILABLE_FUNCTIONS = [{"name": "load_config"},
-                        {"name": "run_filters"},
-                        {"name": "run_grains", "function_key": "grains", "function_to_run": Grains.find_grains, "type_class": Grains, "path_to_data": 'obj.mask_images["above"]["merged_classes"][:, :, 1]'},
-                        {"name": "make_3d"}]
 
 from ._button_grid import ButtonGrid
 
 if TYPE_CHECKING:
     import napari
+
+#Class representation of each AVAILABLE_FUNCTIONS entry
+class WidgetFunction:
+    def __init__(self, name: str, function_key: str | None = None, function_to_run: Callable | None = None, type_class: Any | None = None, path_to_data: str | None = None, uses_config: bool = False, ndims: int = 2):
+        
+        self.name = name
+        self.function_key = function_key
+        if function_key is not None:
+            self.function_key = function_key
+            self.function_to_run = function_to_run
+            self.type_class = type_class
+            self.path_to_data = path_to_data
+            self.uses_config = uses_config
+            self.ndims = ndims
+
+AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config"),
+                        WidgetFunction(name="run_filters",
+                            function_key="filter",
+                            function_to_run=Filters.filter_image,
+                                type_class=Filters,
+                                path_to_data='obj.images["gaussian_filtered"]',
+                                    uses_config=True),
+                        WidgetFunction(name="run_grains",
+                          function_key="grains",
+                            function_to_run=Grains.find_grains,
+                              type_class=Grains,
+                                path_to_data='obj.mask_images["above"]["merged_classes"][:, :, 1]',
+                                  uses_config=True),
+
+                        WidgetFunction(name="make_3d",
+                                       function_key="3d",
+                                       function_to_run=afm2stack,
+                                       ndims=3)]
+
 def remove_scars_from_image(
     image: "napari.types.ImageData",
     removal_iterations: int = 2,
@@ -307,13 +338,11 @@ def gaussian_filter_image(
 @magicgui(
     call_button="Run Filters",
     filename={"label": "Filename"},
-    pixel_to_nm_scaling={"label": "Pixel to nm scaling"},
 )
 def run_filters(
     viewer: Viewer,
-    napari_img_layer: ImageData,
+    napari_img_layer: Image,
     filename: str = "image",
-    pixel_to_nm_scaling: float = 1.0,
 ) -> None:
     """Napari widget to run Filters.filter_image() using the loaded config."""
     global config_wrapper, full_config_container
@@ -350,7 +379,9 @@ def run_filters(
         accepted_params = set(sig.parameters.keys()) - {"self"}
         filtered_config = {k: v for k, v in filter_config.items() if k in accepted_params}
 
-        image_np = np.asarray(napari_img_layer)
+        image_np = np.asarray(napari_img_layer.data)
+        pixel_to_nm_scaling = napari_img_layer.metadata.get("px2nm", 1.0)
+        print(f"Using pixel to nm scaling: {pixel_to_nm_scaling}")
 
         # Run filtering
         filter_obj = Filters(
@@ -371,21 +402,6 @@ def run_filters(
         print(f"Filtering failed: {e}")
         import traceback
         traceback.print_exc()
-
-
-def resolve_chain(obj, attr_str):
-    i = 0
-    while i < len(attr_str):
-        if attr_str[i] == "[":
-            obj = getattr(obj, attr_str[:i])
-            attr_str = attr_str[i + 1:attr_str.index("]")]
-            i = 0
-        i += 1
-
-    parts = attr_str.split(".")
-    for part in parts:
-        obj = getattr(obj, part)
-    return obj
 
 
 def get_topostats_filter_widget():
@@ -653,9 +669,10 @@ def load_config(viewer: Viewer, config_path: Path):
     if full_config_container is None:
         print("Failed to create full config container.")
         return
-    btn = QPushButton("Edit Config")
-    btn.clicked.connect(lambda: open_config_editor(viewer))
-    viewer.window.add_dock_widget(btn, name="Edit Full Config") # Updated dock widget name
+    if "Edit Full Config" not in viewer.window._dock_widgets:
+        btn = QPushButton("Edit Config")
+        btn.clicked.connect(lambda: open_config_editor(viewer))
+        viewer.window.add_dock_widget(btn, name="Edit Full Config") # Updated dock widget name
     if topostats_widget is None:
         print("No TopoStatsRootWidget found in viewer.")
     if topostats_widget is not None:
@@ -664,6 +681,39 @@ def load_config(viewer: Viewer, config_path: Path):
 
 def get_load_config_widget():
     return load_config
+
+def enforce_defaults(args: Dict[str, Any], params: list[Any]) -> Dict[str, Any]:
+    """
+    Ensure that all required parameters have default values.
+    """
+    param_names = [p.name for p in params]
+    if "direction" in param_names:
+        args.setdefault("direction", "above")
+
+    if "threshold_std_dev" in param_names:
+        args.setdefault("threshold_std_dev", {})
+        if args.get("threshold_std_dev") is None:
+            args["threshold_std_dev"] = {}
+        args["threshold_std_dev"].setdefault("above", 1.0)
+        args["threshold_std_dev"].setdefault("below", 10.0)
+
+    if "threshold_absolute" in param_names:
+        args.setdefault("threshold_absolute", {})
+        if args.get("threshold_absolute") is None:
+            args["threshold_absolute"] = {}
+        args["threshold_absolute"].setdefault("above", 1.0)
+        args["threshold_absolute"].setdefault("below", -1.0)
+    if "remove_scars" in param_names:
+        args.setdefault("remove_scars", {})
+        if args.get("remove_scars") is None:
+            args["remove_scars"] = {}
+        args["remove_scars"].setdefault("run", False)
+
+    for key, value in args.items():
+        if isinstance(value, (Image)):
+            print(f"Converting ImageData to ndarray for key: {key}")
+            args[key] = np.asarray(value.data)
+    return args
 
 def add_values_to_dict_from_config(
     config: Dict[str, Any],
@@ -800,31 +850,61 @@ class CallableWithSignature:
         bound = self.__signature__.bind(*args, **kwargs)
         bound.apply_defaults()
         return self.real_func(**bound.arguments)
-    
 
 def is_binary_image(arr: np.ndarray) -> bool:
     unique_vals = np.unique(arr) 
     # Check if unique values are subset of {0,1}
     return set(unique_vals).issubset({0, 1, 255})
 
-def get_widget(function_key: str, function_to_run: Callable, type_class: type = None, path_to_data: str = None) -> FunctionGui:
-    global config_wrapper, full_config_container
+def remove_all_but_last(word: str, text: str) -> str:
+    parts = text.rsplit(word, maxsplit=1)
+    if len(parts) == 1:
+        return text  # word not found or only once
+    return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return
 
-    print(f"--- get_widget called with ---")
-    print(f"function_key: {function_key}")
-    print(f"function_to_run: {function_to_run.__name__}")
-    print(f"type_class: {type_class}")
-    print(f"path_to_data: {path_to_data}")
 
-    if config_wrapper is None:
-        print("⚠️ Config wrapper is None.")
-        print("Please load a config file first using 'Load Config'.")
-        
-    if full_config_container is None:
-        print("⚠️ Full config container is None.")
-        print("Please load a config file first using 'Load Config'.")
-    if config_wrapper is None or full_config_container is None:
-        return
+def render_return_value(return_value: Any,
+    function_key: str,
+    viewer: Viewer = None,
+    original: Image = None,
+    ndims: int = 2) -> None:
+    print(f"Adding return_value to viewer. Type: {type(return_value)}")
+    if isinstance(return_value, np.ndarray):
+        if is_binary_image(return_value):
+            labels, num_labels = label(return_value.astype(bool))
+            label_ids = list(range(1, num_labels + 1))
+            properties = {"label_id": label_ids}
+            viewer.add_labels(
+                labels.astype(np.uint16),
+                name=f"{original.name} {function_key.title()} Mask",
+                properties=properties
+            )
+        else:
+            print(f"Metadata: {original.metadata if original else 'No metadata available'}")
+            name = f"{original.name} {function_key.title()} Image"
+            name = remove_all_but_last("Image", name)
+            viewer.add_image(
+                return_value,
+                name=name,
+                contrast_limits=(-1, 5),
+                metadata={"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}
+            )
+            viewer.dims.ndisplay = ndims
+            
+
+
+def get_widget(widget_function: WidgetFunction) -> FunctionGui:
+    function_key = widget_function.function_key
+    function_to_run = widget_function.function_to_run
+    type_class = widget_function.type_class
+    path_to_data = widget_function.path_to_data
+    uses_config = widget_function.uses_config
+    ndims = widget_function.ndims
+
+    if uses_config:
+        global config_wrapper, full_config_container
+        if config_wrapper is None or full_config_container is None:
+            return
 
     try:
         if path_to_data is None:
@@ -832,20 +912,9 @@ def get_widget(function_key: str, function_to_run: Callable, type_class: type = 
                 path_to_data = "obj"
             else:
                 path_to_data = "return"
-        print(f"Resolved path_to_data: {path_to_data}")
-
-        updated_values = collect_values(full_config_container)
-        print("Collected values from full_config_container.")
-        config_wrapper.flat.update(updated_values)
-
-        full_current_config = config_wrapper.unflatten()
-        config = full_current_config.get(function_key, {})
-        print(f"Retrieved config for key '{function_key}': {config}")
-
         parameters_from_function = [
             p for p in inspect.signature(function_to_run).parameters.values() if p.name != "self"
         ]
-        print(f"Function parameters: {[p.name for p in parameters_from_function]}")
 
         if type_class is not None:
             sig = inspect.signature(type_class.__init__)
@@ -853,83 +922,65 @@ def get_widget(function_key: str, function_to_run: Callable, type_class: type = 
                 p for name, p in sig.parameters.items()
                 if name != "self"
             ]
-            print(f"Class constructor parameters: {[p.name for p in parameters_from_class]}")
             all_parameters = parameters_from_class + parameters_from_function
         else:
             sig = inspect.signature(function_to_run)
             all_parameters = parameters_from_function
+            
 
         including_config_params_from_function = parameters_from_function.copy()
         including_config_params_from_class = parameters_from_class.copy() if type_class is not None else []
-        filtered_config = {}
-        for param_name in [p.name for p in all_parameters]:
-            print(f"Looking for parameter '{param_name}' in config...")
-            if param_name in config:
-                filtered_config[param_name] = config[param_name]
-                print(f"Found in config: {param_name} = {config[param_name]}")
-                parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
-                if type_class is not None:
-                    parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
-            else:
-                for flat_key, flat_val in config_wrapper.flat.items():
-                    if flat_key.startswith(f"{function_key}.") and flat_key[len(f"{function_key}."):] == param_name:
-                        filtered_config[param_name] = flat_val
-                        print(f"Found in flat config: {flat_key} = {flat_val}")
-                        parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
-                        if type_class is not None:
-                            parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
-                        break
-            if param_name in config and isinstance(config[param_name], dict):
-                filtered_config[param_name] = config[param_name]
-                print(f"Found dict for param {param_name}: {config[param_name]}")
-                parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
-                if type_class is not None:
-                    parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
-        print(f"Parameters after filtering: {[p.name for p in parameters_from_function]}")
-        print(f"Class constructor parameters after filtering: {[p.name for p in parameters_from_class]}")
+        if uses_config:
+            updated_values = collect_values(full_config_container)
+            config_wrapper.flat.update(updated_values)
+            full_current_config = config_wrapper.unflatten()
+            config = full_current_config.get(function_key, {})
+            for param_name in [p.name for p in all_parameters]:
+                if param_name in config:
+                    parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
+                    if type_class is not None:
+                        parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
+                else:
+                    for flat_key, flat_val in config_wrapper.flat.items():
+                        if flat_key.startswith(f"{function_key}.") and flat_key[len(f"{function_key}."):] == param_name:
+                            parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
+                            if type_class is not None:
+                                parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
+                            break
+                if param_name in config and isinstance(config[param_name], dict):
+                    parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
+                    if type_class is not None:
+                        parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
         if type_class is not None:
             def func(**kwargs):
-                print("--- Running widget function for class method ---")
                 class_args = {}
                 method_args = {}
-                print(f"Initial kwargs: {kwargs}")
-                print(f"Parameters from function: {[p.name for p in including_config_params_from_function]}")
-                print(f"Parameters from class: {[p.name for p in including_config_params_from_class]}")
+                if (
+                    "pixel_to_nm_scaling" in [p.name for p in including_config_params_from_class + including_config_params_from_function]
+                    and "pixel_to_nm_scaling" not in kwargs
+                ):
+                    kwargs["pixel_to_nm_scaling"] = kwargs["image"].metadata.get("px2nm", 1.0)
+                    print(f"Using pixel_to_nm_scaling from image metadata: {kwargs['pixel_to_nm_scaling']}")
 
                 for key, value in kwargs.items():
                     if key in [p.name for p in including_config_params_from_function]:
                         method_args[key] = value
                     elif key in [p.name for p in including_config_params_from_class]:
                         class_args[key] = value
-                print(f"Initial method_args from kwargs: {method_args}")
-                print(f"Initial class_args from kwargs: {class_args}")
-                print(f"Config: {config}")
-                method_args = add_values_to_dict_from_config(
-                    config, config_wrapper, function_key, method_args, including_config_params_from_function
-                )
-                class_args = add_values_to_dict_from_config(
-                    config, config_wrapper, function_key, class_args, including_config_params_from_class
-                )
+                if uses_config:
+                    method_args = add_values_to_dict_from_config(
+                        config, config_wrapper, function_key, method_args, including_config_params_from_function
+                    )
+                    class_args = add_values_to_dict_from_config(
+                        config, config_wrapper, function_key, class_args, including_config_params_from_class
+                    )
 
-                print(f"Final method_args: {method_args}")
-                print(f"Final class_args: {class_args}")
-
-                for key, value in method_args.items():
-                    if isinstance(value, get_args(ImageData)):
-                        print(f"Converting ImageData to ndarray for key: {key}")
-                        method_args[key] = np.asarray(value.data)
-                for key, value in class_args.items():
-                    if isinstance(value, get_args(ImageData)):
-                        print(f"Converting ImageData to ndarray for key: {key}")
-                        class_args[key] = np.asarray(value.data)
-
-                print("Creating instance of class...")
+                method_args = enforce_defaults(method_args, including_config_params_from_function)
+                class_args = enforce_defaults(class_args, including_config_params_from_class)
                 instance = type_class(**class_args)
                 method = getattr(instance, function_to_run.__name__, None)
                 if method:
-                    print(f"Calling method {function_to_run.__name__}")
                     return_value = method(**method_args)
-                    print(f"Return value: {return_value}")
 
                     if path_to_data.startswith("return"):
                         return_value = _eval(return_value, path_to_data[6:]) if len(path_to_data) > 6 else return_value
@@ -940,65 +991,44 @@ def get_widget(function_key: str, function_to_run: Callable, type_class: type = 
                     
                     if return_value is not None:
                         viewer = kwargs["viewer"] if "viewer" in kwargs else current_viewer()
-                        print(f"Adding return_value to viewer. Type: {type(return_value)}")
-                        if isinstance(return_value, np.ndarray):
-                            if is_binary_image(return_value):
-                                labels, num_labels = label(return_value.astype(bool))
-                                label_ids = list(range(1, num_labels + 1))
-                                properties = {"label_id": label_ids}
-                                viewer.add_labels(
-                                    labels.astype(np.uint16),
-                                    name=f"{function_key.title()} Mask",
-                                    properties=properties
-                                )
-                            else:
-                                viewer.add_image(
-                                    return_value,
-                                    name=f"{function_key.title()} Image",
-                                    contrast_limits=(-1, 5),
-                                )
-                    else:
-                        print(f"Function {function_to_run.__name__} returned None.") 
-            new_parameters = []
-            for p in parameters_from_function + parameters_from_class:
-                if p.name == "image":
-                    new_p = p.replace(default=None)
-                    new_p = new_p.replace(annotation=ImageData)
-                elif p.name == "pixel_to_nm_scaling":
-                    new_p = p.replace(default=1.0)
-                elif p.name == "filename":
-                    new_p = p.replace(default="image")
-                else:
-                    new_p = p
-                new_parameters.append(new_p)
-            print(f"New parameters for magicgui: {[p.name for p in new_parameters]}")
-            wrapped_func = CallableWithSignature(func, inspect.Signature(parameters=new_parameters))
-            
+                        render_return_value(return_value, function_key, viewer, kwargs.get("image", None))
         else:
             def func(**kwargs):
-                print("--- Running widget function for standalone function ---")
                 method_args = {}
 
                 for key, value in kwargs.items():
                     if key in [p.name for p in including_config_params_from_function]:
                         method_args[key] = value
-                print(f"Initial method_args from kwargs: {method_args}")
+                if uses_config:
+                    method_args = add_values_to_dict_from_config(
+                        config, config_wrapper, function_key, method_args, including_config_params_from_function
+                    )
 
-                method_args = add_values_to_dict_from_config(
-                    config, config_wrapper, function_key, method_args, including_config_params_from_function
-                )
+                method_args = enforce_defaults(method_args, including_config_params_from_function)
 
-                for key, value in method_args.items():
-                    if isinstance(value, ImageData):
-                        print(f"Converting ImageData to ndarray for key: {key}")
-                        method_args[key] = np.asarray(value.data)
-
-                print(f"Calling standalone function: {function_to_run.__name__} with args: {method_args}")
-                function_to_run(method_args)
-
-            wrapped_func = CallableWithSignature(func, inspect.Signature(parameters=new_parameters))
-
-        print("Wrapping function with magicgui")
+                return_value = function_to_run(**method_args)
+                if path_to_data.startswith("return"):
+                    return_value = _eval(return_value, path_to_data[6:]) if len(path_to_data) > 6 else return_value
+                if return_value is not None:
+                    viewer = kwargs["viewer"] if "viewer" in kwargs else current_viewer()
+                    render_return_value(return_value, function_key, viewer, original=kwargs.get("image", None), ndims=ndims)
+                else:
+                    print(f"Function {function_to_run.__name__} returned None.") 
+        new_parameters = []
+        for p in (parameters_from_function + parameters_from_class) if type_class is not None else parameters_from_function:
+            if p.name == "image":
+                new_p = p.replace(default=None)
+                new_p = new_p.replace(annotation=Image)
+            elif p.name == "pixel_to_nm_scaling":
+                new_p = p.replace(default=1.0)
+            elif p.name == "filename":
+                new_p = p.replace(default="image")
+            else:
+                new_p = p
+            if new_p.name != "pixel_to_nm_scaling":
+                new_parameters.append(new_p)
+        wrapped_func = CallableWithSignature(func, inspect.Signature(parameters=new_parameters))
+            
         return magicgui()(wrapped_func)
 
     except Exception as e:
@@ -1198,29 +1228,18 @@ class TopoStatsRootWidget(QWidget):
     def get_functions(self):
         functions = {}
         print(AVAILABLE_FUNCTIONS)
-        for function_dict in AVAILABLE_FUNCTIONS:
-            function_name = function_dict["name"]
+        for function in AVAILABLE_FUNCTIONS:
+            function_name = function.name
             title = function_name.replace("_", " ").title()
-            if "function_key" in function_dict:
-                global config_wrapper, full_config_container
-                if config_wrapper is None or full_config_container is None:
-                    continue
-                function_dict.pop("name", None)
-                function_key = function_dict["function_key"]
-                function_to_run = function_dict["function_to_run"]
-                type_class = function_dict["type_class"]
-                path_to_data = function_dict["path_to_data"]
-                print(f"--- get_widget called with ---")
-                print(f"function_key: {function_key}")
-                print(f"function_to_run: {function_to_run.__name__}")
-                print(f"type_class: {type_class}")
-                print(f"path_to_data: {path_to_data}")
-                func = get_widget(function_key, function_to_run, type_class, path_to_data)
-                print(f"Function {title} found: {func}")
+            if function.function_key is not None:
+                if function.uses_config:
+                    global config_wrapper, full_config_container
+                    if config_wrapper is None or full_config_container is None:
+                        continue
+                func = get_widget(function)
                 functions[title] = func
             else:
                 func = getattr(sys.modules[__name__], function_name, None)
-                print(f"Function {function_name} found: {func}")
                 if isinstance(func, FunctionGui):
                     functions[title] = func
                 elif callable(func):
