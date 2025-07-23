@@ -126,7 +126,6 @@ AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config"),
                               type_class=Grains,
                                 path_to_data='obj.mask_images["above"]["merged_classes"][:, :, 1]',
                                   uses_config=True),
-
                         WidgetFunction(name="make_3d",
                                        function_key="3d",
                                        function_to_run=afm2stack,
@@ -335,78 +334,6 @@ def gaussian_filter_image(
     """
     return (gaussian_filter(image=image, sigma=sigma), {}, "image")
 
-@magicgui(
-    call_button="Run Filters",
-    filename={"label": "Filename"},
-)
-def run_filters(
-    viewer: Viewer,
-    napari_img_layer: Image,
-    filename: str = "image",
-) -> None:
-    """Napari widget to run Filters.filter_image() using the loaded config."""
-    global config_wrapper, full_config_container
-
-    if config_wrapper is None or full_config_container is None:
-        print("Please load a config file first using 'Load Config'.")
-        return
-
-    try:
-        # Update config with any edits from the GUI
-        updated_values = collect_values(full_config_container)
-        config_wrapper.flat.update(updated_values)
-        full_current_config = config_wrapper.unflatten()
-
-        # Extract filter config
-        filter_config = full_current_config.get("filter", {})
-
-        # Enforce required defaults
-        filter_config["direction"] = "above"
-
-        filter_config.setdefault("threshold_std_dev", {})
-        filter_config["threshold_std_dev"].setdefault("above", 1.0)
-        filter_config["threshold_std_dev"].setdefault("below", 10.0)
-
-        filter_config.setdefault("threshold_absolute", {})
-        filter_config["threshold_absolute"].setdefault("above", 1.0)
-        filter_config["threshold_absolute"].setdefault("below", -1.0)
-
-        filter_config.setdefault("remove_scars", {})
-        filter_config["remove_scars"].setdefault("run", False)
-
-        # Filter out valid init args
-        sig = inspect.signature(Filters.__init__)
-        accepted_params = set(sig.parameters.keys()) - {"self"}
-        filtered_config = {k: v for k, v in filter_config.items() if k in accepted_params}
-
-        image_np = np.asarray(napari_img_layer.data)
-        pixel_to_nm_scaling = napari_img_layer.metadata.get("px2nm", 1.0)
-        print(f"Using pixel to nm scaling: {pixel_to_nm_scaling}")
-
-        # Run filtering
-        filter_obj = Filters(
-            image=image_np,
-            filename=filename,
-            pixel_to_nm_scaling=pixel_to_nm_scaling,
-            **filtered_config,
-        )
-        filter_obj.filter_image()
-
-        filtered = filter_obj.images.get("gaussian_filtered")
-        if filtered is not None:
-            viewer.add_image(filtered, name=f"{filename} - filtered")
-        else:
-            print("No filtered image found in output.")
-
-    except Exception as e:
-        print(f"Filtering failed: {e}")
-        import traceback
-        traceback.print_exc()
-
-
-def get_topostats_filter_widget():
-    return run_topostats_filter_widget
-
 class ConfigWrapper:
     def __init__(self, config: dict):
         self.original = config
@@ -538,7 +465,6 @@ def collect_values(container: Container) -> Dict[str, Any]:
         result[name] = val
     return result
 
-print("setting config_wrapper and full_config_container to None")
 config_wrapper = None
 full_config_container = None
 comment_descriptions = {}
@@ -739,15 +665,15 @@ def add_values_to_dict_from_config(
             args[param_name] = config[param_name]
     return args
 
-# def show_warning(message: str, time_displayed: float = 3.0):
-#     """
-#     Show a warning message in the console and optionally display it in the GUI.
-#     """
-#     print(f"Warning: {message}")
-#     if hasattr(current_viewer(), 'window'):
-#         current_viewer().window.status = message
-#         QApplication.processEvents()
-#         QTimer.singleShot(int(time_displayed * 1000), lambda: current_viewer().window.status = "")
+def show_warning(message: str, time_displayed: float = 3.0):
+    """
+    Show a warning message in the console and optionally display it in the GUI.
+    """
+    print(f"Warning: {message}")
+    if hasattr(current_viewer(), 'window'):
+        current_viewer().window.status = message
+        QApplication.processEvents()
+        QTimer.singleShot(int(time_displayed * 1000), lambda: current_viewer().window.status = "")
 
 def _eval(obj: Any, string: str) -> Any:
     print(f"Entering _eval with object type: {type(obj)} and string: '{string}'")
@@ -831,8 +757,6 @@ def _eval(obj: Any, string: str) -> Any:
         return obj
 
 
-
-
 def next_punctuation(s: str, start: int = 0, checking_for: str = ".([") -> int:
     """Find the next punctuation character in a string."""
     for i in range(start, len(s)):
@@ -862,7 +786,6 @@ def remove_all_but_last(word: str, text: str) -> str:
         return text  # word not found or only once
     return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return
 
-
 def render_return_value(return_value: Any,
     function_key: str,
     viewer: Viewer = None,
@@ -890,8 +813,6 @@ def render_return_value(return_value: Any,
                 metadata={"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}
             )
             viewer.dims.ndisplay = ndims
-            
-
 
 def get_widget(widget_function: WidgetFunction) -> FunctionGui:
     function_key = widget_function.function_key
@@ -1036,127 +957,6 @@ def get_widget(widget_function: WidgetFunction) -> FunctionGui:
         raise
 
     
-@magicgui(
-    call_button="Run Grains",
-    filename={"label": "Filename"},
-    pixel_to_nm_scaling={"label": "Pixel to nm scaling"},
-)
-def run_grains(
-    viewer: Viewer,
-    napari_img_layer: ImageData,
-    filename: str = "image",
-    pixel_to_nm_scaling: float = 1.0,
-) -> None:
-    global config_wrapper, full_config_container
-
-    if config_wrapper is None or full_config_container is None:
-        print("Please load a config file first using 'Load Config'.")
-        return
-
-    try:
-        updated_values = collect_values(full_config_container)
-        config_wrapper.flat.update(updated_values)
-
-        full_current_config = config_wrapper.unflatten()
-        grains_config = full_current_config.get("grains", {})
-
-        sig = inspect.signature(Grains.__init__)
-        accepted_params = set(sig.parameters.keys()) - {"self", "image", "filename", "pixel_to_nm_scaling"}
-        print(f"Accepted parameters for Grains: {accepted_params}")
-        filtered_grains_config = {}
-        for param_name in accepted_params:
-            if param_name in grains_config:
-                filtered_grains_config[param_name] = grains_config[param_name]
-
-            for flat_key, flat_val in config_wrapper.flat.items():
-                if flat_key.startswith("grains.") and flat_key[len("grains."):] == param_name:
-                    filtered_grains_config[param_name] = flat_val
-                    break
-
-            if param_name in grains_config and isinstance(grains_config[param_name], dict):
-                filtered_grains_config[param_name] = grains_config[param_name]
-
-        image_np = np.asarray(napari_img_layer.data)
-        print(f"Calling Grains with config: {filtered_grains_config}")
-        
-        grains_obj = Grains(
-            image=image_np,
-            filename=filename,
-            pixel_to_nm_scaling=pixel_to_nm_scaling,
-            **filtered_grains_config
-        )
-        grains_obj.find_grains()
-
-        try:
-            merged = grains_obj.mask_images["above"]["merged_classes"][:, :, 1]
-
-            # Label each grain individually
-            labeled_grains, num_grains = label(merged.astype(bool))
-
-            # Simple properties with grain_id
-            grain_ids = list(range(1, num_grains + 1))
-            properties = {"grain_id": grain_ids}
-
-            # Add labeled mask to napari with grain properties
-            viewer.add_labels(
-                labeled_grains.astype(np.uint16),
-                name="Grain Mask",
-                properties=properties
-            )
-
-        except Exception as e:
-            print(f"Failed to add merged_classes mask: {e}")
-
-    except Exception as e:
-        print(f"Grain detection failed: {e}")
-        import traceback
-        traceback.print_exc()
-
-
-def get_grains_widget():
-    return run_grains
-
-@magicgui(
-    call_button="3D-ify Image",
-)
-def make_3d(
-    viewer: Viewer,
-    image: ImageData,
-    filename: str = "image",
-    bySlices: bool = True,
-    min_slices: int = 255,
-    resolution: float = 1.0,
-) -> ImageData:
-    """
-    Convert an AFM height image into a pseudo volume by via the pixel values.
-
-    Parameters
-    ----------
-    image : napari.types.ImageData
-        2-D numpy height-map array.
-    bySlices : bool, optional
-        Convert to voxels by creating N slices or cut at a Z resolution, by default True.
-    min_slices : int, optional
-        Number of voxel slices, by default 255
-    resolution : float, optional
-        Size of voxel height, by default 1.0
-
-    Returns
-    -------
-    napari.types.ImageData
-        3-D slices of the AFM height image.
-    """
-    stack = afm2stack(
-        image=image,
-        by_slices=bySlices,
-        numslices=min_slices,
-        resolution=resolution,
-    )
-    viewer.add_image(stack,
-                    name=f"{filename} - 3D-ified",
-                    contrast_limits=(-1, 5),)
-    viewer.dims.ndisplay = 3
-
 # if we want even more control over our widget, we can use
 # magicgui `Container`
 class ImageThreshold(Container):
@@ -1246,6 +1046,3 @@ class TopoStatsRootWidget(QWidget):
                     functions[title] = magicgui(func)
         return functions
     
-
-
-
