@@ -6,7 +6,7 @@ from magicgui.widgets import FunctionGui
 from napari.viewer import Viewer
 import inspect
 from napari.types import ImageData
-import typing
+from typing import Any, Callable
 from napari.layers import Image
 from napari.types import ImageData
 import numpy as np
@@ -64,8 +64,32 @@ def _get_icon(name):
         return ""
     return str(path)
 
+# Class representation of each function in the button grid.
+class WidgetFunction:
+    def __init__(self, name: str, function_key: str | None = None, function_to_run: Callable | None = None, type_class: Any | None = None, path_to_data: str | None = None, uses_config: bool = False, ndims: int = 2, tooltip: str | None = None):
+        
+        self.name = name
+        self.function_key = function_key
+        if function_key is not None:
+            self.function_key = function_key
+            self.function_to_run = function_to_run
+            self.type_class = type_class
+            self.path_to_data = path_to_data
+            self.uses_config = uses_config
+            self.ndims = ndims
+        self.tooltip = tooltip
+
+    def set_function_gui(self, function_gui: FunctionGui):
+        self.function_gui = function_gui
+
+    def get_function_gui(self) -> FunctionGui:
+        if hasattr(self, 'function_gui'):
+            return self.function_gui
+        else:
+            raise AttributeError("Function GUI not set for this WidgetFunction instance.")
+
 class ButtonGrid(QListWidget):
-    def __init__(self, parent=None, functions: dict[str, FunctionGui] = None, viewer: Viewer = None):
+    def __init__(self, parent=None, functions: dict[str, WidgetFunction] | None = None, viewer: Viewer = None):
         super().__init__(parent=parent)
         self.setMovement(self.Static)  # The items cannot be moved by the user.
         self.setViewMode(self.IconMode)  # make items icons
@@ -80,12 +104,14 @@ class ButtonGrid(QListWidget):
         self.update_functions(functions)
         self.docked_functions = []
 
-    
-    def update_functions(self, functions: dict[str, FunctionGui]):
+    def update_functions(self, functions: dict[str, WidgetFunction] | None):
         self.functions = functions or {}
         self.remove_all_items()  # Clear existing items
-        for label in functions or {}:
-            self.addItem(label)
+        for label, function in functions.items():
+            if function.tooltip:
+                self.addItem(label, function.tooltip)
+            else:
+                self.addItem(label)
         try:
             self.itemClicked.disconnect()
         except TypeError:
@@ -96,7 +122,7 @@ class ButtonGrid(QListWidget):
         """
         Handle the click event on a list item.
         """
-        widget = self.functions.get(item.text())
+        widget = self.functions.get(item.text()).get_function_gui()
         if item.text() not in self.docked_functions:
             self.viewer.window.add_dock_widget(widget, name=item.text())
             self.docked_functions.append(item.text())
@@ -144,7 +170,7 @@ class ButtonGrid(QListWidget):
         return None
 
 
-    def addItem(self, label : str, tool_tip : str = None):
+    def addItem(self, label : str, tool_tip: str | None = None):
         if isinstance(label, QListWidgetItem):
             super().addItem(label)
 
@@ -156,12 +182,6 @@ class ButtonGrid(QListWidget):
             item.setToolTip(tool_tip)
         super().addItem(item)
 
-    def addItems(self, labels) -> None:
-        for label in labels:
-            if hasattr(labels[label], "tool_tip"):
-                self.addItem(label, labels[label].tool_tip)
-            else:
-                self.addItem(label)
     def remove_all_items(self):
         """
         Remove all items from the QListWidget and clear the item mapping.
