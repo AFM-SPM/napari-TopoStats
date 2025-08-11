@@ -65,9 +65,8 @@ QApplication.processEvents()
 import inspect
 import json
 import re
-from argparse import Namespace
 from pathlib import Path
-from typing import Any, Callable, Dict, TYPE_CHECKING, get_args
+from typing import Any, Dict, TYPE_CHECKING
 
 import numpy as np
 import yaml
@@ -97,7 +96,7 @@ from topostats.io import write_config_with_comments
 
 loading_dialog.close()
 
-from ._button_grid import ButtonGrid
+from ._button_grid import ButtonGrid, WidgetFunction
 
 if TYPE_CHECKING:
     import napari
@@ -112,19 +111,7 @@ class ErrorDialog(QDialog):
         self.setLayout(layout)
         self.setModal(True)
 
-#Class representation of each AVAILABLE_FUNCTIONS entry
-class WidgetFunction:
-    def __init__(self, name: str, function_key: str | None = None, function_to_run: Callable | None = None, type_class: Any | None = None, path_to_data: str | None = None, uses_config: bool = False, ndims: int = 2):
-        
-        self.name = name
-        self.function_key = function_key
-        if function_key is not None:
-            self.function_key = function_key
-            self.function_to_run = function_to_run
-            self.type_class = type_class
-            self.path_to_data = path_to_data
-            self.uses_config = uses_config
-            self.ndims = ndims
+
 
 AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config"),
                         WidgetFunction(name="run_filters",
@@ -132,17 +119,20 @@ AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config"),
                             function_to_run=Filters.filter_image,
                                 type_class=Filters,
                                 path_to_data='obj.images["gaussian_filtered"]',
-                                    uses_config=True),
+                                    uses_config=True,
+                                    tooltip="Run filters on the selected image using the current configuration."),
                         WidgetFunction(name="run_grains",
                           function_key="grains",
                             function_to_run=Grains.find_grains,
                               type_class=Grains,
                                 path_to_data='obj.mask_images["above"]["merged_classes"][:, :, 1]',
-                                  uses_config=True),
+                                  uses_config=True,
+                                  tooltip="Run grain analysis on the selected image using the current configuration."),
                         WidgetFunction(name="make_3d",
                                        function_key="3d",
                                        function_to_run=afm2stack,
-                                       ndims=3)]
+                                       ndims=3,
+                                       tooltip="Convert the selected image to a 3D stack"),]
 def show_error_dialog(message: str):
     global current_error_dialog
     print(f"Error: {message}")
@@ -945,8 +935,8 @@ def get_widget(widget_function: WidgetFunction) -> FunctionGui:
             if new_p.name != "pixel_to_nm_scaling":
                 new_parameters.append(new_p)
         wrapped_func = CallableWithSignature(func, inspect.Signature(parameters=new_parameters))
-            
-        return magicgui()(wrapped_func)
+        magicgui_function = magicgui()(wrapped_func)
+        return magicgui_function
 
     except Exception as e:
         show_error_dialog(f"❌ Exception in get_widget: {e}")
@@ -1016,10 +1006,7 @@ class TopoStatsRootWidget(QWidget):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.setContentsMargins(5, 5, 5, 5)
-        self.load_config_message = QLabel("Load config to see more functions.")
-        layout.addWidget(self.load_config_message)
         layout.addWidget(self.function_grid)
-
         self.setLayout(layout)
         topostats_widget = self
         
@@ -1033,9 +1020,10 @@ class TopoStatsRootWidget(QWidget):
                 if function.uses_config:
                     global config_wrapper, full_config_container
                     if config_wrapper is None or full_config_container is None:
-                        continue
+                        load_config(self._viewer)
                 func = get_widget(function)
-                functions[title] = func
+                function.set_function_gui(func)
+                functions[title] = function
             else:
                 func = getattr(sys.modules[__name__], function_name, None)
                 if isinstance(func, FunctionGui):
