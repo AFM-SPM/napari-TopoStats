@@ -31,40 +31,17 @@ Replace code below according to your needs.
 import sys
 import functools
 from qtpy.QtCore import Qt
-from qtpy.QtGui import QIcon, QMovie
+from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
-    QDialog, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel,
-    QPushButton, QScrollArea, QToolButton, QVBoxLayout, QWidget, QSizePolicy, QApplication
+    QToolButton, QVBoxLayout, QWidget, QSizePolicy, QApplication
 )
-class LoadingDialog(QDialog):
-    def __init__(self, text="Loading..."):
-        super().__init__()
-        self.setWindowTitle("Please wait")
-        layout = QVBoxLayout()
-
-        self.label_text = QLabel(text)
-        layout.addWidget(self.label_text)
-
-        self.spinner_label = QLabel()
-        layout.addWidget(self.spinner_label)
-
-        self.setLayout(layout)
-        self.setModal(True)
-
-        # Load the spinner GIF
-        self.movie = QMovie("icons/spinner.gif")  # Path to your spinner gif file
-        self.spinner_label.setMovie(self.movie)
-        self.movie.start()
-
-        self.adjustSize()
+from ._alerts import show_error_dialog, LoadingDialog
 
 loading_dialog = LoadingDialog("Loading TopoStats...")
 loading_dialog.show()
-current_error_dialog = None
-QApplication.processEvents() 
+QApplication.processEvents()
 import inspect
 import json
-import re
 from pathlib import Path
 from typing import Any, Dict, TYPE_CHECKING
 
@@ -92,28 +69,24 @@ from napari_topostats.utils import (
 
 from topostats.grains import Grains
 from topostats.filters import Filters
-from topostats.io import write_config_with_comments
 
 loading_dialog.close()
 
-from ._button_grid import ButtonGrid, WidgetFunction
+from ._button_grid import ButtonGrid
+from ._widget_function import WidgetFunction
+from . import _state as state
+from . import _widget_function as gui_utils
+from ._io import load_config
+
 
 if TYPE_CHECKING:
     import napari
 
-class ErrorDialog(QDialog):
-    def __init__(self, message: str):
-        super().__init__()
-        self.setWindowTitle("Error")
-        layout = QVBoxLayout()
-        self.label = QLabel(message)
-        layout.addWidget(self.label)
-        self.setLayout(layout)
-        self.setModal(True)
 
 
 
-AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config"),
+AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config",
+                                      function_to_run=load_config),
                         WidgetFunction(name="run_filters",
                             function_key="filter",
                             function_to_run=Filters.filter_image,
@@ -133,15 +106,7 @@ AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config"),
                                        function_to_run=afm2stack,
                                        ndims=3,
                                        tooltip="Convert the selected image to a 3D stack"),]
-def show_error_dialog(message: str):
-    global current_error_dialog
-    print(f"Error: {message}")
-    if current_error_dialog is not None:
-        current_error_dialog.close()
-    current_error_dialog = ErrorDialog(message)
-    current_error_dialog.show()
 
-    QApplication.processEvents()  # Ensure the dialog is shown immediately
 
 def remove_scars_from_image(
     image: "napari.types.ImageData",
@@ -346,601 +311,19 @@ def gaussian_filter_image(
     """
     return (gaussian_filter(image=image, sigma=sigma), {}, "image")
 
-class ConfigWrapper:
-    def __init__(self, config: dict):
-        self.original = config
-        self.flat = self._flatten(config)
-
-    def _flatten(self, d, parent_key='', sep='.'):
-        items = {}
-        for k, v in d.items():
-            new_key = f"{parent_key}{sep}{k}" if parent_key else k
-            if isinstance(v, dict):
-                items.update(self._flatten(v, new_key, sep=sep))
-            else:
-                items[new_key] = v
-        return items
-
-    def unflatten(self) -> dict:
-        result = {}
-        for k, v in self.flat.items():
-            keys = k.split('.')
-            d = result
-            for part in keys[:-1]:
-                d = d.setdefault(part, {})
-            d[keys[-1]] = v
-        return result
-
-def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> Dict[str, str]:
-    """
-    Extracts inline comments from a YAML file.
-    (This function remains the same as our last debugged version)
-    """
-    comment_map = {}
-    key_stack = [] 
-
-    if not yaml_path.exists():
-        show_error_dialog(f"Error: YAML file not found at {yaml_path}")
-        return {}
-
-    with open(yaml_path, "r") as f:
-        for line_num, line in enumerate(f, 1):
-            stripped_line = line.strip()
-
-            if not stripped_line or stripped_line.startswith("#"):
-                continue
-
-            match = re.match(r"^(\s*)([a-zA-Z0-9_]+):\s*(?:[^#\n]*?)(?:#\s*(.*))?$", line)
-            
-            if match:
-                indent_str, key_name, comment_text = match.groups()
-                indent_level = len(indent_str.replace("\t", "  ")) // 2
-
-                key_stack = key_stack[:indent_level]
-                key_stack.append(key_name)
-
-                full_yaml_key_path = ".".join(key_stack)
-                final_key_for_map = full_yaml_key_path
-                
-                if top_level_key:
-                    if full_yaml_key_path == top_level_key:
-                        final_key_for_map = ""
-                    elif full_yaml_key_path.startswith(top_level_key + "."):
-                        final_key_for_map = full_yaml_key_path[len(top_level_key) + 1:]
-
-                if comment_text is not None and final_key_for_map:
-                    comment_map[final_key_for_map] = comment_text.strip()
-    return comment_map
-
-def create_info_icon(tooltip_text: str) -> QToolButton:
-    button = QToolButton()
-    icon = QIcon.fromTheme("help-about")
-    
-    if icon and not icon.isNull():
-        button.setIcon(icon)
-    else:
-        button.setText("?")
-        font = button.font()
-        font.setBold(True)
-        button.setFont(font)
-        
-    button.setToolTip(tooltip_text)
-    button.setAutoRaise(True)
-    button.setCursor(Qt.WhatsThisCursor)
-    return button
-
-def build_dynamic_widget(flat_config: Dict[str, Any], descriptions: Dict[str, str] = None) -> Container:
-    widgets = []
-    for key, value in flat_config.items():
-        current_tooltip_text = descriptions.get(key, "") if descriptions else ""
-
-        if isinstance(value, bool):
-            w = create_widget(name=key, widget_type="CheckBox", value=value)
-        elif isinstance(value, int):
-            w = create_widget(name=key, widget_type="SpinBox", value=value)
-        elif isinstance(value, float):
-            w = create_widget(name=key, widget_type="FloatSpinBox", value=value)
-        elif isinstance(value, str):
-            w = create_widget(name=key, widget_type="LineEdit", value=value)
-        elif isinstance(value, list):
-            w = create_widget(name=key, widget_type="LineEdit", value=str(value))
-        elif value is None:
-            w = create_widget(name=key, widget_type="LineEdit", value="None")
-        else:
-            continue
-
-        label = QLabel(w.name)
-        label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-
-        if current_tooltip_text:
-            w.native.setToolTip(current_tooltip_text)
-            label.setToolTip(current_tooltip_text)
-
-        w.label = label
-        widgets.append(w)
-    return Container(widgets=widgets)
 
 
-def collect_values(container: Container) -> Dict[str, Any]:
-    result = {}
-    for widget in container:
-        val = widget.value
-        name = widget.name
-        if isinstance(val, str) and val.strip().startswith("["):
-            try:
-                import ast
-                val = ast.literal_eval(val)
-            except (ValueError, SyntaxError):
-                pass
-        elif val == "None":
-            val = None
-        result[name] = val
-    return result
 
-config_wrapper = None
-full_config_container = None
+
+
+
 comment_descriptions = {}
 topostats_widget = None
 docked_widgets = []
 
-def open_config_editor(viewer: Viewer):
-    global config_wrapper, full_config_container, comment_descriptions
-
-    if config_wrapper is None:
-        show_error_dialog("No config loaded.")
-        return
-    
-    # Keys to include
-    EDITABLE_TOP_LEVEL_KEYS = {"filter", "grains"}
-
-    # Keys to exclude
-    EXCLUDED_KEYS = {"filter.run", "grains.run"}
-
-    filtered_flat_config = {
-        k: v for k, v in config_wrapper.flat.items()
-        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS)
-        and k not in EXCLUDED_KEYS
-    }
-
-    filtered_descriptions = {
-        k: v for k, v in comment_descriptions.items()
-        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS)
-        and k not in EXCLUDED_KEYS
-    }
-
-    fresh_container = build_dynamic_widget(filtered_flat_config, filtered_descriptions)
-
-    dialog = QDialog()
-    dialog.setWindowTitle("Edit Filters and Grains Config")
-    dialog.resize(600, 800)
-
-    main_layout = QVBoxLayout(dialog)
-    scroll_area = QScrollArea()
-    scroll_area.setWidgetResizable(True)
-
-    scroll_content = QWidget()
-    scroll_layout = QVBoxLayout(scroll_content)
-
-    for widget in fresh_container:
-        row = QWidget()
-        row_layout = QHBoxLayout(row)
-        row_layout.addWidget(widget.label)
-        row_layout.addWidget(widget.native)
-
-        tooltip = widget.native.toolTip()
-        if tooltip:
-            info_btn = create_info_icon(tooltip)
-            row_layout.addWidget(info_btn)
-
-        scroll_layout.addWidget(row)
-
-    scroll_content.setLayout(scroll_layout)
-    scroll_area.setWidget(scroll_content)
-
-    button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-    save_button = QPushButton("Save Config to File")
-    button_box.addButton(save_button, QDialogButtonBox.ActionRole)
-
-    def save_to_file():
-        updated_values = collect_values(fresh_container)
-        config_wrapper.flat.update(updated_values)
-        full_config = config_wrapper.unflatten()
-
-        file_path, _ = QFileDialog.getSaveFileName(
-            parent=dialog,
-            caption="Save Config As",
-            filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)"
-        )
-        if file_path:
-            try:
-                if file_path.endswith(".json"):
-                    with open(file_path, "w") as f:
-                        json.dump(full_config, f, indent=2)
-                else:
-                    with open(file_path, "w") as f:
-                        yaml.safe_dump(full_config, f, sort_keys=False)
-                print(f"Config saved to {file_path}")
-            except Exception as e:
-                print(f"Failed to save config: {e}")
-
-    save_button.clicked.connect(save_to_file)
-    button_box.accepted.connect(dialog.accept)
-    button_box.rejected.connect(dialog.reject)
-
-    main_layout.addWidget(scroll_area)
-    main_layout.addWidget(button_box)
-
-    if dialog.exec_():
-        updated_values = collect_values(fresh_container)
-        config_wrapper.flat.update(updated_values)
-        print("Config updated.")
-        # Optionally refresh the full container for other use
-        full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
-
-@magicgui(
-    config_path={"label": "Config file", "mode": "r", "filter": "*.yaml;*.json"}, # Added .json filter
-    call_button="Load Config",
-    auto_call=True,
-)
-def load_config(viewer: Viewer, config_path: Path | None = None):
-    global config_wrapper, full_config_container, comment_descriptions, topostats_widget # Updated global name
-    if config_path is None:
-        write_config_with_comments()
-        config_path = Path("config.yaml")
-
-    try:
-        with open(config_path, "r") as f:
-            if config_path.suffix.lower() in [".yaml", ".yml"]:
-                config = yaml.safe_load(f)
-            elif config_path.suffix.lower() == ".json":
-                config = json.load(f)
-            else:
-                show_error_dialog("Unsupported config format.")
-                return
-    except Exception as e:
-        show_error_dialog(f"Failed to load config: {e}")
-        return
-
-    comment_descriptions = extract_inline_comments(config_path)
-    
-    config_wrapper = ConfigWrapper(config)
-    
-    full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
-    if full_config_container is None:
-        show_error_dialog("Failed to create full config container.")
-        return
-    if "Edit Full Config" not in docked_widgets:
-        btn = QPushButton("Edit Config")
-        btn.clicked.connect(lambda: open_config_editor(viewer))
-        viewer.window.add_dock_widget(btn, name="Edit Full Config")
-        docked_widgets.append("Edit Full Config")  # Updated dock widget name
-    if topostats_widget is not None:
-        topostats_widget.layout().removeWidget(topostats_widget.load_config_message)
-        topostats_widget.load_config_message.setText("")
-        topostats_widget.function_grid.update_functions(topostats_widget.get_functions())
 
 
-def get_load_config_widget():
-    return load_config
 
-def enforce_defaults(args: Dict[str, Any], params: list[Any]) -> Dict[str, Any]:
-    """
-    Ensure that all required parameters have default values.
-    """
-    param_names = [p.name for p in params]
-    if "direction" in param_names:
-        args.setdefault("direction", "above")
-
-    if "threshold_std_dev" in param_names:
-        args.setdefault("threshold_std_dev", {})
-        if args.get("threshold_std_dev") is None:
-            args["threshold_std_dev"] = {}
-        args["threshold_std_dev"].setdefault("above", 1.0)
-        args["threshold_std_dev"].setdefault("below", 10.0)
-
-    if "threshold_absolute" in param_names:
-        args.setdefault("threshold_absolute", {})
-        if args.get("threshold_absolute") is None:
-            args["threshold_absolute"] = {}
-        args["threshold_absolute"].setdefault("above", 1.0)
-        args["threshold_absolute"].setdefault("below", -1.0)
-    if "remove_scars" in param_names:
-        args.setdefault("remove_scars", {})
-        if args.get("remove_scars") is None:
-            args["remove_scars"] = {}
-        args["remove_scars"].setdefault("run", False)
-
-    for key, value in args.items():
-        if isinstance(value, (Image)):
-            print(f"Converting ImageData to ndarray for key: {key}")
-            args[key] = np.asarray(value.data)
-    return args
-
-def add_values_to_dict_from_config(
-    config: Dict[str, Any],
-    wrapper: ConfigWrapper,
-    function_key: str,
-    args: Dict[str, Any],
-    params: list,):
-    # for key, value in config.items():
-    #     print(f"Processing key: {key}, value: {value}")
-    
-    #     if value is not None and key in [p.name for p in params]:
-    #         args[key] = value
-    for param_name in [p.name for p in params]:
-        if param_name in config:
-            args[param_name] = config[param_name]
-
-        for flat_key, flat_val in wrapper.flat.items():
-            if flat_key.startswith(f"{function_key}.") and flat_key[len(f"{function_key}."):] == param_name:
-                args[param_name] = flat_val
-                break
-        # Is this not redundant?
-        if param_name in config and isinstance(config[param_name], dict):
-            args[param_name] = config[param_name]
-    return args
-
-
-def _eval(obj: Any, string: str) -> Any:
-
-    string = string.replace(" ", "")
-    if string == "":
-        return obj
-
-    if string[0] == "[":
-        next_punc = next_punctuation(string, 1, checking_for=",()[].")
-        if next_punc != -1 and string[next_punc] == ",":
-            axes = []
-            for i in string[1:string.index("]", 1)].split(","):
-                if i == ":":
-                    axes.append(slice(None))
-                elif i.isdigit():
-                    axes.append(int(i))
-            subscript = tuple(axes)
-            obj = obj[subscript]
-        else:
-            subscript = string[1:string.index("]", 1)]
-            if subscript.isdigit():
-                obj = obj[int(subscript)]
-            else:
-                key = subscript.replace("'", "").replace('"', '')
-                obj = obj[key]
-        remaining = string[string.index("]", 1) + 1:]
-        return _eval(obj, remaining)
-
-    elif string[0] == ".":
-        index = next_punctuation(string, 1)
-        if index == -1:
-            attr = string[1:]
-            if hasattr(obj, attr):
-                return getattr(obj, attr)
-            else:
-                raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{attr}'")
-
-        if string[index] == "(":
-            func_name = string[1:index]
-            if hasattr(obj, func_name):
-                func = getattr(obj, func_name)
-                args_str = string[index + 1:string.index(")", index + 1)]
-                args = [arg.strip() for arg in args_str.split(",") if arg.strip()]
-                result = func(*args)
-                remaining = string[string.index(")", index + 1) + 1:]
-                return _eval(result, remaining)
-            else:
-                raise AttributeError(f"'{type(obj).__name__}' object has no callable '{func_name}'")
-        else:
-            attr = string[1:index]
-            if hasattr(obj, attr):
-                obj = getattr(obj, attr)
-            else:
-                raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{attr}'")
-            remaining = string[index:]
-            return _eval(obj, remaining)
-
-    else:
-        return obj
-
-
-def next_punctuation(s: str, start: int = 0, checking_for: str = ".([") -> int:
-    """Find the next punctuation character in a string."""
-    for i in range(start, len(s)):
-        if s[i] in checking_for:
-            return i
-    return -1
-        
-class CallableWithSignature:
-    def __init__(self, real_func, sig):
-        functools.update_wrapper(self, real_func)  # Sets __name__, __doc__, etc.
-        self.real_func = real_func
-        self.__signature__ = sig
-
-    def __call__(self, *args, **kwargs):
-        bound = self.__signature__.bind(*args, **kwargs)
-        bound.apply_defaults()
-        return self.real_func(**bound.arguments)
-
-def is_binary_image(arr: np.ndarray) -> bool:
-    unique_vals = np.unique(arr) 
-    # Check if unique values are subset of {0,1}
-    return set(unique_vals).issubset({0, 1, 255})
-
-def remove_all_but_last(word: str, text: str) -> str:
-    parts = text.rsplit(word, maxsplit=1)
-    if len(parts) == 1:
-        return text  # word not found or only once
-    return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return
-
-def render_return_value(return_value: Any,
-    function_key: str,
-    viewer: Viewer = None,
-    original: Image = None,
-    ndims: int = 2) -> None:
-    if isinstance(return_value, np.ndarray):
-        if is_binary_image(return_value):
-            labels, num_labels = label(return_value.astype(bool))
-            label_ids = list(range(1, num_labels + 1))
-            properties = {"label_id": label_ids}
-            viewer.add_labels(
-                labels.astype(np.uint16),
-                name=f"{original.name} {function_key.title()} Mask",
-                properties=properties
-            )
-        else:
-            name = f"{original.name} {function_key.title()} Image"
-            name = remove_all_but_last("Image", name)
-            viewer.add_image(
-                return_value,
-                name=name,
-                contrast_limits=(-1, 5),
-                metadata={"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}
-            )
-            viewer.dims.ndisplay = ndims
-
-def get_widget(widget_function: WidgetFunction) -> FunctionGui:
-    function_key = widget_function.function_key
-    function_to_run = widget_function.function_to_run
-    type_class = widget_function.type_class
-    path_to_data = widget_function.path_to_data
-    uses_config = widget_function.uses_config
-    ndims = widget_function.ndims
-
-    if uses_config:
-        global config_wrapper, full_config_container
-        if config_wrapper is None or full_config_container is None:
-            return
-
-    try:
-        if path_to_data is None:
-            if type_class is not None:
-                path_to_data = "obj"
-            else:
-                path_to_data = "return"
-        parameters_from_function = [
-            p for p in inspect.signature(function_to_run).parameters.values() if p.name != "self"
-        ]
-
-        if type_class is not None:
-            sig = inspect.signature(type_class.__init__)
-            parameters_from_class = [
-                p for name, p in sig.parameters.items()
-                if name != "self"
-            ]
-            all_parameters = parameters_from_class + parameters_from_function
-        else:
-            sig = inspect.signature(function_to_run)
-            all_parameters = parameters_from_function
-            
-
-        including_config_params_from_function = parameters_from_function.copy()
-        including_config_params_from_class = parameters_from_class.copy() if type_class is not None else []
-        if uses_config:
-            updated_values = collect_values(full_config_container)
-            config_wrapper.flat.update(updated_values)
-            full_current_config = config_wrapper.unflatten()
-            config = full_current_config.get(function_key, {})
-            for param_name in [p.name for p in all_parameters]:
-                if param_name in config:
-                    parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
-                    if type_class is not None:
-                        parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
-                else:
-                    for flat_key, flat_val in config_wrapper.flat.items():
-                        if flat_key.startswith(f"{function_key}.") and flat_key[len(f"{function_key}."):] == param_name:
-                            parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
-                            if type_class is not None:
-                                parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
-                            break
-                if param_name in config and isinstance(config[param_name], dict):
-                    parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
-                    if type_class is not None:
-                        parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
-        if type_class is not None:
-            def func(**kwargs):
-                class_args = {}
-                method_args = {}
-                if "image" in [p.name for p in including_config_params_from_class + including_config_params_from_function]:
-                    if kwargs["image"] is None:
-                        show_error_dialog("Please select an image before running this function.")
-                        return
-                if (
-                    "pixel_to_nm_scaling" in [p.name for p in including_config_params_from_class + including_config_params_from_function]
-                    and "pixel_to_nm_scaling" not in kwargs
-                ):
-                    kwargs["pixel_to_nm_scaling"] = kwargs["image"].metadata.get("px2nm", 1.0)
-                    print(f"Using pixel_to_nm_scaling from image metadata: {kwargs['pixel_to_nm_scaling']}")
-
-                for key, value in kwargs.items():
-                    if key in [p.name for p in including_config_params_from_function]:
-                        method_args[key] = value
-                    elif key in [p.name for p in including_config_params_from_class]:
-                        class_args[key] = value
-                if uses_config:
-                    method_args = add_values_to_dict_from_config(
-                        config, config_wrapper, function_key, method_args, including_config_params_from_function
-                    )
-                    class_args = add_values_to_dict_from_config(
-                        config, config_wrapper, function_key, class_args, including_config_params_from_class
-                    )
-
-                method_args = enforce_defaults(method_args, including_config_params_from_function)
-                class_args = enforce_defaults(class_args, including_config_params_from_class)
-                instance = type_class(**class_args)
-                method = getattr(instance, function_to_run.__name__, None)
-                if method:
-                    return_value = method(**method_args)
-
-                    if path_to_data.startswith("return"):
-                        return_value = _eval(return_value, path_to_data[6:]) if len(path_to_data) > 6 else return_value
-                    elif path_to_data.startswith("obj"):
-                        return_value = _eval(instance, path_to_data[3:]) if len(path_to_data) > 3 else instance
-                    else:
-                        raise ValueError(f"Invalid path_to_data: {path_to_data}")
-                    
-                    if return_value is not None:
-                        viewer = kwargs["viewer"] if "viewer" in kwargs else current_viewer()
-                        render_return_value(return_value, function_key, viewer, kwargs.get("image", None))
-        else:
-            def func(**kwargs):
-                method_args = {}
-
-                for key, value in kwargs.items():
-                    if key in [p.name for p in including_config_params_from_function]:
-                        method_args[key] = value
-                if uses_config:
-                    method_args = add_values_to_dict_from_config(
-                        config, config_wrapper, function_key, method_args, including_config_params_from_function
-                    )
-
-                method_args = enforce_defaults(method_args, including_config_params_from_function)
-
-                return_value = function_to_run(**method_args)
-                if path_to_data.startswith("return"):
-                    return_value = _eval(return_value, path_to_data[6:]) if len(path_to_data) > 6 else return_value
-                if return_value is not None:
-                    viewer = kwargs["viewer"] if "viewer" in kwargs else current_viewer()
-                    render_return_value(return_value, function_key, viewer, original=kwargs.get("image", None), ndims=ndims)
-                else:
-                    show_error_dialog(f"Function {function_to_run.__name__} returned None.") 
-        new_parameters = []
-        for p in (parameters_from_function + parameters_from_class) if type_class is not None else parameters_from_function:
-            if p.name == "image":
-                new_p = p.replace(default=None)
-                new_p = new_p.replace(annotation=Image)
-            elif p.name == "pixel_to_nm_scaling":
-                new_p = p.replace(default=1.0)
-            elif p.name == "filename":
-                new_p = p.replace(default="image")
-            else:
-                new_p = p
-            if new_p.name != "pixel_to_nm_scaling":
-                new_parameters.append(new_p)
-        wrapped_func = CallableWithSignature(func, inspect.Signature(parameters=new_parameters))
-        magicgui_function = magicgui()(wrapped_func)
-        return magicgui_function
-
-    except Exception as e:
-        show_error_dialog(f"❌ Exception in get_widget: {e}")
-        raise
 
     
 # if we want even more control over our widget, we can use
@@ -995,7 +378,6 @@ class ImageThreshold(Container):
 class TopoStatsRootWidget(QWidget):
     def __init__(self, viewer: Viewer):
         super().__init__()
-        global topostats_widget
         self._viewer = viewer
         layout = QVBoxLayout(self)
         self.function_grid = ButtonGrid(
@@ -1008,7 +390,7 @@ class TopoStatsRootWidget(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.addWidget(self.function_grid)
         self.setLayout(layout)
-        topostats_widget = self
+        state.topostats_widget = self
         
     
     def get_functions(self):
@@ -1017,15 +399,9 @@ class TopoStatsRootWidget(QWidget):
             function_name = function.name
             title = function_name.replace("_", " ").title()
             if function.function_key is not None:
-                if function.uses_config:
-                    global config_wrapper, full_config_container
-                    if config_wrapper is None or full_config_container is None:
-                        load_config(self._viewer)
-                func = get_widget(function)
-                function.set_function_gui(func)
                 functions[title] = function
             else:
-                func = getattr(sys.modules[__name__], function_name, None)
+                func = function.function_to_run
                 if isinstance(func, FunctionGui):
                     functions[title] = func
                 elif callable(func):

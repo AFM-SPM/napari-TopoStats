@@ -2,15 +2,16 @@ from qtpy.QtCore import QSize
 from qtpy.QtGui import QIcon, QColor, QBrush
 from qtpy.QtWidgets import QListWidget, QListWidgetItem
 from pathlib import Path
-from magicgui.widgets import FunctionGui
+from magicgui.widgets import FunctionGui, Container
 from napari.viewer import Viewer
 import inspect
 from napari.types import ImageData
 from typing import Any, Callable
 from napari.layers import Image
 from napari.types import ImageData
+from napari_topostats._widget_function import WidgetFunction, get_selected_image, ConfigWrapper
 import numpy as np
-import dask.array as da
+
 
 RUN_IMMEDIATELY_EXEMPTIONS = {
     "Load Config"
@@ -64,29 +65,7 @@ def _get_icon(name):
         return ""
     return str(path)
 
-# Class representation of each function in the button grid.
-class WidgetFunction:
-    def __init__(self, name: str, function_key: str | None = None, function_to_run: Callable | None = None, type_class: Any | None = None, path_to_data: str | None = None, uses_config: bool = False, ndims: int = 2, tooltip: str | None = None):
-        
-        self.name = name
-        self.function_key = function_key
-        if function_key is not None:
-            self.function_key = function_key
-            self.function_to_run = function_to_run
-            self.type_class = type_class
-            self.path_to_data = path_to_data
-            self.uses_config = uses_config
-            self.ndims = ndims
-        self.tooltip = tooltip
 
-    def set_function_gui(self, function_gui: FunctionGui):
-        self.function_gui = function_gui
-
-    def get_function_gui(self) -> FunctionGui:
-        if hasattr(self, 'function_gui'):
-            return self.function_gui
-        else:
-            raise AttributeError("Function GUI not set for this WidgetFunction instance.")
 
 class ButtonGrid(QListWidget):
     def __init__(self, parent=None, functions: dict[str, WidgetFunction] | None = None, viewer: Viewer = None):
@@ -106,7 +85,6 @@ class ButtonGrid(QListWidget):
 
     def update_functions(self, functions: dict[str, WidgetFunction] | None):
         self.functions = functions or {}
-        self.remove_all_items()  # Clear existing items
         for label, function in functions.items():
             if function.tooltip:
                 self.addItem(label, function.tooltip)
@@ -122,7 +100,14 @@ class ButtonGrid(QListWidget):
         """
         Handle the click event on a list item.
         """
-        widget = self.functions.get(item.text()).get_function_gui()
+        function_from_list = self.functions.get(item.text())
+        if isinstance(function_from_list, WidgetFunction):
+            widget = function_from_list.get_function_gui()
+        elif isinstance(function_from_list, FunctionGui):
+            widget = function_from_list
+        else:
+            print(f"Function {item.text()} is not a valid WidgetFunction or FunctionGui.")
+            return
         if item.text() not in self.docked_functions:
             self.viewer.window.add_dock_widget(widget, name=item.text())
             self.docked_functions.append(item.text())
@@ -132,42 +117,24 @@ class ButtonGrid(QListWidget):
 
             for name, param in sig.parameters.items():
                 if param.annotation == ImageData:
-                    selected = self.get_selected_image(self.viewer)
+                    selected = get_selected_image(self.viewer)
                     if selected is None:
                         print(f"No valid image data selected for {name}.")
                     else:
-                        kwargs[name] = self.get_selected_image(self.viewer).data
+                        kwargs[name] = get_selected_image(self.viewer).data
                 if param.annotation == Image:
-                    selected = self.get_selected_image(self.viewer)
+                    selected = get_selected_image(self.viewer)
                     if selected is None:
                         print(f"No valid image layer selected for {name}.")
                     else:
-                        kwargs[name] = self.get_selected_image(self.viewer)
+                        kwargs[name] = get_selected_image(self.viewer)
 
                 if param.annotation == Viewer:
                     kwargs[name] = self.viewer
             print(f"Running {widget._function.__name__} with parameters: {kwargs}")
             widget._function(**kwargs)
 
-    @staticmethod
-    def get_selected_image(viewer) -> Image | None:
-        selected = list(viewer.layers.selection)
-
-        if not selected:
-            print("No layer selected.")
-            return None
-
-        layer = selected[0]
-        if isinstance(layer, Image):
-            data = layer.data
-            if isinstance(data, (np.ndarray, da.Array)):  # conforms to ImageData
-                return layer
-            else:
-                print("Layer data is not valid ImageData.")
-        else:
-            print("Selected layer is not an Image layer.")
-
-        return None
+    
 
 
     def addItem(self, label : str, tool_tip: str | None = None):
