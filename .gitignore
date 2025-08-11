@@ -28,6 +28,10 @@ output/config.yaml
 *.csv
 *.spm
 
+# Include icons
+!icons/
+!icons/**
+
 # Example Data
 !cat.spm
 

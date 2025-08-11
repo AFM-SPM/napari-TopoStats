@@ -93,6 +93,8 @@ from napari_topostats.utils import (
 
 from topostats.grains import Grains
 from topostats.filters import Filters
+from topostats.io import write_config_with_comments
+
 loading_dialog.close()
 
 from ._button_grid import ButtonGrid
@@ -590,8 +592,11 @@ def open_config_editor(viewer: Viewer):
     call_button="Load Config",
     auto_call=True,
 )
-def load_config(viewer: Viewer, config_path: Path):
+def load_config(viewer: Viewer, config_path: Path | None = None):
     global config_wrapper, full_config_container, comment_descriptions, topostats_widget # Updated global name
+    if config_path is None:
+        write_config_with_comments()
+        config_path = Path("config.yaml")
 
     try:
         with open(config_path, "r") as f:
@@ -608,7 +613,7 @@ def load_config(viewer: Viewer, config_path: Path):
 
     comment_descriptions = extract_inline_comments(config_path)
     
-    config_wrapper = ConfigWrapper(config) 
+    config_wrapper = ConfigWrapper(config)
     
     full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
     if full_config_container is None:
