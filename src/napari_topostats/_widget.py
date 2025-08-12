@@ -395,6 +395,7 @@ class TopoStatsRootWidget(QWidget):
     def get_functions(self):
         """
         Get the available functions for the button grid.
+
         Returns
         -------
         functions : dict[str, WidgetFunction | FunctionGui]
@@ -405,8 +406,10 @@ class TopoStatsRootWidget(QWidget):
             function_name = function.name
             display_name = function_name.replace("_", " ").title()
             if function.function_key is not None:
+                # This option is used for functions that will be dynamically converted to a widget
                 functions[display_name] = function
             else:
+                # This option is used for functions that are hardcoded
                 func = function.function_to_run
                 if isinstance(func, FunctionGui):
                     functions[display_name] = func

@@ -22,6 +22,9 @@ full_config_container = None
 comment_descriptions = {}
 
 class ConfigWrapper:
+    """
+    A wrapper for configuration dictionaries to provide a flat view and unflattening functionality.
+    """
     def __init__(self, config: dict):
         self.original = config
         self.flat = self._flatten(config)
@@ -99,6 +102,11 @@ def build_dynamic_widget(flat_config: Dict[str, Any], descriptions: Dict[str, st
     auto_call=True,
 )
 def load_config(viewer: Viewer, config_path: Path | None = None):
+    """
+    Load a configuration file and build a dynamic widget to edit it.
+    This is a magicgui function that can be called directly from the napari GUI and is an example of a hardcoded
+    function being implemented using the dynamic function widget system. 
+    """
     global comment_descriptions, config_wrapper, full_config_container  # Updated global name
     if config_path is None:
         write_config_with_comments()
@@ -126,10 +134,12 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
         show_error_dialog("Failed to create full config container.")
         return
     if "Edit Full Config" not in state.docked_widgets:
+        # Create a button to open the config editor
         btn = QPushButton("Edit Config")
         btn.clicked.connect(lambda: open_config_editor(viewer))
         viewer.window.add_dock_widget(btn, name="Edit Full Config")
-        state.docked_widgets.append("Edit Full Config")  # Updated dock widget name
+        # Add the button to the docked widgets list so it can be accessed
+        state.docked_widgets.append("Edit Full Config")
 
 def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> Dict[str, str]:
     """
