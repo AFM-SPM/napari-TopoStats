@@ -28,44 +28,84 @@ References:
 
 Replace code below according to your needs.
 """
+import sys
+import functools
+from qtpy.QtCore import Qt
+from qtpy.QtGui import QIcon
+from qtpy.QtWidgets import (
+    QToolButton, QVBoxLayout, QWidget, QSizePolicy, QApplication
+)
+from ._alerts import show_error_dialog, LoadingDialog
+
+loading_dialog = LoadingDialog("Loading TopoStats...")
+loading_dialog.show()
+QApplication.processEvents()
 import inspect
 import json
-import re
-from argparse import Namespace
 from pathlib import Path
 from typing import Any, Dict, TYPE_CHECKING
+
 import numpy as np
 import yaml
+
 from magicgui import magicgui
-from magicgui.widgets import CheckBox, Container, create_widget
+from magicgui.widgets import CheckBox, Container, create_widget, FunctionGui
+
 from napari import current_viewer
 from napari.types import ImageData
+from napari.layers import Image
 from napari.viewer import Viewer
-from qtpy.QtCore import Qt
-from qtpy.QtGui import QIcon, QPixmap
-from qtpy.QtWidgets import (
-    QDialog, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel,
-    QPushButton, QScrollArea, QToolButton, QVBoxLayout, QWidget
-)
+
+
 from scipy.ndimage import label
 from skimage.util import img_as_float
-import topostats.run_modules as rm
-from topostats.filters import Filters
-from topostats.grains import Grains
+
+
 from napari_topostats.utils import (
-    afm2stack,
-    average_background,
-    gaussian_filter,
-    median_flattened,
-    remove_nonlinear,
-    remove_quadratic,
-    remove_scars,
-    remove_tilt,
+    afm2stack, average_background, gaussian_filter,
+    median_flattened, remove_nonlinear, remove_quadratic,
+    remove_scars, remove_tilt,
 )
-from typing import TYPE_CHECKING
+
+from topostats.grains import Grains
+from topostats.filters import Filters
+
+loading_dialog.close()
+
+from ._button_grid import ButtonGrid
+from ._widget_function import WidgetFunction
+from . import _state as state
+from . import _widget_function as gui_utils
+from ._io import load_config
+
 
 if TYPE_CHECKING:
     import napari
+
+
+AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config",
+                                      tooltip="Load a configuration file to use with TopoStats functions.",
+                                      function_to_run=load_config),
+                        WidgetFunction(name="run_filters",
+                            function_key="filter",
+                            function_to_run=Filters.filter_image,
+                                type_class=Filters,
+                                path_to_data='obj.images["gaussian_filtered"]',
+                                    uses_config=True,
+                                    tooltip="Run filters on the selected image using the current configuration."),
+                        WidgetFunction(name="run_grains",
+                          function_key="grains",
+                            function_to_run=Grains.find_grains,
+                              type_class=Grains,
+                                path_to_data='obj.mask_images["above"]["merged_classes"][:, :, 1]',
+                                  uses_config=True,
+                                  tooltip="Run grain analysis on the selected image using the current configuration."),
+                        WidgetFunction(name="make_3d",
+                                       function_key="3d",
+                                       function_to_run=afm2stack,
+                                       ndims=3,
+                                       tooltip="Convert the selected image to a 3D stack"),]
+
 
 def remove_scars_from_image(
     image: "napari.types.ImageData",
@@ -270,448 +310,10 @@ def gaussian_filter_image(
     """
     return (gaussian_filter(image=image, sigma=sigma), {}, "image")
 
-@magicgui(
-    call_button="Run Filters",
-    filename={"label": "Filename"},
-    pixel_to_nm_scaling={"label": "Pixel to nm scaling"},
-)
-def run_topostats_filter_widget(
-    viewer: Viewer,
-    napari_img_layer: ImageData,
-    filename: str = "image",
-    pixel_to_nm_scaling: float = 1.0,
-) -> None:
-    """Napari widget to run Filters.filter_image() using the loaded config."""
-    global config_wrapper, full_config_container
 
-    if config_wrapper is None or full_config_container is None:
-        print("Please load a config file first using 'Load Config'.")
-        return
 
-    try:
-        # Update config with any edits from the GUI
-        updated_values = collect_values(full_config_container)
-        config_wrapper.flat.update(updated_values)
-        full_current_config = config_wrapper.unflatten()
 
-        # Extract filter config
-        filter_config = full_current_config.get("filter", {})
-
-        # Enforce required defaults
-        filter_config["direction"] = "above"
-
-        filter_config.setdefault("threshold_std_dev", {})
-        filter_config["threshold_std_dev"].setdefault("above", 1.0)
-        filter_config["threshold_std_dev"].setdefault("below", 10.0)
-
-        filter_config.setdefault("threshold_absolute", {})
-        filter_config["threshold_absolute"].setdefault("above", 1.0)
-        filter_config["threshold_absolute"].setdefault("below", -1.0)
-
-        filter_config.setdefault("remove_scars", {})
-        filter_config["remove_scars"].setdefault("run", False)
-
-        # Filter out valid init args
-        sig = inspect.signature(Filters.__init__)
-        accepted_params = set(sig.parameters.keys()) - {"self"}
-        filtered_config = {k: v for k, v in filter_config.items() if k in accepted_params}
-
-        image_np = np.asarray(napari_img_layer)
-
-        # Run filtering
-        filter_obj = Filters(
-            image=image_np,
-            filename=filename,
-            pixel_to_nm_scaling=pixel_to_nm_scaling,
-            **filtered_config,
-        )
-        filter_obj.filter_image()
-
-        filtered = filter_obj.images.get("gaussian_filtered")
-        if filtered is not None:
-            viewer.add_image(filtered, name=f"{filename} - filtered")
-        else:
-            print("No filtered image found in output.")
-
-    except Exception as e:
-        print(f"Filtering failed: {e}")
-        import traceback
-        traceback.print_exc()
-
-def get_topostats_filter_widget():
-    return run_topostats_filter_widget
-
-class ConfigWrapper:
-    def __init__(self, config: dict):
-        self.original = config
-        self.flat = self._flatten(config)
-
-    def _flatten(self, d, parent_key='', sep='.'):
-        items = {}
-        for k, v in d.items():
-            new_key = f"{parent_key}{sep}{k}" if parent_key else k
-            if isinstance(v, dict):
-                items.update(self._flatten(v, new_key, sep=sep))
-            else:
-                items[new_key] = v
-        return items
-
-    def unflatten(self) -> dict:
-        result = {}
-        for k, v in self.flat.items():
-            keys = k.split('.')
-            d = result
-            for part in keys[:-1]:
-                d = d.setdefault(part, {})
-            d[keys[-1]] = v
-        return result
-
-def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> Dict[str, str]:
-    """
-    Extracts inline comments from a YAML file.
-    (This function remains the same as our last debugged version)
-    """
-    comment_map = {}
-    key_stack = [] 
-
-    if not yaml_path.exists():
-        print(f"Error: YAML file not found at {yaml_path}")
-        return {}
-
-    with open(yaml_path, "r") as f:
-        for line_num, line in enumerate(f, 1):
-            stripped_line = line.strip()
-
-            if not stripped_line or stripped_line.startswith("#"):
-                continue
-
-            match = re.match(r"^(\s*)([a-zA-Z0-9_]+):\s*(?:[^#\n]*?)(?:#\s*(.*))?$", line)
-            
-            if match:
-                indent_str, key_name, comment_text = match.groups()
-                indent_level = len(indent_str.replace("\t", "  ")) // 2
-
-                key_stack = key_stack[:indent_level]
-                key_stack.append(key_name)
-
-                full_yaml_key_path = ".".join(key_stack)
-                final_key_for_map = full_yaml_key_path
-                
-                if top_level_key:
-                    if full_yaml_key_path == top_level_key:
-                        final_key_for_map = ""
-                    elif full_yaml_key_path.startswith(top_level_key + "."):
-                        final_key_for_map = full_yaml_key_path[len(top_level_key) + 1:]
-
-                if comment_text is not None and final_key_for_map:
-                    comment_map[final_key_for_map] = comment_text.strip()
-    return comment_map
-
-def create_info_icon(tooltip_text: str) -> QToolButton:
-    button = QToolButton()
-    icon = QIcon.fromTheme("help-about")
     
-    if icon and not icon.isNull():
-        button.setIcon(icon)
-    else:
-        button.setText("?")
-        font = button.font()
-        font.setBold(True)
-        button.setFont(font)
-        
-    button.setToolTip(tooltip_text)
-    button.setAutoRaise(True)
-    button.setCursor(Qt.WhatsThisCursor)
-    return button
-
-def build_dynamic_widget(flat_config: Dict[str, Any], descriptions: Dict[str, str] = None) -> Container:
-    widgets = []
-    for key, value in flat_config.items():
-        current_tooltip_text = descriptions.get(key, "") if descriptions else ""
-
-        if isinstance(value, bool):
-            w = create_widget(name=key, widget_type="CheckBox", value=value)
-        elif isinstance(value, int):
-            w = create_widget(name=key, widget_type="SpinBox", value=value)
-        elif isinstance(value, float):
-            w = create_widget(name=key, widget_type="FloatSpinBox", value=value)
-        elif isinstance(value, str):
-            w = create_widget(name=key, widget_type="LineEdit", value=value)
-        elif isinstance(value, list):
-            w = create_widget(name=key, widget_type="LineEdit", value=str(value))
-        elif value is None:
-            w = create_widget(name=key, widget_type="LineEdit", value="None")
-        else:
-            continue
-
-        label = QLabel(w.name)
-        label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-
-        if current_tooltip_text:
-            w.native.setToolTip(current_tooltip_text)
-            label.setToolTip(current_tooltip_text)
-
-        w.label = label
-        widgets.append(w)
-    return Container(widgets=widgets)
-
-
-def collect_values(container: Container) -> Dict[str, Any]:
-    result = {}
-    for widget in container:
-        val = widget.value
-        name = widget.name
-        if isinstance(val, str) and val.strip().startswith("["):
-            try:
-                import ast
-                val = ast.literal_eval(val)
-            except (ValueError, SyntaxError):
-                pass
-        elif val == "None":
-            val = None
-        result[name] = val
-    return result
-
-config_wrapper = None
-full_config_container = None
-comment_descriptions = {}
-
-def open_config_editor(viewer: Viewer):
-    global config_wrapper, full_config_container, comment_descriptions
-
-    if config_wrapper is None:
-        print("No config loaded.")
-        return
-    
-    # Keys to include
-    EDITABLE_TOP_LEVEL_KEYS = {"filter", "grains"}
-
-    # Keys to exclude
-    EXCLUDED_KEYS = {"filter.run", "grains.run"}
-
-    filtered_flat_config = {
-        k: v for k, v in config_wrapper.flat.items()
-        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS)
-        and k not in EXCLUDED_KEYS
-    }
-
-    filtered_descriptions = {
-        k: v for k, v in comment_descriptions.items()
-        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS)
-        and k not in EXCLUDED_KEYS
-    }
-
-    fresh_container = build_dynamic_widget(filtered_flat_config, filtered_descriptions)
-
-    dialog = QDialog()
-    dialog.setWindowTitle("Edit Filters and Grains Config")
-    dialog.resize(600, 800)
-
-    main_layout = QVBoxLayout(dialog)
-    scroll_area = QScrollArea()
-    scroll_area.setWidgetResizable(True)
-
-    scroll_content = QWidget()
-    scroll_layout = QVBoxLayout(scroll_content)
-
-    for widget in fresh_container:
-        row = QWidget()
-        row_layout = QHBoxLayout(row)
-        row_layout.addWidget(widget.label)
-        row_layout.addWidget(widget.native)
-
-        tooltip = widget.native.toolTip()
-        if tooltip:
-            info_btn = create_info_icon(tooltip)
-            row_layout.addWidget(info_btn)
-
-        scroll_layout.addWidget(row)
-
-    scroll_content.setLayout(scroll_layout)
-    scroll_area.setWidget(scroll_content)
-
-    button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-    save_button = QPushButton("Save Config to File")
-    button_box.addButton(save_button, QDialogButtonBox.ActionRole)
-
-    def save_to_file():
-        updated_values = collect_values(fresh_container)
-        config_wrapper.flat.update(updated_values)
-        full_config = config_wrapper.unflatten()
-
-        file_path, _ = QFileDialog.getSaveFileName(
-            parent=dialog,
-            caption="Save Config As",
-            filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)"
-        )
-        if file_path:
-            try:
-                if file_path.endswith(".json"):
-                    with open(file_path, "w") as f:
-                        json.dump(full_config, f, indent=2)
-                else:
-                    with open(file_path, "w") as f:
-                        yaml.safe_dump(full_config, f, sort_keys=False)
-                print(f"Config saved to {file_path}")
-            except Exception as e:
-                print(f"Failed to save config: {e}")
-
-    save_button.clicked.connect(save_to_file)
-    button_box.accepted.connect(dialog.accept)
-    button_box.rejected.connect(dialog.reject)
-
-    main_layout.addWidget(scroll_area)
-    main_layout.addWidget(button_box)
-
-    if dialog.exec_():
-        updated_values = collect_values(fresh_container)
-        config_wrapper.flat.update(updated_values)
-        print("Config updated.")
-        # Optionally refresh the full container for other use
-        full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
-
-@magicgui(
-    config_path={"label": "Config file", "mode": "r", "filter": "*.yaml;*.json"}, # Added .json filter
-    call_button="Load Config"
-)
-def load_config_widget(viewer: Viewer, config_path: Path):
-    global config_wrapper, full_config_container, comment_descriptions # Updated global name
-
-    try:
-        with open(config_path, "r") as f:
-            if config_path.suffix.lower() in [".yaml", ".yml"]:
-                config = yaml.safe_load(f)
-            elif config_path.suffix.lower() == ".json":
-                config = json.load(f)
-            else:
-                print("Unsupported config format.")
-                return
-    except Exception as e:
-        print(f"Failed to load config: {e}")
-        return
-
-    comment_descriptions = extract_inline_comments(config_path)
-    
-    config_wrapper = ConfigWrapper(config) 
-    
-    full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
-
-    btn = QPushButton("Edit Config")
-    btn.clicked.connect(lambda: open_config_editor(viewer))
-    viewer.window.add_dock_widget(btn, name="Edit Full Config") # Updated dock widget name
-
-
-def get_load_config_widget():
-    return load_config_widget
-
-
-@magicgui(
-    call_button="Run Grains",
-    filename={"label": "Filename"},
-    pixel_to_nm_scaling={"label": "Pixel to nm scaling"},
-)
-
-def run_grains_widget(
-    viewer: Viewer,
-    napari_img_layer: ImageData,
-    filename: str = "image",
-    pixel_to_nm_scaling: float = 1.0,
-) -> None:
-    global config_wrapper, full_config_container
-
-    if config_wrapper is None or full_config_container is None:
-        print("Please load a config file first using 'Load Config'.")
-        return
-
-    try:
-        updated_values = collect_values(full_config_container)
-        config_wrapper.flat.update(updated_values)
-
-        full_current_config = config_wrapper.unflatten()
-        grains_config = full_current_config.get("grains", {})
-
-        sig = inspect.signature(Grains.__init__)
-        accepted_params = set(sig.parameters.keys()) - {"self", "image", "filename", "pixel_to_nm_scaling"}
-        
-        filtered_grains_config = {}
-        for param_name in accepted_params:
-            if param_name in grains_config:
-                filtered_grains_config[param_name] = grains_config[param_name]
-
-            for flat_key, flat_val in config_wrapper.flat.items():
-                if flat_key.startswith("grains.") and flat_key[len("grains."):] == param_name:
-                    filtered_grains_config[param_name] = flat_val
-                    break
-
-            if param_name in grains_config and isinstance(grains_config[param_name], dict):
-                filtered_grains_config[param_name] = grains_config[param_name]
-
-        image_np = np.asarray(napari_img_layer.data)
-        print(f"Calling Grains with config: {filtered_grains_config}")
-        
-        grains_obj = Grains(
-            image=image_np,
-            filename=filename,
-            pixel_to_nm_scaling=pixel_to_nm_scaling,
-            **filtered_grains_config
-        )
-        grains_obj.find_grains()
-
-        try:
-            merged = grains_obj.mask_images["above"]["merged_classes"][:, :, 1]
-
-            # Label each grain individually
-            labeled_grains, num_grains = label(merged.astype(bool))
-
-            # Simple properties with grain_id
-            grain_ids = list(range(1, num_grains + 1))
-            properties = {"grain_id": grain_ids}
-
-            # Add labeled mask to napari with grain properties
-            viewer.add_labels(
-                labeled_grains.astype(np.uint16),
-                name="Grain Mask",
-                properties=properties
-            )
-
-        except Exception as e:
-            print(f"Failed to add merged_classes mask: {e}")
-
-    except Exception as e:
-        print(f"Grain detection failed: {e}")
-        import traceback
-        traceback.print_exc()
-
-def get_grains_widget():
-    return run_grains_widget
-
-def show_3d_autogenerate_widget(
-    image: "napari.types.ImageData",
-    bySlices: bool = True,
-    min_slices: int = 255,
-    resolution: float = 1.0,
-) -> "napari.types.ImageData":
-    """
-    Convert an AFM height image into a pseudo volume by via the pixel values.
-
-    Parameters
-    ----------
-    image : napari.types.ImageData
-        2-D numpy height-map array.
-    bySlices : bool, optional
-        Convert to voxels by creating N slices or cut at a Z resolution, by default True.
-    min_slices : int, optional
-        Number of voxel slices, by default 255
-    resolution : float, optional
-        Size of voxel height, by default 1.0
-
-    Returns
-    -------
-    napari.types.ImageData
-        3-D slices of the AFM height image.
-    """
-    return (afm2stack(image, bySlices, min_slices, resolution), {}, "image")
-
 # if we want even more control over our widget, we can use
 # magicgui `Container`
 class ImageThreshold(Container):
@@ -729,6 +331,7 @@ class ImageThreshold(Container):
         self._threshold_slider.max = 1
         # use magicgui widgets directly
         self._invert_checkbox = CheckBox(text="Keep pixels below threshold")
+        Image(self._viewer, self._image_layer_combo.value)
 
         # connect your own callbacks
         self._threshold_slider.changed.connect(self._threshold_im)
@@ -759,3 +362,54 @@ class ImageThreshold(Container):
             self._viewer.layers[name].data = thresholded
         else:
             self._viewer.add_labels(thresholded, name=name)
+
+#Added comments
+class TopoStatsRootWidget(QWidget):
+    """
+    A root widget where all topostats functions can be accessed.
+    This widget serves as a container for the button grid and provides
+    a layout for the various controls.
+    """
+    def __init__(self, viewer: Viewer):
+        super().__init__()
+        # Initialize the widget with a viewer
+        self._viewer = viewer
+        # Make layout so children are arranged vertically
+        layout = QVBoxLayout(self)
+        # Add the function grid to the layout with the available functions
+        self.function_grid = ButtonGrid(
+            self,
+            functions=self.get_functions(),
+            viewer=self._viewer
+        )
+        # Set the size policy to allow the widget to expand
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Set the layout margins and add the function grid
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.addWidget(self.function_grid)
+        # Set the layout for the widget
+        self.setLayout(layout)
+        
+    
+    def get_functions(self):
+        """
+        Get the available functions for the button grid.
+        Returns
+        -------
+        functions : dict[str, WidgetFunction | FunctionGui]
+            A dictionary of function names and their corresponding WidgetFunction or FunctionGui objects.
+        """
+        functions = {}
+        for function in AVAILABLE_FUNCTIONS:
+            function_name = function.name
+            display_name = function_name.replace("_", " ").title()
+            if function.function_key is not None:
+                functions[display_name] = function
+            else:
+                func = function.function_to_run
+                if isinstance(func, FunctionGui):
+                    functions[display_name] = func
+                elif callable(func):
+                    functions[display_name] = magicgui(func)
+        return functions
