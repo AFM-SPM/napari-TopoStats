@@ -19,6 +19,7 @@ from ._alerts import show_error_dialog
 
 config_wrapper = None
 full_config_container = None
+comment_descriptions = {}
 
 class ConfigWrapper:
     def __init__(self, config: dict):

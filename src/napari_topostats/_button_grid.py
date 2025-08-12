@@ -2,14 +2,15 @@ from qtpy.QtCore import QSize
 from qtpy.QtGui import QIcon, QColor, QBrush
 from qtpy.QtWidgets import QListWidget, QListWidgetItem
 from pathlib import Path
-from magicgui.widgets import FunctionGui, Container
+from magicgui.widgets import FunctionGui
 from napari.viewer import Viewer
 import inspect
 from napari.types import ImageData
 from typing import Any, Callable
 from napari.layers import Image
 from napari.types import ImageData
-from napari_topostats._widget_function import WidgetFunction, get_selected_image, ConfigWrapper
+from napari_topostats._widget_function import WidgetFunction, get_selected_image
+from ._alerts import show_error_dialog
 import numpy as np
 
 
@@ -50,13 +51,6 @@ def _get_background_brush():
 
     return background
 
-def _get_highlight_brush():
-    highlight_color = QColor()
-    highlight_color.setNamedColor("#68707a")
-    highlight = QBrush(1)
-    highlight.setColor(highlight_color)
-
-    return highlight
 
 
 def _get_icon(name):
@@ -70,20 +64,30 @@ def _get_icon(name):
 class ButtonGrid(QListWidget):
     def __init__(self, parent=None, functions: dict[str, WidgetFunction] | None = None, viewer: Viewer = None):
         super().__init__(parent=parent)
+        # Set style and properties for the QListWidget
         self.setMovement(self.Static)  # The items cannot be moved by the user.
         self.setViewMode(self.IconMode)  # make items icons
         self.setResizeMode(self.Adjust)  # relayout when view is resized.
         self.setUniformItemSizes(True)  # better performance
-        self.setIconSize(QSize(90, 40))
-        self.setWordWrap(True)
-        self.setStyleSheet(STYLES)
-        self.setSpacing(2)
-        self.item_mapping = {}
+        self.setIconSize(QSize(90, 40)) # set icon size
+        self.setWordWrap(True) # allow text to wrap
+        self.setStyleSheet(STYLES) # set the style sheet
+        self.setSpacing(2) # set spacing between items
+        
         self.viewer = viewer
+        # Initialize the list of functions
         self.update_functions(functions)
-        self.docked_functions = []
+        # List to keep track of docked functions
+        self.docked_functions = {}
 
     def update_functions(self, functions: dict[str, WidgetFunction] | None):
+        """ 
+        Update the list of functions in the button grid.
+        Parameters
+        ----------
+        functions : dict[str, WidgetFunction] | None
+            A dictionary of function names and their corresponding WidgetFunction objects.
+        """
         self.functions = functions or {}
         for label, function in functions.items():
             if function.tooltip:
@@ -95,54 +99,66 @@ class ButtonGrid(QListWidget):
         except TypeError:
             pass
         self.itemClicked.connect(self.add_function_as_widget)
+    
 
     def add_function_as_widget(self, item):
         """
         Handle the click event on a list item.
+        If the item corresponds to a WidgetFunction, it will be added as a docked widget
+        in the viewer (if it is not already added). If the function is not in the RUN_IMMEDIATELY_EXEMPTIONS list,
+        it will be executed with the appropriate parameters.
+        Parameters
+        ----------
+        item : QListWidgetItem
+            The item that was clicked.
         """
         function_from_list = self.functions.get(item.text())
         if isinstance(function_from_list, WidgetFunction):
+            # If the function is a WidgetFunction, get its GUI representation.
             widget = function_from_list.get_function_gui()
         elif isinstance(function_from_list, FunctionGui):
+            # If the function is already a FunctionGui, use it directly. This means it was created with magicgui and has
+            # been hard-coded to be a FunctionGui.
             widget = function_from_list
         else:
-            print(f"Function {item.text()} is not a valid WidgetFunction or FunctionGui.")
+            show_error_dialog(f"Function {item.text()} is not a valid WidgetFunction or FunctionGui.", raise_exception=True)
             return
+        # Check if the widget is already docked and add it if not
         if item.text() not in self.docked_functions:
             self.viewer.window.add_dock_widget(widget, name=item.text())
-            self.docked_functions.append(item.text())
+            self.docked_functions[item.text()] = widget
+        elif not self.docked_functions[item.text()].native.isVisible():
+            self.docked_functions[item.text()].native.destroy()  # Remove the widget if it is not visible
+            self.viewer.window.add_dock_widget(widget, name=item.text())
+            self.docked_functions[item.text()] = widget
         if item.text() not in RUN_IMMEDIATELY_EXEMPTIONS:
-            sig = inspect.signature(widget._function)
-            kwargs = {}
-
-            for name, param in sig.parameters.items():
-                if param.annotation == ImageData:
-                    selected = get_selected_image(self.viewer)
-                    if selected is None:
-                        print(f"No valid image data selected for {name}.")
-                    else:
-                        kwargs[name] = get_selected_image(self.viewer).data
-                if param.annotation == Image:
-                    selected = get_selected_image(self.viewer)
-                    if selected is None:
-                        print(f"No valid image layer selected for {name}.")
-                    else:
-                        kwargs[name] = get_selected_image(self.viewer)
-
-                if param.annotation == Viewer:
-                    kwargs[name] = self.viewer
-            print(f"Running {widget._function.__name__} with parameters: {kwargs}")
-            widget._function(**kwargs)
+            # If the function is not in the RUN_IMMEDIATELY_EXEMPTIONS list, run it with the appropriate parameters,
+            # using the selected image layer as the image parameter
+            if hasattr(self.docked_functions[item.text()], 'image'):
+                if self.docked_functions[item.text()].image.value is None:
+                    selected_image = get_selected_image(self.viewer)
+                    if selected_image is not None:
+                        self.docked_functions[item.text()].image.value = selected_image
+            if hasattr(self.docked_functions[item.text()], 'viewer'):
+                self.docked_functions[item.text()].viewer.value = self.viewer
+            self.docked_functions[item.text()]()
 
     
 
 
     def addItem(self, label : str, tool_tip: str | None = None):
+        """ Add an item (representing a function) to the QListWidget with an icon and optional tooltip.
+        Parameters
+        ----------
+        label : str
+            The text label for the item.
+        tool_tip : str | None
+            An optional tooltip for the item.
+        """
         if isinstance(label, QListWidgetItem):
             super().addItem(label)
 
         item = QListWidgetItem(QIcon(_get_icon(label)), label)
-        self.item_mapping[label] = item
         item.setBackground(_get_background_brush())
         
         if tool_tip is not None:
@@ -151,8 +167,7 @@ class ButtonGrid(QListWidget):
 
     def remove_all_items(self):
         """
-        Remove all items from the QListWidget and clear the item mapping.
+        Remove all items from the QListWidget.
         """
-        self.clear()            # Clears all QListWidgetItems from the widget
-        self.item_mapping.clear()  # Clear the dictionary tracking the items
+        self.clear()
 

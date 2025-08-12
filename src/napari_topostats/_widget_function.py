@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict
 import dask.array as da
 import numpy as np
 from magicgui import magicgui
-from magicgui.widgets import Container, FunctionGui
+from magicgui.widgets import FunctionGui
 from napari import current_viewer
 from napari.layers import Image
 from napari.viewer import Viewer
@@ -14,12 +14,23 @@ from scipy.ndimage import label
 from . import _io as io
 from ._io import ConfigWrapper, collect_values
 from ._alerts import show_error_dialog
-from . import _state as state
 
 
 def enforce_defaults(args: Dict[str, Any], params: list[Any]) -> Dict[str, Any]:
     """
     Ensure that all required parameters have default values.
+
+    Parameters
+    ----------
+    args : Dict[str, Any]
+        The current dictionary of arguments to which the default values will be checked for and added.
+    params : list[Any]
+        The list of parameters for the function.
+    
+    Returns
+    -------
+    args : Dict[str, Any]
+        The updated dictionary of arguments with default values added for any missing parameters.
     """
     param_names = [p.name for p in params]
     if "direction" in param_names:
@@ -56,11 +67,28 @@ def add_values_to_dict_from_config(
     function_key: str,
     args: Dict[str, Any],
     params: list,):
-    # for key, value in config.items():
-    #     print(f"Processing key: {key}, value: {value}")
-    
-    #     if value is not None and key in [p.name for p in params]:
-    #         args[key] = value
+    """
+    Add values from the config to the args dictionary based on the function key and parameters.
+    This function checks if the parameters are present in the config and adds them to the args dictionary.
+
+    Parameters
+    ----------
+    config : Dict[str, Any]
+        The configuration dictionary containing the function parameters.
+    wrapper : ConfigWrapper
+        The ConfigWrapper instance used to access flattened configuration values.
+    function_key : str
+        The key for the function in the configuration dictionary.
+    args : Dict[str, Any]
+        The current dictionary of arguments to which the configuration values will be added.
+    params : list
+        The list of parameter names for the function.
+
+    Returns
+    -------
+    args : Dict[str, Any]
+        The updated dictionary of arguments with values from the config added.
+    """
     for param_name in [p.name for p in params]:
         if param_name in config:
             args[param_name] = config[param_name]
@@ -75,14 +103,35 @@ def add_values_to_dict_from_config(
     return args
 
 def _eval(obj: Any, string: str) -> Any:
+    """
+    Evaluate a path string on an object to access its attributes or subscripts. For example, given a list `lst`, the
+    string "lst[0].name" would return the name attribute of the first element of the list. This is done without
+    using `eval` to avoid security risks.
 
+    Parameters
+    ----------
+    obj : Any
+        The object on which to evaluate the string.
+    string : str
+        The path string to evaluate.
+
+    Returns
+    -------
+    Any
+        The result of the evaluation.
+    """
+    # Remove spaces from the string for easier parsing
     string = string.replace(" ", "")
     if string == "":
+        # If the string is empty, return the object itself
         return obj
 
+    # Handle subscript access, e.g., [0], [1:3], ['key']
     if string[0] == "[":
+        # Find the next punctuation to determine the subscript type
         next_punc = next_punctuation(string, 1, checking_for=",()[].")
         if next_punc != -1 and string[next_punc] == ",":
+            # Handle tuple subscripts, e.g., [1,2]
             axes = []
             for i in string[1:string.index("]", 1)].split(","):
                 if i == ":":
@@ -92,18 +141,22 @@ def _eval(obj: Any, string: str) -> Any:
             subscript = tuple(axes)
             obj = obj[subscript]
         else:
+            # Handle single index or key, e.g., [0] or ['key']
             subscript = string[1:string.index("]", 1)]
             if subscript.isdigit():
                 obj = obj[int(subscript)]
             else:
                 key = subscript.replace("'", "").replace('"', '')
                 obj = obj[key]
+        # Recursively evaluate the remaining string
         remaining = string[string.index("]", 1) + 1:]
         return _eval(obj, remaining)
 
+    # Handle attribute access or method calls, e.g., .attr or .method()
     elif string[0] == ".":
         index = next_punctuation(string, 1)
         if index == -1:
+            # No further punctuation, just get the attribute
             attr = string[1:]
             if hasattr(obj, attr):
                 return getattr(obj, attr)
@@ -111,6 +164,7 @@ def _eval(obj: Any, string: str) -> Any:
                 raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{attr}'")
 
         if string[index] == "(":
+            # Handle method call, e.g., .method(args)
             func_name = string[1:index]
             if hasattr(obj, func_name):
                 func = getattr(obj, func_name)
@@ -118,21 +172,24 @@ def _eval(obj: Any, string: str) -> Any:
                 args = [arg.strip() for arg in args_str.split(",") if arg.strip()]
                 result = func(*args)
                 remaining = string[string.index(")", index + 1) + 1:]
+                # Recursively evaluate the remaining string
                 return _eval(result, remaining)
             else:
                 raise AttributeError(f"'{type(obj).__name__}' object has no callable '{func_name}'")
         else:
+            # Handle attribute access followed by more operations
             attr = string[1:index]
             if hasattr(obj, attr):
                 obj = getattr(obj, attr)
             else:
                 raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{attr}'")
             remaining = string[index:]
+            # Recursively evaluate the remaining string
             return _eval(obj, remaining)
 
     else:
+        # If the string does not start with '[' or '.', return the object
         return obj
-
 
 def next_punctuation(s: str, start: int = 0, checking_for: str = ".([") -> int:
     """Find the next punctuation character in a string."""
@@ -142,6 +199,10 @@ def next_punctuation(s: str, start: int = 0, checking_for: str = ".([") -> int:
     return -1
 
 class CallableWithSignature:
+    """
+    A callable that wraps a function and its signature. This allows the signature of the function to be updated for
+    its parameters and their defaults so that it can be used correctly with magicgui.
+    """
     def __init__(self, real_func, sig):
         functools.update_wrapper(self, real_func)  # Sets __name__, __doc__, etc.
         self.real_func = real_func
@@ -154,10 +215,23 @@ class CallableWithSignature:
 
 
 def get_selected_image(viewer) -> Image | None:
+    """
+    Get the currently selected image layer from the viewer.
+
+    Parameters
+    ----------
+    viewer : Viewer
+        The napari viewer instance from which to get the selected image layer.
+
+    Returns
+    -------
+    Image | None
+        The selected image layer, or None if no layer is selected.
+    """
     selected = list(viewer.layers.selection)
 
     if not selected:
-        print("No layer selected.")
+        show_error_dialog("No layer selected.")
         return None
 
     layer = selected[0]
@@ -166,18 +240,42 @@ def get_selected_image(viewer) -> Image | None:
         if isinstance(data, (np.ndarray, da.Array)):  # conforms to ImageData
             return layer
         else:
-            print("Layer data is not valid ImageData.")
+            show_error_dialog("Layer data is not valid ImageData.", raise_exception=True)
     else:
-        print("Selected layer is not an Image layer.")
+        show_error_dialog("Selected layer is not an Image layer.", raise_exception=True)
 
     return None
 
 def is_binary_image(arr: np.ndarray) -> bool:
-    unique_vals = np.unique(arr) 
+    """Check if the array is a binary image (0s and 1s or 0s and 255s).
+    Parameters
+    ----------
+    arr : np.ndarray
+        The array to check.
+    Returns
+    -------
+    bool
+        True if the array is a binary image, False otherwise.
+    """
+    unique_vals = np.unique(arr)
     # Check if unique values are subset of {0,1}
     return set(unique_vals).issubset({0, 1, 255})
 
 def remove_all_but_last(word: str, text: str) -> str:
+    """Remove all occurrences of 'word' in 'text' except the last one.
+
+    Parameters
+    ----------
+    word : str
+        The word to remove.
+    text : str
+        The text from which to remove the word.
+
+    Returns
+    -------
+    str
+        The text with all occurrences of the word removed except the last one.
+    """
     parts = text.rsplit(word, maxsplit=1)
     if len(parts) == 1:
         return text  # word not found or only once
@@ -185,10 +283,34 @@ def remove_all_but_last(word: str, text: str) -> str:
 
 def render_return_value(return_value: Any,
     function_key: str,
-    viewer: Viewer = None,
-    original: Image = None,
-    ndims: int = 2) -> None:
+    viewer: Viewer,
+    original: Image,
+    ndims: int = 2):
+    """ 
+    Render the return value of a function in the napari viewer.
+    This function handles the rendering of the return value based on its type.
+    If the return value is a numpy array, it will be added as an image layer.
+    If it is a binary image, it will be added as a labels layer.
+
+    Parameters
+    ----------
+    return_value : Any
+        The return value of the function which will be rendered.
+    function_key : str
+        The key of the function that was executed, used for naming the layer.
+    viewer : Viewer
+        The napari viewer instance where the layer will be added. If not provided, the current viewer will be used.
+    original : Image
+        The original image layer, used for metadata and naming. If not provided, it will be set to None.
+    ndims : int, optional
+        The number of dimensions of the data to be rendered. If not provided, it will be set to 2. 
+    """
+    # Check if the return value is a numpy array
+    # TODO: handle other types of return values if needed
+
     if isinstance(return_value, np.ndarray):
+        # If the return value is a binary image, add it as a labels layer
+        # TODO: Some functions may return a binary image which should be added as an image layer so need to handle that
         if is_binary_image(return_value):
             labels, num_labels = label(return_value.astype(bool))
             label_ids = list(range(1, num_labels + 1))
@@ -198,6 +320,7 @@ def render_return_value(return_value: Any,
                 name=f"{original.name} {function_key.title()} Mask",
                 properties=properties
             )
+        # If the return value is a greyscale image array, add it as an image layer
         else:
             name = f"{original.name} {function_key.title()} Image"
             name = remove_all_but_last("Image", name)
@@ -208,13 +331,28 @@ def render_return_value(return_value: Any,
                 metadata={"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}
             )
             viewer.dims.ndisplay = ndims
+    else:
+        show_error_dialog(f"Function {function_key} returned an unsupported type: {type(return_value)}. Expected numpy array.") 
 
 
 
 # Class representation of each function in the button grid.
 class WidgetFunction:
-    def __init__(self, name: str, function_key: str | None = None, function_to_run: Callable | FunctionGui | None = None, type_class: Any | None = None, path_to_data: str | None = None, uses_config: bool = False, ndims: int = 2, tooltip: str | None = None):
-
+    """
+    A class that represents each topostats function with its parameters and metadata and allows it to be used as a
+    magicgui widget in the napari viewer.
+    """
+    def __init__(
+        self,
+        name: str,
+        function_key: str | None = None,
+        function_to_run: Callable | None = None,
+        type_class: Any | None = None,
+        path_to_data: str | None = None,
+        uses_config: bool = False,
+        ndims: int = 2,
+        tooltip: str | None = None
+    ):
         self.name = name
         self.function_key = function_key
         if function_key is not None:
@@ -228,142 +366,195 @@ class WidgetFunction:
             self.function_to_run = function_to_run
         self.tooltip = tooltip
 
-    def set_function_gui(self, function_gui: FunctionGui):
-        self.function_gui = function_gui
-
     def get_function_gui(self) -> FunctionGui:
-        if not hasattr(self, 'function_gui'):
-            self.function_gui = self.get_widget()
+        """
+        Get the magicgui widget for the function.
+        If the widget has not been created yet, it will be created.
+
+        Returns
+        -------
+        FunctionGui
+            The magicgui widget that can be used in the napari viewer as a representation of the function.
+        """
+        self.function_gui = self.get_widget()
         return self.function_gui
 
-
     def get_widget(self) -> FunctionGui:
-        function_key = self.function_key
-        function_to_run = self.function_to_run
-        type_class = self.type_class
-        path_to_data = self.path_to_data
-        uses_config = self.uses_config
-        ndims = self.ndims
-        if uses_config:
+        """Create a magicgui widget for the function.
+        This widget will have the function's parameters as inputs and will
+        call the function when the user interacts with it.
+        
+        Returns
+        -------
+        FunctionGui
+            A magicgui widget that can be used in the napari viewer.
+        """
+        # Check if a config is needed
+        if self.uses_config:
+            # If so, check if the config is loaded
             if io.config_wrapper is None or io.full_config_container is None:
-                print("Config wrapper or full config container is not set.")
+                # Load the config if not
                 io.load_config(current_viewer())
         try:
-            if path_to_data is None:
-                if type_class is not None:
-                    path_to_data = "obj"
+            # If path_to_data is not set, default to "return" or "obj" if type_class is provided
+            if self.path_to_data is None:
+                if self.type_class is not None:
+                    self.path_to_data = "obj"
                 else:
-                    path_to_data = "return"
+                    self.path_to_data = "return"
+            # Get all the parameters from the function (excluding 'self')
             parameters_from_function = [
-                p for p in inspect.signature(function_to_run).parameters.values() if p.name != "self"
+                p for p in inspect.signature(self.function_to_run).parameters.values() if p.name != "self"
             ]
-
-            if type_class is not None:
-                sig = inspect.signature(type_class.__init__)
+            # Get all the parameters from the type_class (if provided)
+            if self.type_class is not None:
+                sig = inspect.signature(self.type_class.__init__)
                 parameters_from_class = [
                     p for name, p in sig.parameters.items()
                     if name != "self"
                 ]
                 all_parameters = parameters_from_class + parameters_from_function
             else:
-                sig = inspect.signature(function_to_run)
+                sig = inspect.signature(self.function_to_run)
                 all_parameters = parameters_from_function
                 
-
+            # Create a copy of the parameters to include config parameters
             including_config_params_from_function = parameters_from_function.copy()
-            including_config_params_from_class = parameters_from_class.copy() if type_class is not None else []
-            if uses_config:
+            including_config_params_from_class = parameters_from_class.copy() if self.type_class is not None else []
+            # Then remove parameters that are already in the config (so they are set from config file rather than GUI)
+            if self.uses_config:
                 updated_values = collect_values(io.full_config_container)
                 io.config_wrapper.flat.update(updated_values)
                 full_current_config = io.config_wrapper.unflatten()
-                config = full_current_config.get(function_key, {})
+                config = full_current_config.get(self.function_key, {})
                 for param_name in [p.name for p in all_parameters]:
                     if param_name in config:
                         parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
-                        if type_class is not None:
+                        if self.type_class is not None:
                             parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
                     else:
                         for flat_key, flat_val in io.config_wrapper.flat.items():
-                            if flat_key.startswith(f"{function_key}.") and flat_key[len(f"{function_key}."):] == param_name:
+                            if flat_key.startswith(f"{self.function_key}.") and flat_key[len(f"{self.function_key}."):] == param_name:
                                 parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
-                                if type_class is not None:
+                                if self.type_class is not None:
                                     parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
                                 break
                     if param_name in config and isinstance(config[param_name], dict):
                         parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
-                        if type_class is not None:
+                        if self.type_class is not None:
                             parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
-            if type_class is not None:
+            
+            if self.type_class is not None:
+                # Create a callable that wraps the function and class instantiation if type_class is provided
                 def func(**kwargs):
                     class_args = {}
                     method_args = {}
+                    # If the function requires an image, ensure one is given
                     if "image" in [p.name for p in including_config_params_from_class + including_config_params_from_function]:
                         if kwargs["image"] is None:
                             show_error_dialog("Please select an image before running this function.")
                             return
+                    # If pixel_to_nm_scaling is required, get it from the image metadata if not provided
                     if (
                         "pixel_to_nm_scaling" in [p.name for p in including_config_params_from_class + including_config_params_from_function]
                         and "pixel_to_nm_scaling" not in kwargs
                     ):
                         kwargs["pixel_to_nm_scaling"] = kwargs["image"].metadata.get("px2nm", 1.0)
                         print(f"Using pixel_to_nm_scaling from image metadata: {kwargs['pixel_to_nm_scaling']}")
-
+                    # Add all the arguments that are passed by the user in GUI to method_args or class_args
                     for key, value in kwargs.items():
                         if key in [p.name for p in including_config_params_from_function]:
                             method_args[key] = value
                         elif key in [p.name for p in including_config_params_from_class]:
                             class_args[key] = value
-                    if uses_config:
+                    # If the function uses config, add the config values which are required to run the function 
+                    # to method_args and class_args
+                    if self.uses_config:
                         method_args = add_values_to_dict_from_config(
-                            config, io.config_wrapper, function_key, method_args, including_config_params_from_function
+                            config, io.config_wrapper, self.function_key, method_args, including_config_params_from_function
                         )
                         class_args = add_values_to_dict_from_config(
-                            config, io.config_wrapper, function_key, class_args, including_config_params_from_class
+                            config, io.config_wrapper, self.function_key, class_args, including_config_params_from_class
                         )
-
+                    # Ensure all required parameters have default values
                     method_args = enforce_defaults(method_args, including_config_params_from_function)
                     class_args = enforce_defaults(class_args, including_config_params_from_class)
-                    instance = type_class(**class_args)
-                    method = getattr(instance, function_to_run.__name__, None)
+                    # Create an instance of the class with class_args (from config or GUI)
+                    instance = self.type_class(**class_args)
+                    # Get the method to run from the instance
+                    method = getattr(instance, self.function_to_run.__name__, None)
                     if method:
+                        # Run the method with method_args (from config or GUI)
                         return_value = method(**method_args)
-
-                        if path_to_data.startswith("return"):
-                            return_value = _eval(return_value, path_to_data[6:]) if len(path_to_data) > 6 else return_value
-                        elif path_to_data.startswith("obj"):
-                            return_value = _eval(instance, path_to_data[3:]) if len(path_to_data) > 3 else instance
+                        # If path_to_data is set, evaluate it to get the return value. This is necessary as different
+                        # topostats methods return data in different ways i.e. some return the data from the function,
+                        # some return the data to the attributes of the instance. The data required also may be at
+                        # different levels of the object hierarchy or within a list or dictionary so this is a way to
+                        # handle that.
+                        if self.path_to_data.startswith("return"):
+                            return_value = _eval(return_value, self.path_to_data[6:]) if len(self.path_to_data) > 6 else return_value
+                        elif self.path_to_data.startswith("obj"):
+                            return_value = _eval(instance, self.path_to_data[3:]) if len(self.path_to_data) > 3 else instance
                         else:
-                            raise ValueError(f"Invalid path_to_data: {path_to_data}")
-                        
+                            show_error_dialog(f"Invalid path_to_data: {self.path_to_data}")
+                        # If the return value is not None, render it in the viewer
                         if return_value is not None:
                             viewer = kwargs["viewer"] if "viewer" in kwargs else current_viewer()
-                            render_return_value(return_value, function_key, viewer, kwargs.get("image", None))
+                            render_return_value(return_value, self.function_key, viewer, kwargs.get("image", None), ndims=self.ndims)
+                        else:
+                            show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
             else:
+                # If no type_class is provided, just run the function directly
                 def func(**kwargs):
                     method_args = {}
-
+                    # If the function requires an image, ensure one is given
+                    if "image" in [p.name for p in including_config_params_from_function]:
+                        if kwargs["image"] is None:
+                            show_error_dialog("Please select an image before running this function.", raise_exception=True)
+                            return
+                    # If pixel_to_nm_scaling is required, get it from the image metadata if not provided
+                    if (
+                        "pixel_to_nm_scaling" in [p.name for p in including_config_params_from_function]
+                        and "pixel_to_nm_scaling" not in kwargs
+                    ):
+                        kwargs["pixel_to_nm_scaling"] = kwargs["image"].metadata.get("px2nm", 1.0)
+                        print(f"Using pixel_to_nm_scaling from image metadata: {kwargs['pixel_to_nm_scaling']}")
+                    # Add all the arguments that are passed by the user in GUI to method_args
                     for key, value in kwargs.items():
                         if key in [p.name for p in including_config_params_from_function]:
                             method_args[key] = value
-                    if uses_config:
+                    # If the function uses config, add the config values which are required to run the function
+                    if self.uses_config:
                         method_args = add_values_to_dict_from_config(
-                            config, io.config_wrapper, function_key, method_args, including_config_params_from_function
+                            config, io.config_wrapper, self.function_key, method_args, including_config_params_from_function
                         )
-
+                    # Ensure all required parameters have default values
                     method_args = enforce_defaults(method_args, including_config_params_from_function)
-
-                    return_value = function_to_run(**method_args)
-                    if path_to_data.startswith("return"):
-                        return_value = _eval(return_value, path_to_data[6:]) if len(path_to_data) > 6 else return_value
+                    # Run the function with method_args (from config or GUI)
+                    return_value = self.function_to_run(**method_args)
+                    # If path_to_data is set, evaluate it to get the return value. This is necessary as different
+                    # topostats methods return data in different ways i.e. the required data may be at
+                    # different levels of the object hierarchy or within a list or dictionary.
+                    if self.path_to_data.startswith("return"):
+                        return_value = _eval(return_value, self.path_to_data[6:]) if len(self.path_to_data) > 6 else return_value
+                    else:
+                        show_error_dialog(f"Invalid path_to_data: {self.path_to_data}")
+                    # If the return value is not None, render it in the viewer
                     if return_value is not None:
                         viewer = kwargs["viewer"] if "viewer" in kwargs else current_viewer()
-                        render_return_value(return_value, function_key, viewer, original=kwargs.get("image", None), ndims=ndims)
+                        render_return_value(return_value, self.function_key, viewer, original=kwargs.get("image", None), ndims=self.ndims)
                     else:
-                        show_error_dialog(f"Function {function_to_run.__name__} returned None.") 
+                        show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
+            # Collect the parameters for the function and ensure defaults are set (these defaults are shown in the GUI)
             new_parameters = []
-            for p in (parameters_from_function + parameters_from_class) if type_class is not None else parameters_from_function:
+            for p in (parameters_from_function + parameters_from_class) if self.type_class is not None else parameters_from_function:
                 if p.name == "image":
-                    new_p = p.replace(default=get_selected_image(current_viewer()), annotation=Image)
+                    # Sets the default image to the currently selected image in the viewer (at the time of opening the widget)
+                    selected_image = get_selected_image(current_viewer())
+                    if selected_image is not None:
+                        new_p = p.replace(default=selected_image, annotation=Image)
+                    else:
+                        new_p = p.replace(annotation=Image)
                 elif p.name == "pixel_to_nm_scaling":
                     new_p = p.replace(default=1.0)
                 elif p.name == "filename":
@@ -372,6 +563,7 @@ class WidgetFunction:
                     new_p = p
                 if new_p.name != "pixel_to_nm_scaling":
                     new_parameters.append(new_p)
+            # Create a magicgui function with the wrapped function and the new parameters
             wrapped_func = CallableWithSignature(func, inspect.Signature(parameters=new_parameters))
             magicgui_function = magicgui()(wrapped_func)
             return magicgui_function

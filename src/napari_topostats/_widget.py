@@ -83,9 +83,8 @@ if TYPE_CHECKING:
     import napari
 
 
-
-
 AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config",
+                                      tooltip="Load a configuration file to use with TopoStats functions.",
                                       function_to_run=load_config),
                         WidgetFunction(name="run_filters",
                             function_key="filter",
@@ -314,17 +313,6 @@ def gaussian_filter_image(
 
 
 
-
-
-
-comment_descriptions = {}
-topostats_widget = None
-docked_widgets = []
-
-
-
-
-
     
 # if we want even more control over our widget, we can use
 # magicgui `Container`
@@ -375,36 +363,53 @@ class ImageThreshold(Container):
         else:
             self._viewer.add_labels(thresholded, name=name)
 
+#Added comments
 class TopoStatsRootWidget(QWidget):
+    """
+    A root widget where all topostats functions can be accessed.
+    This widget serves as a container for the button grid and provides
+    a layout for the various controls.
+    """
     def __init__(self, viewer: Viewer):
         super().__init__()
+        # Initialize the widget with a viewer
         self._viewer = viewer
+        # Make layout so children are arranged vertically
         layout = QVBoxLayout(self)
+        # Add the function grid to the layout with the available functions
         self.function_grid = ButtonGrid(
             self,
             functions=self.get_functions(),
             viewer=self._viewer
         )
+        # Set the size policy to allow the widget to expand
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Set the layout margins and add the function grid
         layout.setContentsMargins(5, 5, 5, 5)
         layout.addWidget(self.function_grid)
+        # Set the layout for the widget
         self.setLayout(layout)
-        state.topostats_widget = self
         
     
     def get_functions(self):
+        """
+        Get the available functions for the button grid.
+        Returns
+        -------
+        functions : dict[str, WidgetFunction | FunctionGui]
+            A dictionary of function names and their corresponding WidgetFunction or FunctionGui objects.
+        """
         functions = {}
         for function in AVAILABLE_FUNCTIONS:
             function_name = function.name
-            title = function_name.replace("_", " ").title()
+            display_name = function_name.replace("_", " ").title()
             if function.function_key is not None:
-                functions[title] = function
+                functions[display_name] = function
             else:
                 func = function.function_to_run
                 if isinstance(func, FunctionGui):
-                    functions[title] = func
+                    functions[display_name] = func
                 elif callable(func):
-                    functions[title] = magicgui(func)
+                    functions[display_name] = magicgui(func)
         return functions
-    
