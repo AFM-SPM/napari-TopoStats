@@ -1,4 +1,3 @@
-
 import json
 import re
 from pathlib import Path
@@ -11,7 +10,16 @@ from napari.viewer import Viewer
 from qtpy.QtWidgets import QLabel, QPushButton
 from qtpy.QtCore import Qt
 from topostats.io import write_config_with_comments
-from qtpy.QtWidgets import QDialog, QScrollArea, QVBoxLayout, QHBoxLayout, QWidget, QDialogButtonBox, QFileDialog, QToolButton
+from qtpy.QtWidgets import (
+    QDialog,
+    QScrollArea,
+    QVBoxLayout,
+    QHBoxLayout,
+    QWidget,
+    QDialogButtonBox,
+    QFileDialog,
+    QToolButton,
+)
 from qtpy.QtGui import QIcon
 
 from . import _state as state
@@ -21,15 +29,17 @@ config_wrapper = None
 full_config_container = None
 comment_descriptions = {}
 
+
 class ConfigWrapper:
     """
     A wrapper for configuration dictionaries to provide a flat view and unflattening functionality.
     """
+
     def __init__(self, config: dict):
         self.original = config
         self.flat = self._flatten(config)
 
-    def _flatten(self, d, parent_key='', sep='.'):
+    def _flatten(self, d, parent_key="", sep="."):
         items = {}
         for k, v in d.items():
             new_key = f"{parent_key}{sep}{k}" if parent_key else k
@@ -42,13 +52,14 @@ class ConfigWrapper:
     def unflatten(self) -> dict:
         result = {}
         for k, v in self.flat.items():
-            keys = k.split('.')
+            keys = k.split(".")
             d = result
             for part in keys[:-1]:
                 d = d.setdefault(part, {})
             d[keys[-1]] = v
         return result
-    
+
+
 def collect_values(container: Container) -> Dict[str, Any]:
     result = {}
     for widget in container:
@@ -57,6 +68,7 @@ def collect_values(container: Container) -> Dict[str, Any]:
         if isinstance(val, str) and val.strip().startswith("["):
             try:
                 import ast
+
                 val = ast.literal_eval(val)
             except (ValueError, SyntaxError):
                 pass
@@ -64,7 +76,8 @@ def collect_values(container: Container) -> Dict[str, Any]:
             val = None
         result[name] = val
     return result
-    
+
+
 def build_dynamic_widget(flat_config: Dict[str, Any], descriptions: Dict[str, str] = None) -> Container:
     widgets = []
     for key, value in flat_config.items():
@@ -96,8 +109,9 @@ def build_dynamic_widget(flat_config: Dict[str, Any], descriptions: Dict[str, st
         widgets.append(w)
     return Container(widgets=widgets)
 
+
 @magicgui(
-    config_path={"label": "Config file", "mode": "r", "filter": "*.yaml;*.json"}, # Added .json filter
+    config_path={"label": "Config file", "mode": "r", "filter": "*.yaml;*.json"},  # Added .json filter
     call_button="Load Config",
     auto_call=True,
 )
@@ -105,7 +119,7 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
     """
     Load a configuration file and build a dynamic widget to edit it.
     This is a magicgui function that can be called directly from the napari GUI and is an example of a hardcoded
-    function being implemented using the dynamic function widget system. 
+    function being implemented using the dynamic function widget system.
     """
     global comment_descriptions, config_wrapper, full_config_container  # Updated global name
     if config_path is None:
@@ -126,7 +140,7 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
         return
 
     comment_descriptions = extract_inline_comments(config_path)
-    
+
     config_wrapper = ConfigWrapper(config)
 
     full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
@@ -137,9 +151,18 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
         # Create a button to open the config editor
         btn = QPushButton("Edit Config")
         btn.clicked.connect(lambda: open_config_editor(viewer))
-        viewer.window.add_dock_widget(btn, name="Edit Full Config")
+        docked = viewer.window.add_dock_widget(btn, name="Edit Full Config")
+        # Remove from state.docked_widgets when widget is closed
+        docked.visibilityChanged.connect(
+            lambda visible: (
+                state.docked_widgets.remove("Edit Full Config")
+                if not visible and "Edit Full Config" in state.docked_widgets
+                else None
+            )
+        )
         # Add the button to the docked widgets list so it can be accessed
         state.docked_widgets.append("Edit Full Config")
+
 
 def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> Dict[str, str]:
     """
@@ -147,7 +170,7 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> Dict[
     (This function remains the same as our last debugged version)
     """
     comment_map = {}
-    key_stack = [] 
+    key_stack = []
 
     if not yaml_path.exists():
         show_error_dialog(f"Error: YAML file not found at {yaml_path}")
@@ -161,7 +184,7 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> Dict[
                 continue
 
             match = re.match(r"^(\s*)([a-zA-Z0-9_]+):\s*(?:[^#\n]*?)(?:#\s*(.*))?$", line)
-            
+
             if match:
                 indent_str, key_name, comment_text = match.groups()
                 indent_level = len(indent_str.replace("\t", "  ")) // 2
@@ -171,21 +194,22 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> Dict[
 
                 full_yaml_key_path = ".".join(key_stack)
                 final_key_for_map = full_yaml_key_path
-                
+
                 if top_level_key:
                     if full_yaml_key_path == top_level_key:
                         final_key_for_map = ""
                     elif full_yaml_key_path.startswith(top_level_key + "."):
-                        final_key_for_map = full_yaml_key_path[len(top_level_key) + 1:]
+                        final_key_for_map = full_yaml_key_path[len(top_level_key) + 1 :]
 
                 if comment_text is not None and final_key_for_map:
                     comment_map[final_key_for_map] = comment_text.strip()
     return comment_map
 
+
 def create_info_icon(tooltip_text: str) -> QToolButton:
     button = QToolButton()
     icon = QIcon.fromTheme("help-about")
-    
+
     if icon and not icon.isNull():
         button.setIcon(icon)
     else:
@@ -193,11 +217,12 @@ def create_info_icon(tooltip_text: str) -> QToolButton:
         font = button.font()
         font.setBold(True)
         button.setFont(font)
-        
+
     button.setToolTip(tooltip_text)
     button.setAutoRaise(True)
     button.setCursor(Qt.WhatsThisCursor)
     return button
+
 
 def open_config_editor(viewer: Viewer):
     global config_wrapper, full_config_container, comment_descriptions
@@ -205,7 +230,7 @@ def open_config_editor(viewer: Viewer):
     if config_wrapper is None:
         show_error_dialog("No config loaded.")
         return
-    
+
     # Keys to include
     EDITABLE_TOP_LEVEL_KEYS = {"filter", "grains"}
 
@@ -213,15 +238,15 @@ def open_config_editor(viewer: Viewer):
     EXCLUDED_KEYS = {"filter.run", "grains.run"}
 
     filtered_flat_config = {
-        k: v for k, v in config_wrapper.flat.items()
-        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS)
-        and k not in EXCLUDED_KEYS
+        k: v
+        for k, v in config_wrapper.flat.items()
+        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS) and k not in EXCLUDED_KEYS
     }
 
     filtered_descriptions = {
-        k: v for k, v in comment_descriptions.items()
-        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS)
-        and k not in EXCLUDED_KEYS
+        k: v
+        for k, v in comment_descriptions.items()
+        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS) and k not in EXCLUDED_KEYS
     }
 
     fresh_container = build_dynamic_widget(filtered_flat_config, filtered_descriptions)
@@ -263,9 +288,7 @@ def open_config_editor(viewer: Viewer):
         full_config = config_wrapper.unflatten()
 
         file_path, _ = QFileDialog.getSaveFileName(
-            parent=dialog,
-            caption="Save Config As",
-            filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)"
+            parent=dialog, caption="Save Config As", filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)"
         )
         if file_path:
             try:
