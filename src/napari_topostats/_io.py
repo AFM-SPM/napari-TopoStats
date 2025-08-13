@@ -2,6 +2,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Dict
+from argparse import Namespace
 
 import yaml
 from magicgui import magicgui
@@ -123,8 +124,13 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
     """
     global comment_descriptions, config_wrapper, full_config_container  # Updated global name
     if config_path is None:
-        write_config_with_comments()
-        config_path = Path("config.yaml")
+        args = Namespace()
+        args.config = None
+        args.filename = "_generated_config.yaml"
+        args.output_dir = None
+        args.simple = False
+        write_config_with_comments(args)
+        config_path = Path("_generated_config.yaml")
 
     try:
         with open(config_path, "r") as f:

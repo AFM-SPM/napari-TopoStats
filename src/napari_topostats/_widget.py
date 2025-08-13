@@ -103,6 +103,7 @@ AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config",
                         WidgetFunction(name="make_3d",
                                        function_key="3d",
                                        function_to_run=afm2stack,
+                                       path_to_data="return",
                                        ndims=3,
                                        tooltip="Convert the selected image to a 3D stack"),]
 
@@ -405,7 +406,7 @@ class TopoStatsRootWidget(QWidget):
         for function in AVAILABLE_FUNCTIONS:
             function_name = function.name
             display_name = function_name.replace("_", " ").title()
-            if function.function_key is not None:
+            if function.path_to_data is not None:
                 # This option is used for functions that will be dynamically converted to a widget
                 functions[display_name] = function
             else:

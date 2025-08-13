@@ -242,7 +242,7 @@ def get_selected_image(viewer) -> Image | None:
         else:
             show_error_dialog("Layer data is not valid ImageData.", raise_exception=True)
     else:
-        show_error_dialog("Selected layer is not an Image layer.", raise_exception=False)
+        show_error_dialog("Selected layer is not an Image layer. Looking for a default layer.", raise_exception=False)
         return None
 
     return None
@@ -342,6 +342,38 @@ class WidgetFunction:
     """
     A class that represents each topostats function with its parameters and metadata and allows it to be used as a
     magicgui widget in the napari viewer.
+
+    Parameters
+    ----------
+    name : str
+        The name of the function, used for display and identification. These should be in snake_case. They are used to 
+        show the title of the widget (would become Snake Case) as well as get the icon for the widget for use in the
+        button grid. Therefore, their should be a name.png file in the icons directory with the same name.
+    function_key : str | None, optional
+        The key for the function in the configuration dictionary.
+    function_to_run : Callable | None, optional
+        The function to run when the widget is triggered. This can be a FunctionGui or a regular function. This function
+        can be directly from the topostats module or a custom function that is defined in the napari-TopoStats plugin.
+    type_class : Any | None, optional
+        The class type that the function belongs to, if applicable. This is used to instantiate the class and call the
+        method. This may not be required for all functions, so it can be None. It is used if an instance of the enclosing
+        class is required to run the function.
+    uses_config : bool, optional
+        Whether the function uses a configuration file to set its parameters. If True, the function will
+        load the configuration file and use it to set the parameters. If False, the function will
+        use only the parameters set in the widget. Note that certain parameters can also be taken from the napari
+        viewer, such as the selected image or from the image metadata, such as the pixel to nm scaling factor.
+    path_to_data : str | None, optional
+        The path to the data that the function returns. This is used to determine how to extract the data from the
+        return value of the function. It can be "return" to return the data directly (from the function), "obj" to 
+        return the object itself, or a specific path to access a nested attribute or subscript in the return value
+        or the object instance.
+    ndims : int, optional
+        The number of dimensions of the data to be rendered. Can be left as default 2, but can be set to 3 if the
+        function returns 3D data.
+    tooltip : str | None, optional
+        A tooltip for the widget, providing additional information about the function. This is displayed when the
+        user hovers over the button for the function in the button grid.
     """
     def __init__(
         self,
@@ -355,16 +387,13 @@ class WidgetFunction:
         tooltip: str | None = None
     ):
         self.name = name
-        self.function_key = function_key
-        if function_key is not None:
+        self.path_to_data = path_to_data
+        if path_to_data is not None:
             self.function_key = function_key
-            self.function_to_run = function_to_run
             self.type_class = type_class
-            self.path_to_data = path_to_data
             self.uses_config = uses_config
             self.ndims = ndims
-        else:
-            self.function_to_run = function_to_run
+        self.function_to_run = function_to_run
         self.tooltip = tooltip
 
     def get_function_gui(self) -> FunctionGui:
@@ -451,10 +480,12 @@ class WidgetFunction:
                     class_args = {}
                     method_args = {}
                     # If the function requires an image, ensure one is given
-                    if "image" in [p.name for p in including_config_params_from_class + including_config_params_from_function]:
-                        if kwargs["image"] is None:
-                            show_error_dialog("Please select an image before running this function.")
+                    if "image" in [p.name for p in including_config_params_from_function + including_config_params_from_class]:
+                        selected_image = get_selected_image(kwargs.get("viewer", current_viewer()))
+                        if selected_image is None:
+                            show_error_dialog("Please select an image before running this function.", raise_exception=True)
                             return
+                        kwargs["image"] = selected_image
                     # If pixel_to_nm_scaling is required, get it from the image metadata if not provided
                     if (
                         "pixel_to_nm_scaling" in [p.name for p in including_config_params_from_class + including_config_params_from_function]
@@ -510,9 +541,11 @@ class WidgetFunction:
                     method_args = {}
                     # If the function requires an image, ensure one is given
                     if "image" in [p.name for p in including_config_params_from_function]:
-                        if kwargs["image"] is None:
+                        selected_image = get_selected_image(kwargs.get("viewer", current_viewer()))
+                        if selected_image is None:
                             show_error_dialog("Please select an image before running this function.", raise_exception=True)
                             return
+                        kwargs["image"] = selected_image
                     # If pixel_to_nm_scaling is required, get it from the image metadata if not provided
                     if (
                         "pixel_to_nm_scaling" in [p.name for p in including_config_params_from_function]
@@ -562,7 +595,7 @@ class WidgetFunction:
                     new_p = p.replace(default="image")
                 else:
                     new_p = p
-                if new_p.name != "pixel_to_nm_scaling":
+                if new_p.name != "pixel_to_nm_scaling" and new_p.name != "image":
                     new_parameters.append(new_p)
             # Create a magicgui function with the wrapped function and the new parameters
             wrapped_func = CallableWithSignature(func, inspect.Signature(parameters=new_parameters))
