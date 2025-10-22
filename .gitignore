@@ -34,6 +34,8 @@ output/config.yaml
 # Include icons
 !icons/
 !icons/**
+!readme_images/
+!readme_images/**
 
 # IDE
 .vscode/
