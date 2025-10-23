@@ -10,7 +10,11 @@ from magicgui.widgets import Container, create_widget
 from napari.viewer import Viewer
 from qtpy.QtWidgets import QLabel, QPushButton
 from qtpy.QtCore import Qt
-from topostats.io import write_config_with_comments
+# This should be moved when no longer necessary
+try: 
+    from topostats.config import write_config_with_comments
+except:
+    from topostats.io import write_config_with_comments
 from qtpy.QtWidgets import (
     QDialog,
     QScrollArea,
@@ -128,7 +132,8 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
         args.config = None
         args.filename = "_generated_config.yaml"
         args.output_dir = None
-        args.simple = False
+        args.simple = False #This is to allow backwards compatibility with old version of topostatsdir
+        args.module = "topostats"
         write_config_with_comments(args)
         config_path = Path("_generated_config.yaml")
 
