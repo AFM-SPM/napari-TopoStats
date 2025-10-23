@@ -35,13 +35,14 @@ keywords = [
   "afm",
   "image processing",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10, <3.12"
 dependencies = [
   "magicgui",
   "napari[all]",
   "qtpy",
-  "topostats",
-  "tox"
+  "tox",
+  "TopoStats @ git+https://github.com/AFM-SPM/TopoStats.git@df2e2c3",
+  "napari-AFMReader @ git+https://github.com/AFM-SPM/napari-AFMReader.git@main"
 ]
 
 [project.optional-dependencies]
