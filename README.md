@@ -1,4 +1,4 @@
-# napari-loadafm
+# napari-TopoStats
 
 [![License MIT](https://img.shields.io/pypi/l/napari-loadafm.svg?color=green)](https://github.com/MaxGamill-Sheffield/napari-loadafm/raw/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/napari-loadafm.svg?color=green)](https://pypi.org/project/napari-loadafm)
@@ -23,18 +23,21 @@ https://napari.org/stable/plugins/index.html
 
 ## Installation
 
-First, make sure you have [AFMReader] and [napari-AFMReader] installed (view the README for those repos to see installation instructions)
 
-With [Git installed] on your machine, clone the napari-TopoStats repositories:
+Activate your Python environment (e.g. Conda) and make sure your Python version is >= 3.10 and < 3.12. An example conda enviroment command would be:
 
-    git clone https://github.com/AFM-SPM/napari-TopoStats.git
+    conda create -n napari-env python=3.11
+    conda activate napari-env
 
-Activate your Python environment (e.g. Conda) and install the dependency.
+With [Git installed] on your machine, install the napari-TopoStats repository using pip.
 
-    cd napari-TopoStats
-    pip install .
-    cd ..
+    pip install git+https://github.com/AFM-SPM/napari-TopoStats.git@main
 
+This command will install other required modules from GitHub (AFMReader, napari-AFMReader, TopoStats)
+
+You can then run napari with:
+
+    napari
 ## Usage
 
 Topostats tools can be accessed from the toolbar of napari (top left) as shown.
@@ -80,3 +83,4 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 [PyPI]: https://pypi.org/
 [AFMReader]: https://github.com/AFM-SPM/AFMReader
 [napari-AFMReader]: https://github.com/AFM-SPM/napari-AFMReader
+[Git installed]: https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
