@@ -7,7 +7,6 @@
 [![codecov](https://codecov.io/gh/MaxGamill-Sheffield/napari-loadafm/branch/main/graph/badge.svg)](https://codecov.io/gh/MaxGamill-Sheffield/napari-loadafm)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-loadafm)](https://napari-hub.org/plugins/napari-loadafm)
 
-maybe topostats lol
 
 ----------------------------------
 
@@ -38,6 +37,7 @@ This command will install other required modules from GitHub (AFMReader, napari-
 You can then run napari with:
 
     napari
+
 ## Usage
 
 Topostats tools can be accessed from the toolbar of napari (top left) as shown.
