@@ -42,6 +42,8 @@ You can then run napari with:
 
 Topostats tools can be accessed from the toolbar of napari (top left) as shown.
 ![Toolbar](readme_images/toolbar.png)
+To load an image into the napari viewer, drag and drop your image file into the window. A small window will open prompting you to input the input channel for the image you are loading. Enter the channel used by your image (e.g. Height). The loaded image will appear as a layer in the GUI.
+![Input channel window](readme_images/input_channel_window.png)
 This will then open a window containing buttons with available functions. Select a layer, then click the button corresponding to the function you want to run on the layer.
 ![Button Grid](readme_images/button_grid.png)
 Before running the function, you can choose to load a config file using the button and selecting the file. Both json and yaml file formats are supported. This config will be used for the functions you run until you close napari.
