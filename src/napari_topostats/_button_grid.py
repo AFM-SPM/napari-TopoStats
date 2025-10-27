@@ -9,7 +9,10 @@ from napari.types import ImageData
 from typing import Any, Callable, overload
 from napari.layers import Image
 from napari.types import ImageData
-from napari_topostats._widget_function import WidgetFunction, get_selected_image
+from napari_topostats._widget_function import (
+    WidgetFunction,
+    get_selected_image,
+)
 from ._alerts import show_error_dialog
 import numpy as np
 
@@ -85,7 +88,12 @@ class ButtonGrid(QListWidget):
     Each button can be clicked to execute the corresponding function, and open a docked widget in the viewer.
     """
 
-    def __init__(self, parent=None, functions: dict[str, WidgetFunction] | None = None, viewer: Viewer = None):
+    def __init__(
+        self,
+        parent=None,
+        functions: dict[str, WidgetFunction] | None = None,
+        viewer: Viewer = None,
+    ):
         super().__init__(parent=parent)
         # Set style and properties for the QListWidget
         self.setMovement(self.Static)  # The items cannot be moved by the user.
@@ -134,7 +142,7 @@ class ButtonGrid(QListWidget):
         item : QListWidgetItem
             The item that was clicked.
         """
-        
+
         # Check if the widget is already docked and add it if not
         if item.text() not in self.docked_functions:
             widget = self.get_widget_from_function(item.text())
@@ -142,7 +150,9 @@ class ButtonGrid(QListWidget):
             self.docked_functions[item.text()] = widget
         elif not self.docked_functions[item.text()].native.isVisible():
             widget = self.get_widget_from_function(item.text())
-            self.docked_functions[item.text()].native.destroy()  # Remove the widget if it is not visible
+            self.docked_functions[
+                item.text()
+            ].native.destroy()  # Remove the widget if it is not visible
             self.viewer.window.add_dock_widget(widget, name=item.text())
             self.docked_functions[item.text()] = widget
         if item.text() not in RUN_IMMEDIATELY_EXEMPTIONS:
@@ -152,12 +162,16 @@ class ButtonGrid(QListWidget):
                 if self.docked_functions[item.text()].image.value is None:
                     selected_image = get_selected_image(self.viewer)
                     if selected_image is not None:
-                        self.docked_functions[item.text()].image.value = selected_image
+                        self.docked_functions[
+                            item.text()
+                        ].image.value = selected_image
             if hasattr(self.docked_functions[item.text()], "viewer"):
                 self.docked_functions[item.text()].viewer.value = self.viewer
             self.docked_functions[item.text()]()
-    
-    def get_widget_from_function(self, function_name: str) -> FunctionGui | None:
+
+    def get_widget_from_function(
+        self, function_name: str
+    ) -> FunctionGui | None:
         function_from_list = self.functions.get(function_name)
         if isinstance(function_from_list, WidgetFunction):
             # If the function is a WidgetFunction, get its GUI representation.
@@ -168,7 +182,8 @@ class ButtonGrid(QListWidget):
             widget = function_from_list
         else:
             show_error_dialog(
-                f"Function {function_name} is not a valid WidgetFunction or FunctionGui.", raise_exception=True
+                f"Function {function_name} is not a valid WidgetFunction or FunctionGui.",
+                raise_exception=True,
             )
             return None
         return widget
@@ -176,7 +191,7 @@ class ButtonGrid(QListWidget):
     def addFunctionButton(self, label: str, tool_tip: str | None = None):
         """
         Add a button to the grid with the specified label and tooltip.
-        
+
         Parameters
         ----------
         label : str | QListWidgetItem

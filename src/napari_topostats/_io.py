@@ -10,8 +10,9 @@ from magicgui.widgets import Container, create_widget
 from napari.viewer import Viewer
 from qtpy.QtWidgets import QLabel, QPushButton
 from qtpy.QtCore import Qt
+
 # This should be moved when no longer necessary
-try: 
+try:
     from topostats.config import write_config_with_comments
 except:
     from topostats.io import write_config_with_comments
@@ -83,21 +84,29 @@ def collect_values(container: Container) -> Dict[str, Any]:
     return result
 
 
-def build_dynamic_widget(flat_config: Dict[str, Any], descriptions: Dict[str, str] = None) -> Container:
+def build_dynamic_widget(
+    flat_config: Dict[str, Any], descriptions: Dict[str, str] = None
+) -> Container:
     widgets = []
     for key, value in flat_config.items():
-        current_tooltip_text = descriptions.get(key, "") if descriptions else ""
+        current_tooltip_text = (
+            descriptions.get(key, "") if descriptions else ""
+        )
 
         if isinstance(value, bool):
             w = create_widget(name=key, widget_type="CheckBox", value=value)
         elif isinstance(value, int):
             w = create_widget(name=key, widget_type="SpinBox", value=value)
         elif isinstance(value, float):
-            w = create_widget(name=key, widget_type="FloatSpinBox", value=value)
+            w = create_widget(
+                name=key, widget_type="FloatSpinBox", value=value
+            )
         elif isinstance(value, str):
             w = create_widget(name=key, widget_type="LineEdit", value=value)
         elif isinstance(value, list):
-            w = create_widget(name=key, widget_type="LineEdit", value=str(value))
+            w = create_widget(
+                name=key, widget_type="LineEdit", value=str(value)
+            )
         elif value is None:
             w = create_widget(name=key, widget_type="LineEdit", value="None")
         else:
@@ -116,7 +125,11 @@ def build_dynamic_widget(flat_config: Dict[str, Any], descriptions: Dict[str, st
 
 
 @magicgui(
-    config_path={"label": "Config file", "mode": "r", "filter": "*.yaml;*.json"},  # Added .json filter
+    config_path={
+        "label": "Config file",
+        "mode": "r",
+        "filter": "*.yaml;*.json",
+    },  # Added .json filter
     call_button="Load Config",
     auto_call=True,
 )
@@ -132,13 +145,13 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
         args.config = None
         args.filename = "_generated_config.yaml"
         args.output_dir = None
-        args.simple = False #This is to allow backwards compatibility with old version of topostatsdir
+        args.simple = False  # This is to allow backwards compatibility with old version of topostatsdir
         args.module = "topostats"
         write_config_with_comments(args)
         config_path = Path("_generated_config.yaml")
 
     try:
-        with open(config_path, "r") as f:
+        with open(config_path) as f:
             if config_path.suffix.lower() in [".yaml", ".yml"]:
                 config = yaml.safe_load(f)
             elif config_path.suffix.lower() == ".json":
@@ -154,7 +167,9 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
 
     config_wrapper = ConfigWrapper(config)
 
-    full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
+    full_config_container = build_dynamic_widget(
+        config_wrapper.flat.copy(), comment_descriptions
+    )
     if full_config_container is None:
         show_error_dialog("Failed to create full config container.")
         return
@@ -175,7 +190,9 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
         state.docked_widgets.append("Edit Full Config")
 
 
-def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> Dict[str, str]:
+def extract_inline_comments(
+    yaml_path: Path, top_level_key: str = None
+) -> Dict[str, str]:
     """
     Extracts inline comments from a YAML file.
     (This function remains the same as our last debugged version)
@@ -187,14 +204,16 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> Dict[
         show_error_dialog(f"Error: YAML file not found at {yaml_path}")
         return {}
 
-    with open(yaml_path, "r") as f:
+    with open(yaml_path) as f:
         for line_num, line in enumerate(f, 1):
             stripped_line = line.strip()
 
             if not stripped_line or stripped_line.startswith("#"):
                 continue
 
-            match = re.match(r"^(\s*)([a-zA-Z0-9_]+):\s*(?:[^#\n]*?)(?:#\s*(.*))?$", line)
+            match = re.match(
+                r"^(\s*)([a-zA-Z0-9_]+):\s*(?:[^#\n]*?)(?:#\s*(.*))?$", line
+            )
 
             if match:
                 indent_str, key_name, comment_text = match.groups()
@@ -210,7 +229,9 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> Dict[
                     if full_yaml_key_path == top_level_key:
                         final_key_for_map = ""
                     elif full_yaml_key_path.startswith(top_level_key + "."):
-                        final_key_for_map = full_yaml_key_path[len(top_level_key) + 1 :]
+                        final_key_for_map = full_yaml_key_path[
+                            len(top_level_key) + 1 :
+                        ]
 
                 if comment_text is not None and final_key_for_map:
                     comment_map[final_key_for_map] = comment_text.strip()
@@ -251,16 +272,24 @@ def open_config_editor(viewer: Viewer):
     filtered_flat_config = {
         k: v
         for k, v in config_wrapper.flat.items()
-        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS) and k not in EXCLUDED_KEYS
+        if any(
+            k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS
+        )
+        and k not in EXCLUDED_KEYS
     }
 
     filtered_descriptions = {
         k: v
         for k, v in comment_descriptions.items()
-        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS) and k not in EXCLUDED_KEYS
+        if any(
+            k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS
+        )
+        and k not in EXCLUDED_KEYS
     }
 
-    fresh_container = build_dynamic_widget(filtered_flat_config, filtered_descriptions)
+    fresh_container = build_dynamic_widget(
+        filtered_flat_config, filtered_descriptions
+    )
 
     dialog = QDialog()
     dialog.setWindowTitle("Edit Filters and Grains Config")
@@ -289,7 +318,9 @@ def open_config_editor(viewer: Viewer):
     scroll_content.setLayout(scroll_layout)
     scroll_area.setWidget(scroll_content)
 
-    button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+    button_box = QDialogButtonBox(
+        QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+    )
     save_button = QPushButton("Save Config to File")
     button_box.addButton(save_button, QDialogButtonBox.ActionRole)
 
@@ -299,7 +330,9 @@ def open_config_editor(viewer: Viewer):
         full_config = config_wrapper.unflatten()
 
         file_path, _ = QFileDialog.getSaveFileName(
-            parent=dialog, caption="Save Config As", filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)"
+            parent=dialog,
+            caption="Save Config As",
+            filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)",
         )
         if file_path:
             try:
@@ -325,4 +358,6 @@ def open_config_editor(viewer: Viewer):
         config_wrapper.flat.update(updated_values)
         print("Config updated.")
         # Optionally refresh the full container for other use
-        full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
+        full_config_container = build_dynamic_widget(
+            config_wrapper.flat.copy(), comment_descriptions
+        )

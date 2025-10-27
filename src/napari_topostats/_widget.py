@@ -33,7 +33,11 @@ import functools
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
-    QToolButton, QVBoxLayout, QWidget, QSizePolicy, QApplication
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+    QSizePolicy,
+    QApplication,
 )
 from ._alerts import show_error_dialog, LoadingDialog
 
@@ -62,9 +66,14 @@ from skimage.util import img_as_float
 
 
 from napari_topostats.utils import (
-    afm2stack, average_background, gaussian_filter,
-    median_flattened, remove_nonlinear, remove_quadratic,
-    remove_scars, remove_tilt,
+    afm2stack,
+    average_background,
+    gaussian_filter,
+    median_flattened,
+    remove_nonlinear,
+    remove_quadratic,
+    remove_scars,
+    remove_tilt,
 )
 
 from topostats.grains import Grains
@@ -83,29 +92,39 @@ if TYPE_CHECKING:
     import napari
 
 
-AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config",
-                                      tooltip="Load a configuration file to use with TopoStats functions.",
-                                      function_to_run=load_config),
-                        WidgetFunction(name="run_filters",
-                            function_key="filter",
-                            function_to_run=Filters.filter_image,
-                                type_class=Filters,
-                                path_to_data='obj.images["gaussian_filtered"]',
-                                    uses_config=True,
-                                    tooltip="Run filters on the selected image using the current configuration."),
-                        WidgetFunction(name="run_grains",
-                          function_key="grains",
-                            function_to_run=Grains.find_grains,
-                              type_class=Grains,
-                                path_to_data='obj.mask_images["above"]["merged_classes"][:, :, 1]',
-                                  uses_config=True,
-                                  tooltip="Run grain analysis on the selected image using the current configuration."),
-                        WidgetFunction(name="make_3d",
-                                       function_key="3d",
-                                       function_to_run=afm2stack,
-                                       path_to_data="return",
-                                       ndims=3,
-                                       tooltip="Convert the selected image to a 3D stack"),]
+AVAILABLE_FUNCTIONS = [
+    WidgetFunction(
+        name="load_config",
+        tooltip="Load a configuration file to use with TopoStats functions.",
+        function_to_run=load_config,
+    ),
+    WidgetFunction(
+        name="run_filters",
+        function_key="filter",
+        function_to_run=Filters.filter_image,
+        type_class=Filters,
+        path_to_data='obj.images["gaussian_filtered"]',
+        uses_config=True,
+        tooltip="Run filters on the selected image using the current configuration.",
+    ),
+    WidgetFunction(
+        name="run_grains",
+        function_key="grains",
+        function_to_run=Grains.find_grains,
+        type_class=Grains,
+        path_to_data='obj.mask_images["above"]["merged_classes"][:, :, 1]',
+        uses_config=True,
+        tooltip="Run grain analysis on the selected image using the current configuration.",
+    ),
+    WidgetFunction(
+        name="make_3d",
+        function_key="3d",
+        function_to_run=afm2stack,
+        path_to_data="return",
+        ndims=3,
+        tooltip="Convert the selected image to a 3D stack",
+    ),
+]
 
 
 def remove_scars_from_image(
@@ -156,16 +175,27 @@ def remove_scars_from_image(
         The original 2-D image with scars removed, unless the config has run set to False, in which case it
         will not remove the scars.
     """
-    return (remove_scars(image, removal_iterations, threshold_low, threshold_high, max_scar_width, min_scar_length), {}, "image")
+    return (
+        remove_scars(
+            image,
+            removal_iterations,
+            threshold_low,
+            threshold_high,
+            max_scar_width,
+            min_scar_length,
+        ),
+        {},
+        "image",
+    )
 
 
-#@magicgui(
+# @magicgui(
 #    auto_call=True,
 #    row_alignment_quantile={"widget_type": "FloatSlider", "min": 0, "max": 1}
-#)
+# )
 def median_align_rows(
     image: "napari.types.ImageData",
-    mask: "napari.types.LabelsData"=None,
+    mask: "napari.types.LabelsData" = None,
     row_alignment_quantile: float = 0.5,
 ) -> "napari.types.LayerDataTuple":
     """
@@ -190,11 +220,20 @@ def median_align_rows(
     npt.NDArray
         Copy of the input image with rows aligned.
     """
-    return (median_flattened(image=image, mask=mask, row_alignment_quantile=row_alignment_quantile), {}, "image")
+    return (
+        median_flattened(
+            image=image,
+            mask=mask,
+            row_alignment_quantile=row_alignment_quantile,
+        ),
+        {},
+        "image",
+    )
+
 
 def remove_planar_tilt(
     image: "napari.types.ImageData",
-    mask: "napari.types.LabelsData"=None,
+    mask: "napari.types.LabelsData" = None,
 ) -> "napari.types.LayerDataTuple":
     """
     Remove the planar tilt from an image (linear in 2D spaces).
@@ -216,9 +255,10 @@ def remove_planar_tilt(
     """
     return (remove_tilt(image=image, mask=mask), {}, "image")
 
+
 def remove_quadratic_background(
     image: "napari.types.ImageData",
-    mask: "napari.types.LabelsData"=None,
+    mask: "napari.types.LabelsData" = None,
 ) -> "napari.types.LayerDataTuple":
     """
     Remove the quadratic bowing that can be seen in some large-scale AFM images.
@@ -240,9 +280,10 @@ def remove_quadratic_background(
     """
     return (remove_quadratic(image=image, mask=mask), {}, "image")
 
+
 def remove_nonlinear_background(
     image: "napari.types.ImageData",
-    mask: "napari.types.LabelsData"=None,
+    mask: "napari.types.LabelsData" = None,
 ) -> "napari.types.LayerDataTuple":
     """
     Fit and remove a "saddle" shaped nonlinear polynomial from the image.
@@ -269,9 +310,10 @@ def remove_nonlinear_background(
     """
     return (remove_nonlinear(image=image, mask=mask), {}, "image")
 
+
 def zero_average_background(
     image: "napari.types.ImageData",
-    mask: "napari.types.LabelsData"=None,
+    mask: "napari.types.LabelsData" = None,
 ) -> "napari.types.LayerDataTuple":
     """
     Zero the background by subtracting the non-masked mean from all pixels.
@@ -289,6 +331,7 @@ def zero_average_background(
             Numpy array of image zero averaged.
     """
     return (average_background(image=image, mask=mask), {}, "image")
+
 
 def gaussian_filter_image(
     image: "napari.types.ImageData",
@@ -312,9 +355,6 @@ def gaussian_filter_image(
     return (gaussian_filter(image=image, sigma=sigma), {}, "image")
 
 
-
-
-    
 # if we want even more control over our widget, we can use
 # magicgui `Container`
 class ImageThreshold(Container):
@@ -364,35 +404,36 @@ class ImageThreshold(Container):
         else:
             self._viewer.add_labels(thresholded, name=name)
 
-#Added comments
+
+# Added comments
 class TopoStatsRootWidget(QWidget):
     """
     A root widget where all topostats functions can be accessed.
     This widget serves as a container for the button grid and provides
     a layout for the various controls.
     """
+
     def __init__(self, viewer: Viewer):
         super().__init__()
         # Initialize the widget with a viewer
         self._viewer = viewer
         # Make layout so children are arranged vertically
         layout = QVBoxLayout(self)
-        # Add the function grid to the layout with the available functions
+        # Add the function grid to the layout with the available functions
         self.function_grid = ButtonGrid(
-            self,
-            functions=self.get_functions(),
-            viewer=self._viewer
+            self, functions=self.get_functions(), viewer=self._viewer
         )
         # Set the size policy to allow the widget to expand
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.function_grid.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Expanding
+        )
         # Set the layout margins and add the function grid
         layout.setContentsMargins(5, 5, 5, 5)
         layout.addWidget(self.function_grid)
         # Set the layout for the widget
         self.setLayout(layout)
-        
-    
+
     def get_functions(self):
         """
         Get the available functions for the button grid.
