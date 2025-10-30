@@ -1,14 +1,15 @@
-import os
 from pathlib import Path
+
+import napari
 import pytest
+from napari_afmreader._reader import reader_function
 from pytestqt.qtbot import QtBot
 from qtpy.QtCore import Qt
-import napari
-from napari_afmreader._reader import reader_function
+
 from napari_topostats._widget import AVAILABLE_FUNCTIONS, TopoStatsRootWidget
 
-
 # --- Fixtures ---
+
 
 @pytest.fixture
 def viewer(qtbot: QtBot):
@@ -30,6 +31,7 @@ def topostats_widget(viewer, qtbot: QtBot):
 
 # --- Helper Functions ---
 
+
 def load_test_image(viewer, image_path):
     """Load a test AFM image using the napari_afmreader."""
     layers = reader_function(image_path, channel="Height")
@@ -42,6 +44,7 @@ def load_test_image(viewer, image_path):
 
 
 # --- Tests ---
+
 
 @pytest.mark.parametrize(
     ("run_function_on", "expected_layers"),
@@ -62,7 +65,9 @@ def load_test_image(viewer, image_path):
         )
     ],
 )
-def test_functions_in_grid(qtbot: QtBot, topostats_widget, viewer, run_function_on, expected_layers):
+def test_functions_in_grid(
+    qtbot: QtBot, topostats_widget, viewer, run_function_on, expected_layers
+):
     """Simulate clicking functions and verify new layers are created."""
     function_names = [f.name for f in AVAILABLE_FUNCTIONS]
     button_grid = topostats_widget.function_grid
@@ -70,17 +75,23 @@ def test_functions_in_grid(qtbot: QtBot, topostats_widget, viewer, run_function_
         pretty_name = func_name.replace("_", " ").title()
         viewer.layers.selection = [viewer.layers[run_function_on[i]]]
         item = button_grid.findItems(pretty_name, Qt.MatchExactly)[0]
-        qtbot.mouseClick(button_grid.viewport(), Qt.LeftButton, pos=item.rect().center())
+        qtbot.mouseClick(
+            button_grid.viewport(), Qt.LeftButton, pos=item.rect().center()
+        )
         button_grid.add_function_as_widget(item)
         qtbot.wait(100)
 
     for expected_name in expected_layers:
-        assert expected_name in viewer.layers, f"Layer '{expected_name}' not found"
+        assert (
+            expected_name in viewer.layers
+        ), f"Layer '{expected_name}' not found"
 
 
 def test_button_grid_exists(qtbot: QtBot, button_grid):
     """Ensure the function grid loads correctly."""
-    assert button_grid.functions is not None, "Function grid did not initialize"
+    assert (
+        button_grid.functions is not None
+    ), "Function grid did not initialize"
 
 
 @pytest.mark.parametrize(
@@ -113,7 +124,20 @@ def test_load_image(viewer, image_path):
         )
     ],
 )
-def test_end_to_end(qtbot: QtBot, viewer, topostats_widget, image_path, run_function_on, expected_layers):
+def test_end_to_end(
+    qtbot: QtBot,
+    viewer,
+    topostats_widget,
+    image_path,
+    run_function_on,
+    expected_layers,
+):
     """End-to-end test: load image, run functions, and verify layers."""
     load_test_image(viewer, image_path)
-    test_functions_in_grid(qtbot, topostats_widget.function_grid, viewer, run_function_on, expected_layers)
+    test_functions_in_grid(
+        qtbot,
+        topostats_widget.function_grid,
+        viewer,
+        run_function_on,
+        expected_layers,
+    )

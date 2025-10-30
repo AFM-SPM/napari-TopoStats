@@ -91,7 +91,7 @@ def reader_function(path):
             if not scan_data_dict:
                 raise ValueError
             break
-        except ValueError: #TODO more open exceptions?
+        except ValueError:  # TODO more open exceptions?
             available_channels = "Check console error message."
 
     # stack arrays into single array
