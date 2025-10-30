@@ -14,8 +14,12 @@ from scipy.ndimage import label
 from pandas import DataFrame
 
 from qtpy.QtWidgets import (
-    QTableWidget, QTableWidgetItem, QPushButton, QFileDialog,
-    QWidget, QVBoxLayout
+    QTableWidget,
+    QTableWidgetItem,
+    QPushButton,
+    QFileDialog,
+    QWidget,
+    QVBoxLayout,
 )
 from . import _io as io
 from ._io import ConfigWrapper, collect_values
@@ -267,7 +271,9 @@ def get_selected_image(viewer) -> Image | None:
         if isinstance(data, (np.ndarray, da.Array)):  # conforms to ImageData
             return layer
         else:
-            show_error_dialog("Layer data is not valid ImageData.", raise_exception=True)
+            show_error_dialog(
+                "Layer data is not valid ImageData.", raise_exception=True
+            )
     elif isinstance(layer, Labels):
         return layer
     else:
@@ -327,8 +333,9 @@ def render_return_value(
     viewer: Viewer,
     original: Layer,
     ndims: int = 2,
-    metadata: dict = None):
-    """ 
+    metadata: dict = None,
+):
+    """
     Render the return value of a function in the napari viewer.
     This function handles the rendering of the return value based on its type.
     If the return value is a numpy array, it will be added as an image layer.
@@ -361,7 +368,12 @@ def render_return_value(
                 labels.astype(np.uint16),
                 name=f"{original.name} {function_key.title()} Mask",
                 properties=properties,
-                metadata=({"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}) | metadata
+                metadata=(
+                    {"px2nm": original.metadata.get("px2nm", 1.0)}
+                    if original
+                    else {}
+                )
+                | metadata,
             )
         # If the return value is a greyscale image array, add it as an image layer
         else:
@@ -371,12 +383,19 @@ def render_return_value(
                 return_value,
                 name=name,
                 contrast_limits=(-1, 5),
-                metadata=({"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}) | metadata
+                metadata=(
+                    {"px2nm": original.metadata.get("px2nm", 1.0)}
+                    if original
+                    else {}
+                )
+                | metadata,
             )
             viewer.dims.ndisplay = ndims
-    elif (isinstance(return_value, tuple) and 
-            len(return_value) == 3 and
-            isinstance(return_value[0], DataFrame)):
+    elif (
+        isinstance(return_value, tuple)
+        and len(return_value) == 3
+        and isinstance(return_value[0], DataFrame)
+    ):
         df = return_value[0]
         container = QWidget()
         layout = QVBoxLayout(container)
@@ -390,7 +409,9 @@ def render_return_value(
         def on_row_clicked(row, column):
             """Triggered when a table row is clicked."""
             # Get the grain number (or label id) from the dataframe
-            grain_id = df.iloc[row]['grain_number']  # or 'label', whatever your column is called
+            grain_id = df.iloc[row][
+                "grain_number"
+            ]  # or 'label', whatever your column is called
 
             # Center the view on it
             # Find coordinates of that label in the image
@@ -415,11 +436,13 @@ def render_return_value(
                 return
 
             # Find matching row
-            match = df.index[df['grain_number'] + 1 == selected]
+            match = df.index[df["grain_number"] + 1 == selected]
             if len(match):
                 row = int(match[0])
                 table.selectRow(row)
-                table.scrollToItem(table.item(row, 0), QTableWidget.PositionAtCenter)
+                table.scrollToItem(
+                    table.item(row, 0), QTableWidget.PositionAtCenter
+                )
                 original.show_selected_label = True
 
         original.events.selected_label.connect(on_label_selected)
@@ -441,7 +464,7 @@ def render_return_value(
                 table,
                 "Save Table as CSV",
                 f"{original.name.lower().replace(' ', '_')}_stats.csv",
-                "CSV Files (*.csv)"
+                "CSV Files (*.csv)",
             )
             if file_path:
                 df.to_csv(file_path, index=False)
@@ -451,16 +474,21 @@ def render_return_value(
         table.cellClicked.connect(on_row_clicked)
 
         # Add to viewer
-        viewer.window.add_dock_widget(container, area='right', name='Grain Statistics')
+        viewer.window.add_dock_widget(
+            container, area="right", name="Grain Statistics"
+        )
     else:
         show_error_dialog(
             f"Function {function_key} returned an unsupported type: {type(return_value)}. Expected numpy array."
         )
 
-def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=None):
+
+def evaluate_path_to_data(
+    path_to_data, return_value, instance=None, type_class=None
+):
     """
     Evaluate a path expression to extract data from return values or object instances.
-    
+
     Parameters
     ----------
     path_to_data : str
@@ -471,26 +499,36 @@ def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=
         The object instance to evaluate against (required for 'obj' paths)
     type_class : any, optional
         Type class indicator (required for 'obj' paths)
-    
+
     Returns
     -------
     any
         The evaluated result, or None if there's an error
     """
     if path_to_data.startswith("return"):
-        return _eval(return_value, path_to_data[6:]) if len(path_to_data) > 6 else return_value
-    
+        return (
+            _eval(return_value, path_to_data[6:])
+            if len(path_to_data) > 6
+            else return_value
+        )
+
     elif path_to_data.startswith("obj"):
         if type_class:
-            return _eval(instance, path_to_data[3:]) if len(path_to_data) > 3 else instance
+            return (
+                _eval(instance, path_to_data[3:])
+                if len(path_to_data) > 3
+                else instance
+            )
         else:
-            show_error_dialog(f"Invalid path_to_data: {path_to_data} - 'obj' requires type_class")
+            show_error_dialog(
+                f"Invalid path_to_data: {path_to_data} - 'obj' requires type_class"
+            )
             return None
-    
+
     else:
         show_error_dialog(f"Invalid path_to_data: {path_to_data}")
         return None
-    
+
 
 # Class representation of each function in the button grid.
 class WidgetFunction:
@@ -541,7 +579,7 @@ class WidgetFunction:
         uses_config: bool = False,
         ndims: int = 2,
         metadata_paths: dict = None,
-        tooltip: str | None = None
+        tooltip: str | None = None,
     ):
         self.name = name
         self.path_to_data = path_to_data
@@ -554,10 +592,9 @@ class WidgetFunction:
         self.function_to_run = function_to_run
         self.tooltip = tooltip
         self.overide_viewer = None
-    
+
     def add_overide_viewer(self, viewer: Viewer):
         self.overide_viewer = viewer
-
 
     def get_function_gui(self) -> FunctionGui:
         """
@@ -675,43 +712,72 @@ class WidgetFunction:
                             if p.name != param_name
                         ]
                         if self.type_class is not None:
-                            parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
-            
+                            parameters_from_class = [
+                                p
+                                for p in parameters_from_class
+                                if p.name != param_name
+                            ]
+
             def func(**kwargs):
                 method_args = {}
                 class_args = {}
-                
+
                 # Determine all relevant parameters
                 all_params = including_config_params_from_function + (
-                    including_config_params_from_class if self.type_class else []
+                    including_config_params_from_class
+                    if self.type_class
+                    else []
                 )
-                
+
                 # Handle image selection if required
                 if "image" in [p.name for p in all_params]:
-                    selected_image = get_selected_image(kwargs.get("viewer", current_viewer()))
+                    selected_image = get_selected_image(
+                        kwargs.get("viewer", current_viewer())
+                    )
                     if selected_image is None:
-                        show_error_dialog("Please select an image before running this function.", raise_exception=True)
+                        show_error_dialog(
+                            "Please select an image before running this function.",
+                            raise_exception=True,
+                        )
                         return
                     kwargs["image"] = selected_image
-                
-                # Handle pixel_to_nm_scaling if required
-                if "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs:
-                    kwargs["pixel_to_nm_scaling"] = kwargs["image"].metadata.get("px2nm", 1.0)
-                    print(f"Using pixel_to_nm_scaling from image metadata: {kwargs['pixel_to_nm_scaling']}")
 
-                if "filename" in [p.name for p in all_params] and "filename" not in kwargs:
+                # Handle pixel_to_nm_scaling if required
+                if (
+                    "pixel_to_nm_scaling" in [p.name for p in all_params]
+                    and "pixel_to_nm_scaling" not in kwargs
+                ):
+                    kwargs["pixel_to_nm_scaling"] = kwargs[
+                        "image"
+                    ].metadata.get("px2nm", 1.0)
+                    print(
+                        f"Using pixel_to_nm_scaling from image metadata: {kwargs['pixel_to_nm_scaling']}"
+                    )
+
+                if (
+                    "filename" in [p.name for p in all_params]
+                    and "filename" not in kwargs
+                ):
                     kwargs["filename"] = "image"
                 # Distribute arguments between method_args and class_args
                 for key, value in kwargs.items():
-                    if key in [p.name for p in including_config_params_from_function]:
+                    if key in [
+                        p.name for p in including_config_params_from_function
+                    ]:
                         method_args[key] = value
-                    elif self.type_class and key in [p.name for p in including_config_params_from_class]:
+                    elif self.type_class and key in [
+                        p.name for p in including_config_params_from_class
+                    ]:
                         class_args[key] = value
-                
+
                 # Add config values if needed
                 if self.uses_config:
                     method_args = add_values_to_dict_from_config(
-                        config, io.config_wrapper, self.function_key, method_args, including_config_params_from_function
+                        config,
+                        io.config_wrapper,
+                        self.function_key,
+                        method_args,
+                        including_config_params_from_function,
                     )
                     if self.type_class:
                         class_args = add_values_to_dict_from_config(
@@ -721,24 +787,32 @@ class WidgetFunction:
                             class_args,
                             including_config_params_from_class,
                         )
-                
+
                 # Enforce defaults
-                method_args = enforce_defaults(method_args, including_config_params_from_function)
+                method_args = enforce_defaults(
+                    method_args, including_config_params_from_function
+                )
                 if self.type_class:
-                    class_args = enforce_defaults(class_args, including_config_params_from_class)
-                
+                    class_args = enforce_defaults(
+                        class_args, including_config_params_from_class
+                    )
+
                 # Execute function or method
                 if self.type_class:
                     instance = self.type_class(**class_args)
-                    method = getattr(instance, self.function_to_run.__name__, None)
+                    method = getattr(
+                        instance, self.function_to_run.__name__, None
+                    )
                     if method:
                         return_value = method(**method_args)
                     else:
-                        show_error_dialog(f"Method {self.function_to_run.__name__} not found on instance.")
+                        show_error_dialog(
+                            f"Method {self.function_to_run.__name__} not found on instance."
+                        )
                         return
                 else:
                     return_value = self.function_to_run(**method_args)
-                
+
                 # Evaluate path_to_data
                 metadata = {}
                 if self.metadata_paths is not None:
@@ -746,22 +820,48 @@ class WidgetFunction:
                         if self.metadata_paths[key] == "config":
                             metadata[key] = full_current_config
                         else:
-                            metadata[key] = evaluate_path_to_data(self.metadata_paths[key], return_value, instance, self.type_class)
+                            metadata[key] = evaluate_path_to_data(
+                                self.metadata_paths[key],
+                                return_value,
+                                instance,
+                                self.type_class,
+                            )
 
                 if self.type_class:
-                    result = evaluate_path_to_data(self.path_to_data, return_value, instance, self.type_class)
+                    result = evaluate_path_to_data(
+                        self.path_to_data,
+                        return_value,
+                        instance,
+                        self.type_class,
+                    )
                 else:
-                    result = evaluate_path_to_data(self.path_to_data, return_value)
+                    result = evaluate_path_to_data(
+                        self.path_to_data, return_value
+                    )
                 if result is None:
                     return
                 return_value = result
 
                 # Render return value
                 if return_value is not None:
-                    viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
-                    render_return_value(return_value, self.function_key, viewer, kwargs.get("image", None), ndims=self.ndims, metadata=metadata)
+                    viewer = (
+                        self.overide_viewer
+                        or kwargs.get("viewer")
+                        or current_viewer()
+                    )
+                    render_return_value(
+                        return_value,
+                        self.function_key,
+                        viewer,
+                        kwargs.get("image", None),
+                        ndims=self.ndims,
+                        metadata=metadata,
+                    )
                 else:
-                    show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
+                    show_error_dialog(
+                        f"Function {self.function_to_run.__name__} returned None."
+                    )
+
             # Collect the parameters for the function and ensure defaults are set (these defaults are shown in the GUI)
             new_parameters = []
             for p in (
@@ -784,7 +884,11 @@ class WidgetFunction:
                     new_p = p.replace(default="image")
                 else:
                     new_p = p
-                if new_p.name != "pixel_to_nm_scaling" and new_p.name != "image" and new_p.name != "filename":
+                if (
+                    new_p.name != "pixel_to_nm_scaling"
+                    and new_p.name != "image"
+                    and new_p.name != "filename"
+                ):
                     new_parameters.append(new_p)
             # Create a magicgui function with the wrapped function and the new parameters
             wrapped_func = CallableWithSignature(

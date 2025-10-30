@@ -52,7 +52,7 @@ Before running the function, you can choose to load a config file using the butt
 Both json and yaml file formats are supported.
 This config will be used for the functions you run until you close napari.
 ![Loading a config file](readme_images/config_file.png)
-If you don't load a config file manually, a default config file ("_generated_config.yaml") is created in your current 
+If you don't load a config file manually, a default config file ("_generated_config.yaml") is created in your current
 directory (when you run a function) which will then be used for all subsequent functions. If you edit this yaml file,
 your changes will be overwritten by the default config values when the file is generated again if a config isn't
 loaded, so it is not recommended that you edit that file!
@@ -60,7 +60,7 @@ Once a config is loaded, either manually or automatically, an edit config window
 to be edited directly through the napari gui. Changes made are not automatically saved to the loaded config file,
 however, the updated config file can be saved as a file with the Save to file button at the bottom of the window.
 ![Edit config window](readme_images/edit_config_window.png)
-When you run a function for the first time, a window will open with options to adjust for that function 
+When you run a function for the first time, a window will open with options to adjust for that function
 (which are applied next time the function is run). There is also a run button in that window. This runs the function
 on the selected layer (it does exactly the same thing as clicking the function button in the grid).
 ![Function window](readme_images/function_window.png)
