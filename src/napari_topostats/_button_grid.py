@@ -142,7 +142,7 @@ class ButtonGrid(QListWidget):
         if item.text() not in self.docked_functions:
             widget = self.get_widget_from_function(item.text())
             for param in widget:
-                if param.name != "call_button" or not param.value:
+                if param.name != "call_button":
                     self.viewer.window.add_dock_widget(
                         widget, name=item.text()
                     )
