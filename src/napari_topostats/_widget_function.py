@@ -22,7 +22,9 @@ from ._io import ConfigWrapper, collect_values
 from ._alerts import show_error_dialog
 
 
-def enforce_defaults(args: Dict[str, Any], params: list[Any]) -> Dict[str, Any]:
+def enforce_defaults(
+    args: Dict[str, Any], params: list[Any]
+) -> Dict[str, Any]:
     """
     Ensure that all required parameters have default values.
 
@@ -32,7 +34,7 @@ def enforce_defaults(args: Dict[str, Any], params: list[Any]) -> Dict[str, Any]:
         The current dictionary of arguments to which the default values will be checked for and added.
     params : list[Any]
         The list of parameters for the function.
-    
+
     Returns
     -------
     args : Dict[str, Any]
@@ -67,12 +69,14 @@ def enforce_defaults(args: Dict[str, Any], params: list[Any]) -> Dict[str, Any]:
             args[key] = np.asarray(value.data)
     return args
 
+
 def add_values_to_dict_from_config(
     config: Dict[str, Any],
     wrapper: ConfigWrapper,
     function_key: str,
     args: Dict[str, Any],
-    params: list,):
+    params: list,
+):
     """
     Add values from the config to the args dictionary based on the function key and parameters.
     This function checks if the parameters are present in the config and adds them to the args dictionary.
@@ -100,13 +104,17 @@ def add_values_to_dict_from_config(
             args[param_name] = config[param_name]
 
         for flat_key, flat_val in wrapper.flat.items():
-            if flat_key.startswith(f"{function_key}.") and flat_key[len(f"{function_key}."):] == param_name:
+            if (
+                flat_key.startswith(f"{function_key}.")
+                and flat_key[len(f"{function_key}.") :] == param_name
+            ):
                 args[param_name] = flat_val
                 break
         # Is this not redundant?
         if param_name in config and isinstance(config[param_name], dict):
             args[param_name] = config[param_name]
     return args
+
 
 def _eval(obj: Any, string: str) -> Any:
     """
@@ -139,7 +147,7 @@ def _eval(obj: Any, string: str) -> Any:
         if next_punc != -1 and string[next_punc] == ",":
             # Handle tuple subscripts, e.g., [1,2]
             axes = []
-            for i in string[1:string.index("]", 1)].split(","):
+            for i in string[1 : string.index("]", 1)].split(","):
                 if i == ":":
                     axes.append(slice(None))
                 elif i.isdigit():
@@ -148,14 +156,14 @@ def _eval(obj: Any, string: str) -> Any:
             obj = obj[subscript]
         else:
             # Handle single index or key, e.g., [0] or ['key']
-            subscript = string[1:string.index("]", 1)]
+            subscript = string[1 : string.index("]", 1)]
             if subscript.isdigit():
                 obj = obj[int(subscript)]
             else:
-                key = subscript.replace("'", "").replace('"', '')
+                key = subscript.replace("'", "").replace('"', "")
                 obj = obj[key]
         # Recursively evaluate the remaining string
-        remaining = string[string.index("]", 1) + 1:]
+        remaining = string[string.index("]", 1) + 1 :]
         return _eval(obj, remaining)
 
     # Handle attribute access or method calls, e.g., .attr or .method()
@@ -167,28 +175,36 @@ def _eval(obj: Any, string: str) -> Any:
             if hasattr(obj, attr):
                 return getattr(obj, attr)
             else:
-                raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{attr}'")
+                raise AttributeError(
+                    f"'{type(obj).__name__}' object has no attribute '{attr}'"
+                )
 
         if string[index] == "(":
             # Handle method call, e.g., .method(args)
             func_name = string[1:index]
             if hasattr(obj, func_name):
                 func = getattr(obj, func_name)
-                args_str = string[index + 1:string.index(")", index + 1)]
-                args = [arg.strip() for arg in args_str.split(",") if arg.strip()]
+                args_str = string[index + 1 : string.index(")", index + 1)]
+                args = [
+                    arg.strip() for arg in args_str.split(",") if arg.strip()
+                ]
                 result = func(*args)
-                remaining = string[string.index(")", index + 1) + 1:]
+                remaining = string[string.index(")", index + 1) + 1 :]
                 # Recursively evaluate the remaining string
                 return _eval(result, remaining)
             else:
-                raise AttributeError(f"'{type(obj).__name__}' object has no callable '{func_name}'")
+                raise AttributeError(
+                    f"'{type(obj).__name__}' object has no callable '{func_name}'"
+                )
         else:
             # Handle attribute access followed by more operations
             attr = string[1:index]
             if hasattr(obj, attr):
                 obj = getattr(obj, attr)
             else:
-                raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{attr}'")
+                raise AttributeError(
+                    f"'{type(obj).__name__}' object has no attribute '{attr}'"
+                )
             remaining = string[index:]
             # Recursively evaluate the remaining string
             return _eval(obj, remaining)
@@ -197,6 +213,7 @@ def _eval(obj: Any, string: str) -> Any:
         # If the string does not start with '[' or '.', return the object
         return obj
 
+
 def next_punctuation(s: str, start: int = 0, checking_for: str = ".([") -> int:
     """Find the next punctuation character in a string."""
     for i in range(start, len(s)):
@@ -204,13 +221,17 @@ def next_punctuation(s: str, start: int = 0, checking_for: str = ".([") -> int:
             return i
     return -1
 
+
 class CallableWithSignature:
     """
     A callable that wraps a function and its signature. This allows the signature of the function to be updated for
     its parameters and their defaults so that it can be used correctly with magicgui.
     """
+
     def __init__(self, real_func, sig):
-        functools.update_wrapper(self, real_func)  # Sets __name__, __doc__, etc.
+        functools.update_wrapper(
+            self, real_func
+        )  # Sets __name__, __doc__, etc.
         self.real_func = real_func
         self.__signature__ = sig
 
@@ -250,10 +271,14 @@ def get_selected_image(viewer) -> Image | None:
     elif isinstance(layer, Labels):
         return layer
     else:
-        show_error_dialog("Selected layer is not an Image layer. Looking for a default layer.", raise_exception=False)
+        show_error_dialog(
+            "Selected layer is not an Image layer. Looking for a default layer.",
+            raise_exception=False,
+        )
         return None
 
     return None
+
 
 def is_binary_image(arr: np.ndarray) -> bool:
     """Check if the array is a binary image (0s and 1s or 0s and 255s).
@@ -269,6 +294,7 @@ def is_binary_image(arr: np.ndarray) -> bool:
     unique_vals = np.unique(arr)
     # Check if unique values are subset of {0,1}
     return set(unique_vals).issubset({0, 1, 255})
+
 
 def remove_all_but_last(word: str, text: str) -> str:
     """Remove all occurrences of 'word' in 'text' except the last one.
@@ -288,9 +314,15 @@ def remove_all_but_last(word: str, text: str) -> str:
     parts = text.rsplit(word, maxsplit=1)
     if len(parts) == 1:
         return text  # word not found or only once
-    return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return
+    return (
+        (parts[0].replace(word, "") + word + parts[1])
+        .replace("  ", " ")
+        .strip()
+    )  # Remove extra spaces and return
 
-def render_return_value(return_value: Any,
+
+def render_return_value(
+    return_value: Any,
     function_key: str,
     viewer: Viewer,
     original: Layer,
@@ -313,7 +345,7 @@ def render_return_value(return_value: Any,
     original : Layer
         The original image layer, used for metadata and naming. If not provided, it will be set to None.
     ndims : int, optional
-        The number of dimensions of the data to be rendered. If not provided, it will be set to 2. 
+        The number of dimensions of the data to be rendered. If not provided, it will be set to 2.
     """
     # Check if the return value is a numpy array
     # TODO: handle other types of return values if needed
@@ -421,8 +453,9 @@ def render_return_value(return_value: Any,
         # Add to viewer
         viewer.window.add_dock_widget(container, area='right', name='Grain Statistics')
     else:
-        show_error_dialog(f"Function {function_key} returned an unsupported type: {type(return_value)}. Expected numpy array.") 
-
+        show_error_dialog(
+            f"Function {function_key} returned an unsupported type: {type(return_value)}. Expected numpy array."
+        )
 
 def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=None):
     """
@@ -468,7 +501,7 @@ class WidgetFunction:
     Parameters
     ----------
     name : str
-        The name of the function, used for display and identification. These should be in snake_case. They are used to 
+        The name of the function, used for display and identification. These should be in snake_case. They are used to
         show the title of the widget (would become Snake Case) as well as get the icon for the widget for use in the
         button grid. Therefore, their should be a name.png file in the icons directory with the same name.
     function_key : str | None, optional
@@ -487,7 +520,7 @@ class WidgetFunction:
         viewer, such as the selected image or from the image metadata, such as the pixel to nm scaling factor.
     path_to_data : str | None, optional
         The path to the data that the function returns. This is used to determine how to extract the data from the
-        return value of the function. It can be "return" to return the data directly (from the function), "obj" to 
+        return value of the function. It can be "return" to return the data directly (from the function), "obj" to
         return the object itself, or a specific path to access a nested attribute or subscript in the return value
         or the object instance.
     ndims : int, optional
@@ -497,6 +530,7 @@ class WidgetFunction:
         A tooltip for the widget, providing additional information about the function. This is displayed when the
         user hovers over the button for the function in the button grid.
     """
+
     def __init__(
         self,
         name: str,
@@ -542,7 +576,7 @@ class WidgetFunction:
         """Create a magicgui widget for the function.
         This widget will have the function's parameters as inputs and will
         call the function when the user interacts with it.
-        
+
         Returns
         -------
         FunctionGui
@@ -563,23 +597,34 @@ class WidgetFunction:
                     self.path_to_data = "return"
             # Get all the parameters from the function (excluding 'self')
             parameters_from_function = [
-                p for p in inspect.signature(self.function_to_run).parameters.values() if p.name != "self"
+                p
+                for p in inspect.signature(
+                    self.function_to_run
+                ).parameters.values()
+                if p.name != "self"
             ]
             # Get all the parameters from the type_class (if provided)
             if self.type_class is not None:
                 sig = inspect.signature(self.type_class.__init__)
                 parameters_from_class = [
-                    p for name, p in sig.parameters.items()
-                    if name != "self"
+                    p for name, p in sig.parameters.items() if name != "self"
                 ]
-                all_parameters = parameters_from_class + parameters_from_function
+                all_parameters = (
+                    parameters_from_class + parameters_from_function
+                )
             else:
                 sig = inspect.signature(self.function_to_run)
                 all_parameters = parameters_from_function
-                
+
             # Create a copy of the parameters to include config parameters
-            including_config_params_from_function = parameters_from_function.copy()
-            including_config_params_from_class = parameters_from_class.copy() if self.type_class is not None else []
+            including_config_params_from_function = (
+                parameters_from_function.copy()
+            )
+            including_config_params_from_class = (
+                parameters_from_class.copy()
+                if self.type_class is not None
+                else []
+            )
             # Then remove parameters that are already in the config (so they are set from config file rather than GUI)
             if self.uses_config:
                 updated_values = collect_values(io.full_config_container)
@@ -588,18 +633,47 @@ class WidgetFunction:
                 config = full_current_config.get(self.function_key, {})
                 for param_name in [p.name for p in all_parameters]:
                     if param_name in config:
-                        parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
+                        parameters_from_function = [
+                            p
+                            for p in parameters_from_function
+                            if p.name != param_name
+                        ]
                         if self.type_class is not None:
-                            parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
+                            parameters_from_class = [
+                                p
+                                for p in parameters_from_class
+                                if p.name != param_name
+                            ]
                     else:
-                        for flat_key, flat_val in io.config_wrapper.flat.items():
-                            if flat_key.startswith(f"{self.function_key}.") and flat_key[len(f"{self.function_key}."):] == param_name:
-                                parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
+                        for (
+                            flat_key,
+                            flat_val,
+                        ) in io.config_wrapper.flat.items():
+                            if (
+                                flat_key.startswith(f"{self.function_key}.")
+                                and flat_key[len(f"{self.function_key}.") :]
+                                == param_name
+                            ):
+                                parameters_from_function = [
+                                    p
+                                    for p in parameters_from_function
+                                    if p.name != param_name
+                                ]
                                 if self.type_class is not None:
-                                    parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
+                                    parameters_from_class = [
+                                        p
+                                        for p in parameters_from_class
+                                        if p.name != param_name
+                                    ]
                                 break
-                    if param_name in config and isinstance(config[param_name], dict):
-                        parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
+                    if param_name in config and isinstance(
+                        config[param_name], dict
+                    ):
+                        parameters_from_function = [
+                            p
+                            for p in parameters_from_function
+                            if p.name != param_name
+                        ]
                         if self.type_class is not None:
                             parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
             
@@ -641,7 +715,11 @@ class WidgetFunction:
                     )
                     if self.type_class:
                         class_args = add_values_to_dict_from_config(
-                            config, io.config_wrapper, self.function_key, class_args, including_config_params_from_class
+                            config,
+                            io.config_wrapper,
+                            self.function_key,
+                            class_args,
+                            including_config_params_from_class,
                         )
                 
                 # Enforce defaults
@@ -686,12 +764,18 @@ class WidgetFunction:
                     show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
             # Collect the parameters for the function and ensure defaults are set (these defaults are shown in the GUI)
             new_parameters = []
-            for p in (parameters_from_function + parameters_from_class) if self.type_class is not None else parameters_from_function:
+            for p in (
+                (parameters_from_function + parameters_from_class)
+                if self.type_class is not None
+                else parameters_from_function
+            ):
                 if p.name == "image":
                     # Sets the default image to the currently selected image in the viewer (at the time of opening the widget)
                     selected_image = get_selected_image(current_viewer())
                     if selected_image is not None:
-                        new_p = p.replace(default=selected_image, annotation=Image)
+                        new_p = p.replace(
+                            default=selected_image, annotation=Image
+                        )
                     else:
                         new_p = p.replace(annotation=Image)
                 elif p.name == "pixel_to_nm_scaling":
@@ -703,11 +787,12 @@ class WidgetFunction:
                 if new_p.name != "pixel_to_nm_scaling" and new_p.name != "image" and new_p.name != "filename":
                     new_parameters.append(new_p)
             # Create a magicgui function with the wrapped function and the new parameters
-            wrapped_func = CallableWithSignature(func, inspect.Signature(parameters=new_parameters))
+            wrapped_func = CallableWithSignature(
+                func, inspect.Signature(parameters=new_parameters)
+            )
             magicgui_function = magicgui()(wrapped_func)
             return magicgui_function
 
         except Exception as e:
             show_error_dialog(f"❌ Exception in get_widget: {e}")
             raise
-

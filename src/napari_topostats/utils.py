@@ -13,6 +13,7 @@ from napari import Viewer
 from skimage.measure import regionprops_table
 import pandas as pd
 
+
 # ------- Misc -------
 def afm2stack(
     image: ImageData,
@@ -103,122 +104,131 @@ def remove_scars(
         min_scar_length=min_scar_length,
     )
 
+
 def median_flattened(
     image: "Napari.types.ImageData",
-    mask: "Napari.types.LabelsData"=None,
-    row_alignment_quantile: float = 0.5
+    mask: "Napari.types.LabelsData" = None,
+    row_alignment_quantile: float = 0.5,
 ):
     filtered_image = Filters(
-        image=image, 
-        filename="FILE", 
-        pixel_to_nm_scaling=1, 
+        image=image,
+        filename="FILE",
+        pixel_to_nm_scaling=1,
         row_alignment_quantile=row_alignment_quantile,
         threshold_method="std_dev",
         otsu_threshold_multiplier=1.0,
         threshold_std_dev=1.0,
         threshold_absolute=1.0,
         gaussian_size=1.0121397464510862,
-        gaussian_mode="nearest"
-        )
-    median_flattened = filtered_image.median_flatten(image=image, mask=mask, row_alignment_quantile=row_alignment_quantile)
+        gaussian_mode="nearest",
+    )
+    median_flattened = filtered_image.median_flatten(
+        image=image, mask=mask, row_alignment_quantile=row_alignment_quantile
+    )
     return median_flattened
+
 
 def remove_tilt(
     image: "Napari.types.ImageData",
-    mask: "Napari.types.LabelsData"=None,
+    mask: "Napari.types.LabelsData" = None,
 ):
     filtered_image = Filters(
-        image=image, 
-        filename="FILE", 
-        pixel_to_nm_scaling=1, 
+        image=image,
+        filename="FILE",
+        pixel_to_nm_scaling=1,
         row_alignment_quantile=0.5,
         threshold_method="std_dev",
         otsu_threshold_multiplier=1.0,
         threshold_std_dev=1.0,
         threshold_absolute=1.0,
         gaussian_size=1.0121397464510862,
-        gaussian_mode="nearest"
-        )
+        gaussian_mode="nearest",
+    )
     tilt_removed = filtered_image.remove_tilt(image=image, mask=mask)
     return tilt_removed
 
+
 def remove_quadratic(
     image: "Napari.types.ImageData",
-    mask: "Napari.types.LabelsData"=None,
+    mask: "Napari.types.LabelsData" = None,
 ):
     filtered_image = Filters(
-        image=image, 
-        filename="FILE", 
-        pixel_to_nm_scaling=1, 
+        image=image,
+        filename="FILE",
+        pixel_to_nm_scaling=1,
         row_alignment_quantile=0.5,
         threshold_method="std_dev",
         otsu_threshold_multiplier=1.0,
         threshold_std_dev=1.0,
         threshold_absolute=1.0,
         gaussian_size=1.0121397464510862,
-        gaussian_mode="nearest"
-        )
+        gaussian_mode="nearest",
+    )
     removed_quadratic = filtered_image.remove_quadratic(image=image, mask=mask)
     return removed_quadratic
 
+
 def remove_nonlinear(
     image: "Napari.types.ImageData",
-    mask: "Napari.types.LabelsData"=None,
+    mask: "Napari.types.LabelsData" = None,
 ):
     filtered_image = Filters(
-        image=image, 
-        filename="FILE", 
-        pixel_to_nm_scaling=1, 
+        image=image,
+        filename="FILE",
+        pixel_to_nm_scaling=1,
         row_alignment_quantile=0.5,
         threshold_method="std_dev",
         otsu_threshold_multiplier=1.0,
         threshold_std_dev=1.0,
         threshold_absolute=1.0,
         gaussian_size=1.0121397464510862,
-        gaussian_mode="nearest"
-        )
-    removed_nonlinear = filtered_image.remove_nonlinear_polynomial(image=image, mask=mask)
+        gaussian_mode="nearest",
+    )
+    removed_nonlinear = filtered_image.remove_nonlinear_polynomial(
+        image=image, mask=mask
+    )
     return removed_nonlinear
+
 
 def average_background(
     image: "Napari.types.ImageData",
-    mask: "Napari.types.LabelsData"=None,
+    mask: "Napari.types.LabelsData" = None,
 ):
     filtered_image = Filters(
-    image=image, 
-    filename="FILE", 
-    pixel_to_nm_scaling=1, 
-    row_alignment_quantile=0.5,
-    threshold_method="std_dev",
-    otsu_threshold_multiplier=1.0,
-    threshold_std_dev=1.0,
-    threshold_absolute=1.0,
-    gaussian_size=1.0121397464510862,
-    gaussian_mode="nearest"
+        image=image,
+        filename="FILE",
+        pixel_to_nm_scaling=1,
+        row_alignment_quantile=0.5,
+        threshold_method="std_dev",
+        otsu_threshold_multiplier=1.0,
+        threshold_std_dev=1.0,
+        threshold_absolute=1.0,
+        gaussian_size=1.0121397464510862,
+        gaussian_mode="nearest",
     )
 
-    removed_nonlinear = filtered_image.average_background(image=image, mask=mask)
+    removed_nonlinear = filtered_image.average_background(
+        image=image, mask=mask
+    )
     return removed_nonlinear
+
 
 def gaussian_filter(
     image: "Napari.types.ImageData",
     sigma: float = 2.0,
 ):
     filtered_image = Filters(
-    image=image, 
-    filename="FILE", 
-    pixel_to_nm_scaling=1, 
-    row_alignment_quantile=0.5,
-    threshold_method="std_dev",
-    otsu_threshold_multiplier=1.0,
-    threshold_std_dev=1.0,
-    threshold_absolute=1.0,
-    gaussian_size=sigma,
-    gaussian_mode="nearest"
+        image=image,
+        filename="FILE",
+        pixel_to_nm_scaling=1,
+        row_alignment_quantile=0.5,
+        threshold_method="std_dev",
+        otsu_threshold_multiplier=1.0,
+        threshold_std_dev=1.0,
+        threshold_absolute=1.0,
+        gaussian_size=sigma,
+        gaussian_mode="nearest",
     )
 
     gaussian = filtered_image.gaussian_filter(image=image)
     return gaussian
-
-
-    

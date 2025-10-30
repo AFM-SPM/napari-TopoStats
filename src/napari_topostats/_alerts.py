@@ -6,6 +6,7 @@ class ErrorDialog(QDialog):
     """
     A simple dialog window to display error messages.
     """
+
     def __init__(self, message: str):
         """
         Initialize the error dialog with the provided message.
@@ -45,15 +46,17 @@ def show_error_dialog(message: str, raise_exception: bool = False):
     state.current_error_dialog.show()
 
     # Ensure the dialog is shown immediately
-    QApplication.processEvents()  
+    QApplication.processEvents()
     # If raise_exception is True, raise a ValueError
     if raise_exception:
         raise ValueError(message)
+
 
 class LoadingDialog(QDialog):
     """
     A dialog window to indicate a loading or processing state.
     """
+
     def __init__(self, text="Loading..."):
         """
         Initialize the loading dialog with optional text.
