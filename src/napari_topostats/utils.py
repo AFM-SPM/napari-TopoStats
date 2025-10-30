@@ -5,7 +5,13 @@ import copy
 import numpy as np
 from topostats.filters import Filters
 from topostats import scars
+from topostats.grainstats import GrainStats
 from napari.types import ImageData
+from napari.layers import Labels
+from napari.layers import Image
+from napari import Viewer
+from skimage.measure import regionprops_table
+import pandas as pd
 
 # ------- Misc -------
 def afm2stack(
@@ -50,6 +56,33 @@ def afm2stack(
         current_z += increment
 
     return output
+
+def grainstats(image: Labels):
+    print(image.metadata)
+    cfg = image.metadata['config']['grainstats']
+    cfg.pop("run")
+    cfg.pop("class_names")
+    stats = GrainStats(image.metadata['grains'].image_grain_crops.above.crops,
+                       direction="above",
+                       base_output_dir="grains",
+                       **cfg)
+    df = stats.calculate_stats()[0]
+    # Get scaling factors from metadata
+    
+    pixel_to_nm_scaling = image.metadata.get('px2nm', 1.0)
+    metre_scaling_factor = image.metadata.get('metre_scaling_factor', 1e-9)
+    length_scaling_factor = pixel_to_nm_scaling * metre_scaling_factor
+    
+    # Convert centre coordinates back to pixels if they exist
+    if 'centre_x' in df.columns and 'centre_y' in df.columns:
+        df['centre_x_px'] = df['centre_x'] / length_scaling_factor
+        df['centre_y_px'] = df['centre_y'] / length_scaling_factor
+
+        
+        
+        return (df, 'centre_y_px', 'centre_x_px')
+
+    return (df, 'centre_x', 'centre_y')
 
 # ------- Filters -------
 def remove_scars(
@@ -186,3 +219,6 @@ def gaussian_filter(
 
     gaussian = filtered_image.gaussian_filter(image=image)
     return gaussian
+
+
+    

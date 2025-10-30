@@ -138,24 +138,30 @@ class ButtonGrid(QListWidget):
         # Check if the widget is already docked and add it if not
         if item.text() not in self.docked_functions:
             widget = self.get_widget_from_function(item.text())
-            self.viewer.window.add_dock_widget(widget, name=item.text())
-            self.docked_functions[item.text()] = widget
+            print(f"Has {len(widget)} parameters")
+            for param in widget:
+                if param.name != "call_button" or param.value != False:
+                    self.viewer.window.add_dock_widget(widget, name=item.text())
+                    self.docked_functions[item.text()] = widget
+                    break
         elif not self.docked_functions[item.text()].native.isVisible():
             widget = self.get_widget_from_function(item.text())
             self.docked_functions[item.text()].native.destroy()  # Remove the widget if it is not visible
             self.viewer.window.add_dock_widget(widget, name=item.text())
             self.docked_functions[item.text()] = widget
+        else:
+            widget = self.docked_functions[item.text()]
         if item.text() not in RUN_IMMEDIATELY_EXEMPTIONS:
             # If the function is not in the RUN_IMMEDIATELY_EXEMPTIONS list, run it with the appropriate parameters,
             # using the selected image layer as the image parameter
-            if hasattr(self.docked_functions[item.text()], "image"):
-                if self.docked_functions[item.text()].image.value is None:
+            if hasattr(widget, "image"):
+                if widget.image.value is None:
                     selected_image = get_selected_image(self.viewer)
                     if selected_image is not None:
-                        self.docked_functions[item.text()].image.value = selected_image
-            if hasattr(self.docked_functions[item.text()], "viewer"):
-                self.docked_functions[item.text()].viewer.value = self.viewer
-            self.docked_functions[item.text()]()
+                        widget.image.value = selected_image
+            if hasattr(widget, "viewer"):
+                widget.viewer.value = self.viewer
+            widget()
     
     def get_widget_from_function(self, function_name: str) -> FunctionGui | None:
         function_from_list = self.functions.get(function_name)

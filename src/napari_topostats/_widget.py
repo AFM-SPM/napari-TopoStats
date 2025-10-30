@@ -98,6 +98,8 @@ AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config",
                             function_to_run=Grains.find_grains,
                               type_class=Grains,
                                 path_to_data='obj.mask_images["above"]["merged_classes"][:, :, 1]',
+                                metadata_paths={"config": "config",
+                                                "grains": "obj"},
                                   uses_config=True,
                                   tooltip="Run grain analysis on the selected image using the current configuration."),
                         WidgetFunction(name="make_3d",
@@ -105,7 +107,13 @@ AVAILABLE_FUNCTIONS = [WidgetFunction(name="load_config",
                                        function_to_run=afm2stack,
                                        path_to_data="return",
                                        ndims=3,
-                                       tooltip="Convert the selected image to a 3D stack"),]
+                                       tooltip="Convert the selected image to a 3D stack"),
+                        WidgetFunction(name="run_grainstats",
+                                       function_key="grainstats",
+                                       path_to_data="return",
+                                       function_to_run=grainstats,
+                                       tooltip="Creates a table showing the grainstats of the selected grain")
+                        ]
 
 
 def remove_scars_from_image(
