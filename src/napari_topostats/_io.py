@@ -14,7 +14,7 @@ from qtpy.QtWidgets import QLabel, QPushButton
 # This should be moved when no longer necessary
 try:
     from topostats.config import write_config_with_comments
-except ModuleNotFoundError or ImportError:
+except (ModuleNotFoundError, ImportError):
     from topostats.io import write_config_with_comments
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
