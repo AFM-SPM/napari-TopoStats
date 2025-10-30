@@ -3,15 +3,11 @@
 import copy
 
 import numpy as np
-from topostats.filters import Filters
-from topostats import scars
-from topostats.grainstats import GrainStats
-from napari.types import ImageData
 from napari.layers import Labels
-from napari.layers import Image
-from napari import Viewer
-from skimage.measure import regionprops_table
-import pandas as pd
+from napari.types import ImageData
+from topostats import scars
+from topostats.filters import Filters
+from topostats.grainstats import GrainStats
 
 
 # ------- Misc -------

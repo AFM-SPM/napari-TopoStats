@@ -1,32 +1,32 @@
 import json
 import re
+from argparse import Namespace
 from pathlib import Path
 from typing import Any, Dict
-from argparse import Namespace
 
 import yaml
 from magicgui import magicgui
 from magicgui.widgets import Container, create_widget
 from napari.viewer import Viewer
-from qtpy.QtWidgets import QLabel, QPushButton
 from qtpy.QtCore import Qt
+from qtpy.QtWidgets import QLabel, QPushButton
 
 # This should be moved when no longer necessary
 try:
     from topostats.config import write_config_with_comments
 except:
     from topostats.io import write_config_with_comments
+from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
     QDialog,
-    QScrollArea,
-    QVBoxLayout,
-    QHBoxLayout,
-    QWidget,
     QDialogButtonBox,
     QFileDialog,
+    QHBoxLayout,
+    QScrollArea,
     QToolButton,
+    QVBoxLayout,
+    QWidget,
 )
-from qtpy.QtGui import QIcon
 
 from . import _state as state
 from ._alerts import show_error_dialog

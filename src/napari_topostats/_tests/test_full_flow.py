@@ -3,12 +3,13 @@ from pathlib import Path
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
-import pytest
-from qtpy.QtWidgets import QApplication
 import napari
+import pytest
 from napari_afmreader._reader import reader_function
-from napari_topostats._widget import AVAILABLE_FUNCTIONS, TopoStatsRootWidget
 from qtpy.QtCore import Qt
+from qtpy.QtWidgets import QApplication
+
+from napari_topostats._widget import AVAILABLE_FUNCTIONS, TopoStatsRootWidget
 
 
 @pytest.fixture(scope="session")
@@ -59,7 +60,7 @@ def test_functions_in_grid(
     button_grid, viewer, run_function_on, expected_layers
 ):
     function_names = [f.name for f in AVAILABLE_FUNCTIONS]
-    for i in range(0, len(function_names)):
+    for i in range(len(function_names)):
         name = function_names[i]
         name = name.replace("_", " ").title()
         viewer.layers.selection = [viewer.layers[run_function_on[i]]]

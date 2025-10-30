@@ -5,14 +5,14 @@ except ImportError:
 from ._sample_data import make_sample_data
 from ._widget import (
     ImageThreshold,
-    remove_scars_from_image,
+    TopoStatsRootWidget,
+    gaussian_filter_image,
     median_align_rows,
+    remove_nonlinear_background,
     remove_planar_tilt,
     remove_quadratic_background,
-    remove_nonlinear_background,
+    remove_scars_from_image,
     zero_average_background,
-    gaussian_filter_image,
-    TopoStatsRootWidget,
 )
 from ._writer import write_multiple, write_single_image
 

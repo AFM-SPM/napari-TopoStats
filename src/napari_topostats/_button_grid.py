@@ -1,21 +1,17 @@
-from qtpy.QtCore import QSize
-from qtpy.QtGui import QIcon, QColor, QBrush
-from qtpy.QtWidgets import QListWidget, QListWidgetItem
 from pathlib import Path
+
 from magicgui.widgets import FunctionGui
 from napari.viewer import Viewer
-import inspect
-from napari.types import ImageData
-from typing import Any, Callable, overload
-from napari.layers import Image
-from napari.types import ImageData
+from qtpy.QtCore import QSize
+from qtpy.QtGui import QBrush, QColor, QIcon
+from qtpy.QtWidgets import QListWidget, QListWidgetItem
+
 from napari_topostats._widget_function import (
     WidgetFunction,
     get_selected_image,
 )
-from ._alerts import show_error_dialog
-import numpy as np
 
+from ._alerts import show_error_dialog
 
 RUN_IMMEDIATELY_EXEMPTIONS = {"Load Config"}
 ICON_ROOT = Path(__file__).parent / "icons"

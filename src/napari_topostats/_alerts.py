@@ -1,4 +1,5 @@
-from qtpy.QtWidgets import QDialog, QLabel, QVBoxLayout, QApplication
+from qtpy.QtWidgets import QApplication, QDialog, QLabel, QVBoxLayout
+
 from . import _state as state
 
 

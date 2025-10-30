@@ -10,20 +10,20 @@ from napari import current_viewer
 from napari.layers import Image, Labels, Layer
 from napari.layers.labels._labels_constants import Mode
 from napari.viewer import Viewer
-from scipy.ndimage import label
 from pandas import DataFrame
-
 from qtpy.QtWidgets import (
+    QFileDialog,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
-    QPushButton,
-    QFileDialog,
-    QWidget,
     QVBoxLayout,
+    QWidget,
 )
+from scipy.ndimage import label
+
 from . import _io as io
-from ._io import ConfigWrapper, collect_values
 from ._alerts import show_error_dialog
+from ._io import ConfigWrapper, collect_values
 
 
 def enforce_defaults(

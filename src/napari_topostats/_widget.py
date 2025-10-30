@@ -28,76 +28,55 @@ References:
 
 Replace code below according to your needs.
 """
-import sys
 import os
-import functools
-from qtpy.QtCore import Qt
-from qtpy.QtGui import QIcon
+
 from qtpy.QtWidgets import (
-    QToolButton,
+    QApplication,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
-    QSizePolicy,
-    QApplication,
 )
-from ._alerts import show_error_dialog, LoadingDialog
+
+from ._alerts import LoadingDialog
 
 if (
-    not os.environ.get("QT_QPA_PLATFORM") == "offscreen"
+    os.environ.get("QT_QPA_PLATFORM") != "offscreen"
     and QApplication.instance() is not None
 ):
     loading_dialog = LoadingDialog("Loading TopoStats...")
     loading_dialog.show()
     QApplication.processEvents()
-import inspect
-import json
-from pathlib import Path
-from typing import Any, Dict, TYPE_CHECKING
-
-import numpy as np
-import yaml
+from typing import TYPE_CHECKING
 
 from magicgui import magicgui
-from magicgui.widgets import CheckBox, Container, create_widget, FunctionGui
-
-from napari import current_viewer
-from napari.types import ImageData
+from magicgui.widgets import CheckBox, Container, FunctionGui, create_widget
 from napari.layers import Image
 from napari.viewer import Viewer
-
-
-from scipy.ndimage import label
 from skimage.util import img_as_float
-
+from topostats.filters import Filters
+from topostats.grains import Grains
 
 from napari_topostats.utils import (
     afm2stack,
     average_background,
     gaussian_filter,
+    grainstats,
     median_flattened,
     remove_nonlinear,
     remove_quadratic,
     remove_scars,
     remove_tilt,
-    grainstats,
 )
 
-from topostats.grainstats import GrainStats
-from topostats.grains import Grains
-from topostats.filters import Filters
-
 if (
-    not os.environ.get("QT_QPA_PLATFORM") == "offscreen"
+    os.environ.get("QT_QPA_PLATFORM") != "offscreen"
     and QApplication.instance() is not None
 ):
     loading_dialog.close()
 
 from ._button_grid import ButtonGrid
-from ._widget_function import WidgetFunction
-from . import _state as state
-from . import _widget_function as gui_utils
 from ._io import load_config
-
+from ._widget_function import WidgetFunction
 
 if TYPE_CHECKING:
     import napari
