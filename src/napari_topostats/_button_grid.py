@@ -138,7 +138,6 @@ class ButtonGrid(QListWidget):
         # Check if the widget is already docked and add it if not
         if item.text() not in self.docked_functions:
             widget = self.get_widget_from_function(item.text())
-            print(f"Has {len(widget)} parameters")
             for param in widget:
                 if param.name != "call_button" or param.value != False:
                     self.viewer.window.add_dock_widget(widget, name=item.text())

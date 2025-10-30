@@ -13,7 +13,10 @@ from napari.viewer import Viewer
 from scipy.ndimage import label
 from pandas import DataFrame
 
-from qtpy.QtWidgets import QTableWidget, QTableWidgetItem
+from qtpy.QtWidgets import (
+    QTableWidget, QTableWidgetItem, QPushButton, QFileDialog,
+    QWidget, QVBoxLayout
+)
 from . import _io as io
 from ._io import ConfigWrapper, collect_values
 from ._alerts import show_error_dialog
@@ -343,6 +346,8 @@ def render_return_value(return_value: Any,
             len(return_value) == 3 and
             isinstance(return_value[0], DataFrame)):
         df = return_value[0]
+        container = QWidget()
+        layout = QVBoxLayout(container)
         # Create table widget
         table = QTableWidget()
         table.setRowCount(len(df))
@@ -387,18 +392,34 @@ def render_return_value(return_value: Any,
 
         original.events.selected_label.connect(on_label_selected)
 
-
-
-
         # Populate table
         for i in range(len(df)):
             for j, col in enumerate(df.columns):
                 item = QTableWidgetItem(str(df.iloc[i, j]))
                 table.setItem(i, j, item)
+
+        layout.addWidget(table)
+
+        save_button = QPushButton("Save to CSV")
+        layout.addWidget(save_button)
+
+        def save_to_csv():
+            # Open a file dialog to choose where to save
+            file_path, _ = QFileDialog.getSaveFileName(
+                table,
+                "Save Table as CSV",
+                f"{original.name.lower().replace(' ', '_')}_stats.csv",
+                "CSV Files (*.csv)"
+            )
+            if file_path:
+                df.to_csv(file_path, index=False)
+                print(f"Saved CSV to: {file_path}")
+
+        save_button.clicked.connect(save_to_csv)
         table.cellClicked.connect(on_row_clicked)
 
         # Add to viewer
-        viewer.window.add_dock_widget(table, area='right', name='Grain Statistics')
+        viewer.window.add_dock_widget(container, area='right', name='Grain Statistics')
     else:
         show_error_dialog(f"Function {function_key} returned an unsupported type: {type(return_value)}. Expected numpy array.") 
 
