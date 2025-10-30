@@ -21,7 +21,8 @@ https://napari.org/stable/plugins/index.html
 
 ## Installation
 
-Activate your Python environment (e.g. Conda) and make sure your Python version is >= 3.10 and < 3.12. An example conda enviroment command would be:
+Activate your Python environment (e.g. Conda) and make sure your Python version is >= 3.10 and < 3.12. An example
+conda enviroment command would be:
 
     conda create -n napari-env python=3.11
     conda activate napari-env
@@ -40,16 +41,28 @@ You can then run napari with:
 
 Topostats tools can be accessed from the toolbar of napari (top left) as shown.
 ![Toolbar](readme_images/toolbar.png)
-To load an image into the napari viewer, drag and drop your image file into the window. A small window will open prompting you to input the input channel for the image you are loading. Enter the channel used by your image (e.g. Height). The loaded image will appear as a layer in the GUI.
+To load an image into the napari viewer, drag and drop your image file into the window.
+A small window will open prompting you to input the input channel for the image you are loading.
+Enter the channel used by your image (e.g. Height). The loaded image will appear as a layer in the GUI.
 ![Input channel window](readme_images/input_channel_window.png)
-This will then open a window containing buttons with available functions. Select a layer, then click the button corresponding to the function you want to run on the layer.
+This will then open a window containing buttons with available functions.
+Select a layer, then click the button corresponding to the function you want to run on the layer.
 ![Button Grid](readme_images/button_grid.png)
-Before running the function, you can choose to load a config file using the button and selecting the file. Both json and yaml file formats are supported. This config will be used for the functions you run until you close napari.
+Before running the function, you can choose to load a config file using the button and selecting the file.
+Both json and yaml file formats are supported.
+This config will be used for the functions you run until you close napari.
 ![Loading a config file](readme_images/config_file.png)
-If you don't load a config file manually, a default config file ("_generated_config.yaml") is created in your current directory (when you run a function) which will then be used for all subsequent functions. If you edit this yaml file, your changes will be overwritten by the default config values when the file is generated again if a config isn't loaded, so it is not recommended that you edit that file!
-Once a config is loaded, either manually or automatically, an edit config window will appear, allowing the config file to be edited directly through the napari gui. Changes made are not automatically saved to the loaded config file, however, the updated config file can be saved as a file with the Save to file button at the bottom of the window.
+If you don't load a config file manually, a default config file ("_generated_config.yaml") is created in your current 
+directory (when you run a function) which will then be used for all subsequent functions. If you edit this yaml file,
+your changes will be overwritten by the default config values when the file is generated again if a config isn't
+loaded, so it is not recommended that you edit that file!
+Once a config is loaded, either manually or automatically, an edit config window will appear, allowing the config file
+to be edited directly through the napari gui. Changes made are not automatically saved to the loaded config file,
+however, the updated config file can be saved as a file with the Save to file button at the bottom of the window.
 ![Edit config window](readme_images/edit_config_window.png)
-When you run a function for the first time, a window will open with options to adjust for that function (which are applied next time the function is run). There is also a run button in that window. This runs the function on the selected layer (it does exactly the same thing as clicking the function button in the grid).
+When you run a function for the first time, a window will open with options to adjust for that function 
+(which are applied next time the function is run). There is also a run button in that window. This runs the function
+on the selected layer (it does exactly the same thing as clicking the function button in the grid).
 ![Function window](readme_images/function_window.png)
 
 ## Contributing
