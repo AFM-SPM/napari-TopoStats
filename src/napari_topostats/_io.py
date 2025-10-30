@@ -351,7 +351,9 @@ def open_config_editor(viewer: Viewer):
                         yaml.safe_dump(full_config, f, sort_keys=False)
                 print(f"Config saved to {file_path}")
             except (OSError, TypeError, yaml.YAMLError) as e:
-                show_error_dialog(f"Failed to save config ({e.__class__.__name__}): {e}")
+                show_error_dialog(
+                    f"Failed to save config ({e.__class__.__name__}): {e}"
+                )
 
     save_button.clicked.connect(save_to_file)
     button_box.accepted.connect(dialog.accept)

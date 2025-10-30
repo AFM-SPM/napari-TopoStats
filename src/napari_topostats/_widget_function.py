@@ -620,7 +620,9 @@ class WidgetFunction:
             A magicgui widget that can be used in the napari viewer.
         """
         # Check if a config is needed
-        if self.uses_config and (io.config_wrapper is None or io.full_config_container is None):
+        if self.uses_config and (
+            io.config_wrapper is None or io.full_config_container is None
+        ):
             io.load_config(current_viewer())
         try:
             # If path_to_data is not set, default to "return" or "obj" if type_class is provided
