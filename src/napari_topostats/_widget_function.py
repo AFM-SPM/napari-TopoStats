@@ -449,8 +449,8 @@ def render_return_value(
 
         # Populate table
         for i in range(len(df)):
-            for j, col in enumerate(df.columns):
-                item = QTableWidgetItem(str(df.iloc[i, j]))
+            for j in range(df.shape[1]):
+                item = QTableWidgetItem(str(df.iat[i, j]))
                 table.setItem(i, j, item)
 
         layout.addWidget(table)
@@ -620,11 +620,8 @@ class WidgetFunction:
             A magicgui widget that can be used in the napari viewer.
         """
         # Check if a config is needed
-        if self.uses_config:
-            # If so, check if the config is loaded
-            if io.config_wrapper is None or io.full_config_container is None:
-                # Load the config if not
-                io.load_config(current_viewer())
+        if self.uses_config and (io.config_wrapper is None or io.full_config_container is None):
+            io.load_config(current_viewer())
         try:
             # If path_to_data is not set, default to "return" or "obj" if type_class is provided
             if self.path_to_data is None:
@@ -682,10 +679,7 @@ class WidgetFunction:
                                 if p.name != param_name
                             ]
                     else:
-                        for (
-                            flat_key,
-                            flat_val,
-                        ) in io.config_wrapper.flat.items():
+                        for flat_key in io.config_wrapper.flat:
                             if (
                                 flat_key.startswith(f"{self.function_key}.")
                                 and flat_key[len(f"{self.function_key}.") :]

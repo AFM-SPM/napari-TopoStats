@@ -91,12 +91,12 @@ def reader_function(path):
             if not scan_data_dict:
                 raise ValueError
             break
-        except Exception:
+        except ValueError: #TODO more open exceptions?
             available_channels = "Check console error message."
 
     # stack arrays into single array
     arrays = []
-    for filename, values in scan_data_dict.items():
+    for values in scan_data_dict.values():
         arrays.append(values["image_original"])
     data = np.squeeze(np.stack(arrays))
 

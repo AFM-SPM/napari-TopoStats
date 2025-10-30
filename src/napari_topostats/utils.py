@@ -2,6 +2,7 @@
 
 import copy
 
+import napari
 import numpy as np
 from napari.layers import Labels
 from napari.types import ImageData
@@ -85,7 +86,7 @@ def grainstats(image: Labels):
 
 # ------- Filters -------
 def remove_scars(
-    image: "Napari.types.ImageData",
+    image: ImageData,
     removal_iterations: int = 2,
     threshold_low: float = 0.250,
     threshold_high: float = 0.666,
@@ -104,8 +105,8 @@ def remove_scars(
 
 
 def median_flattened(
-    image: "Napari.types.ImageData",
-    mask: "Napari.types.LabelsData" = None,
+    image: "napari.types.ImageData",
+    mask: "napari.types.LabelsData" = None,
     row_alignment_quantile: float = 0.5,
 ):
     filtered_image = Filters(
@@ -127,8 +128,8 @@ def median_flattened(
 
 
 def remove_tilt(
-    image: "Napari.types.ImageData",
-    mask: "Napari.types.LabelsData" = None,
+    image: ImageData,
+    mask: Labels = None,
 ):
     filtered_image = Filters(
         image=image,
@@ -147,8 +148,8 @@ def remove_tilt(
 
 
 def remove_quadratic(
-    image: "Napari.types.ImageData",
-    mask: "Napari.types.LabelsData" = None,
+    image: ImageData,
+    mask: Labels = None,
 ):
     filtered_image = Filters(
         image=image,
@@ -167,8 +168,8 @@ def remove_quadratic(
 
 
 def remove_nonlinear(
-    image: "Napari.types.ImageData",
-    mask: "Napari.types.LabelsData" = None,
+    image: ImageData,
+    mask: Labels = None,
 ):
     filtered_image = Filters(
         image=image,
@@ -189,8 +190,8 @@ def remove_nonlinear(
 
 
 def average_background(
-    image: "Napari.types.ImageData",
-    mask: "Napari.types.LabelsData" = None,
+    image: ImageData,
+    mask: Labels = None,
 ):
     filtered_image = Filters(
         image=image,
@@ -212,7 +213,7 @@ def average_background(
 
 
 def gaussian_filter(
-    image: "Napari.types.ImageData",
+    image: ImageData,
     sigma: float = 2.0,
 ):
     filtered_image = Filters(

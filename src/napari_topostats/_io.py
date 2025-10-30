@@ -14,7 +14,7 @@ from qtpy.QtWidgets import QLabel, QPushButton
 # This should be moved when no longer necessary
 try:
     from topostats.config import write_config_with_comments
-except:
+except ModuleNotFoundError or ImportError:
     from topostats.io import write_config_with_comments
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
@@ -159,7 +159,14 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
             else:
                 show_error_dialog("Unsupported config format.")
                 return
-    except Exception as e:
+    except (
+        FileNotFoundError,
+        PermissionError,
+        yaml.YAMLError,
+        json.JSONDecodeError,
+        UnicodeDecodeError,
+        OSError,
+    ) as e:
         show_error_dialog(f"Failed to load config: {e}")
         return
 
@@ -205,7 +212,7 @@ def extract_inline_comments(
         return {}
 
     with open(yaml_path) as f:
-        for line_num, line in enumerate(f, 1):
+        for line in f:
             stripped_line = line.strip()
 
             if not stripped_line or stripped_line.startswith("#"):
@@ -343,8 +350,8 @@ def open_config_editor(viewer: Viewer):
                     with open(file_path, "w") as f:
                         yaml.safe_dump(full_config, f, sort_keys=False)
                 print(f"Config saved to {file_path}")
-            except Exception as e:
-                print(f"Failed to save config: {e}")
+            except (OSError, TypeError, yaml.YAMLError) as e:
+                show_error_dialog(f"Failed to save config ({e.__class__.__name__}): {e}")
 
     save_button.clicked.connect(save_to_file)
     button_box.accepted.connect(dialog.accept)

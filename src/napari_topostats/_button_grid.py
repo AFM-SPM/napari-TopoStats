@@ -1,3 +1,4 @@
+from contextlib import suppress
 from pathlib import Path
 
 from magicgui.widgets import FunctionGui
@@ -121,10 +122,8 @@ class ButtonGrid(QListWidget):
                 self.addFunctionButton(label, function.tooltip)
             else:
                 self.addFunctionButton(label)
-        try:
+        with suppress(TypeError):
             self.itemClicked.disconnect()
-        except TypeError:
-            pass
         self.itemClicked.connect(self.add_function_as_widget)
 
     def add_function_as_widget(self, item):
@@ -143,7 +142,7 @@ class ButtonGrid(QListWidget):
         if item.text() not in self.docked_functions:
             widget = self.get_widget_from_function(item.text())
             for param in widget:
-                if param.name != "call_button" or param.value != False:
+                if param.name != "call_button" or not param.value:
                     self.viewer.window.add_dock_widget(
                         widget, name=item.text()
                     )
@@ -161,11 +160,10 @@ class ButtonGrid(QListWidget):
         if item.text() not in RUN_IMMEDIATELY_EXEMPTIONS:
             # If the function is not in the RUN_IMMEDIATELY_EXEMPTIONS list, run it with the appropriate parameters,
             # using the selected image layer as the image parameter
-            if hasattr(widget, "image"):
-                if widget.image.value is None:
-                    selected_image = get_selected_image(self.viewer)
-                    if selected_image is not None:
-                        widget.image.value = selected_image
+            if hasattr(widget, "image") and widget.image.value is None:
+                selected_image = get_selected_image(self.viewer)
+                if selected_image is not None:
+                    widget.image.value = selected_image
             if hasattr(widget, "viewer"):
                 widget.viewer.value = self.viewer
             widget()
