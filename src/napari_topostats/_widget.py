@@ -29,6 +29,7 @@ References:
 Replace code below according to your needs.
 """
 import sys
+import os
 import functools
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QIcon
@@ -37,9 +38,10 @@ from qtpy.QtWidgets import (
 )
 from ._alerts import show_error_dialog, LoadingDialog
 
-loading_dialog = LoadingDialog("Loading TopoStats...")
-loading_dialog.show()
-QApplication.processEvents()
+if not os.environ.get("QT_QPA_PLATFORM") == "offscreen" and QApplication.instance() is not None:
+    loading_dialog = LoadingDialog("Loading TopoStats...")
+    loading_dialog.show()
+    QApplication.processEvents()
 import inspect
 import json
 from pathlib import Path
@@ -64,13 +66,15 @@ from skimage.util import img_as_float
 from napari_topostats.utils import (
     afm2stack, average_background, gaussian_filter,
     median_flattened, remove_nonlinear, remove_quadratic,
-    remove_scars, remove_tilt,
+    remove_scars, remove_tilt, grainstats
 )
 
+from topostats.grainstats import GrainStats
 from topostats.grains import Grains
 from topostats.filters import Filters
 
-loading_dialog.close()
+if not os.environ.get("QT_QPA_PLATFORM") == "offscreen" and QApplication.instance() is not None:
+    loading_dialog.close()
 
 from ._button_grid import ButtonGrid
 from ._widget_function import WidgetFunction
