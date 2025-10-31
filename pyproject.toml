@@ -13,8 +13,10 @@ readme = "README.md"
 license = {text = "GNU GPLv3 only"}
 dynamic = ["version"]
 authors = [
-  {name = "TopoStats Team", email = "topostats@sheffield.ac.uk"},
   {name = "Max Gamill", email = "mcgamill1@sheffield.ac.uk"},
+  {name = "Aran Hobbs", email = "ahobbs834@gmail.com"},
+  {name = "Laura Wiggins", email = "l.wiggins@sheffield.ac.uk"},
+  {name = "TopoStats Team", email = "topostats@sheffield.ac.uk"},
 ]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
@@ -113,8 +115,3 @@ exclude = [
 
 target-version = "py38"
 fix = true
-
-#[project.entry-points."napari.manifest"]
-#napari-TopoStats = "napari-TopoStats.napari.yaml"
-#napari-loadafm = "napari-loadafm.napari.yaml"
-#napari-saveafm = "napari-saveafm.napari.yaml"
