@@ -15,7 +15,7 @@ dynamic = ["version"]
 authors = [
   {name = "Max Gamill", email = "mcgamill1@sheffield.ac.uk"},
   {name = "Aran Hobbs", email = "ahobbs834@gmail.com"},
-  {name = "Laura Wiggins", email = "llwiggins},
+  {name = "Laura Wiggins", email = "l.wiggins@sheffield.ac.uk"},
   {name = "TopoStats Team", email = "topostats@sheffield.ac.uk"},
 ]
 classifiers = [
