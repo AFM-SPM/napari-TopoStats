@@ -67,14 +67,14 @@ same thing as clicking the function button in the grid).
 ![Function window](readme_images/function_window.png)
 
 Current functions:
+
 1. Load config button allows a config file to be selected from your hard disk.
 2. Run filters requires an image layer to be selected and creates an image layer with topostats filters run.
 3. Run grains requires an image layer to be selected and creates a labels layer with topostats grains detection run.
 4. Make 3D requires an image layer to be selected and creates a 3D image layer. Viewing mode (in the bottom left of
 the viewer) is automatically switched to 3D.
-5. Run Grainstats requires a labels layer **created by the Run Grains function** to be selected and creates an 
+5. Run Grainstats requires a labels layer **created by the Run Grains function** to be selected and creates an
 interactivate table in the dock on the right.
-
 
 ## Contributing
 
