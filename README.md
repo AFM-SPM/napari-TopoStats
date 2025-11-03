@@ -9,7 +9,7 @@
 
 ----------------------------------
 
-This [napari] plugin was generated with [Cookiecutter] using [@napari]'s [cookiecutter-napari-plugin] template.
+This [napari] plugin was generated with [Cookiecutter] using the [cookiecutter-napari-plugin] template.
 
 <!--
 Don't miss the full getting started guide to set up your new package:
@@ -27,7 +27,7 @@ conda enviroment command would be:
     conda create -n napari-env python=3.11
     conda activate napari-env
 
-With [Git installed] on your machine, install the napari-TopoStats repository using pip.
+With [Git installed] on your machine, install the napari-TopoStats package from GitHub using [pip][pip].
 
     pip install git+https://github.com/AFM-SPM/napari-TopoStats.git@main
 
@@ -90,11 +90,10 @@ Distributed under the terms of the [MIT] license,
 
 If you encounter any problems, please [file an issue] along with a detailed description.
 
-[napari]: https://github.com/napari/napari
 [Cookiecutter]: https://github.com/audreyr/cookiecutter
-[@napari]: https://github.com/napari
+[Git installed]: https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
 [MIT]: http://opensource.org/licenses/MIT
 [cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
-
+[napari]: https://github.com/napari/napari
+[pip]: <https://pypi.org/project/pip/>
 [tox]: https://tox.readthedocs.io/en/latest/
-[Git installed]: https://git-scm.com/book/en/v2/Getting-Started-Installing-Git

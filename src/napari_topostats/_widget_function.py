@@ -849,7 +849,7 @@ class WidgetFunction:
                         return_value,
                         self.function_key,
                         viewer,
-                        kwargs.get("image", None),
+                        kwargs.get("image"),
                         ndims=self.ndims,
                         metadata=metadata,
                     )
