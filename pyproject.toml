@@ -13,8 +13,10 @@ readme = "README.md"
 license = {text = "GNU GPLv3 only"}
 dynamic = ["version"]
 authors = [
-  {name = "TopoStats Team", email = "topostats@sheffield.ac.uk"},
   {name = "Max Gamill", email = "mcgamill1@sheffield.ac.uk"},
+  {name = "Aran Hobbs", email = "ahobbs834@gmail.com"},
+  {name = "Laura Wiggins", email = "l.wiggins@sheffield.ac.uk"},
+  {name = "TopoStats Team", email = "topostats@sheffield.ac.uk"},
 ]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
@@ -35,13 +37,14 @@ keywords = [
   "afm",
   "image processing",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10, <3.12"
 dependencies = [
   "magicgui",
   "napari[all]",
   "qtpy",
-  "topostats",
-  "tox"
+  "tox",
+  "TopoStats @ git+https://github.com/AFM-SPM/TopoStats.git@main",
+  "napari-AFMReader @ git+https://github.com/AFM-SPM/napari-AFMReader.git@58c77c8"
 ]
 
 [project.optional-dependencies]
@@ -49,7 +52,7 @@ tests = [
   "pytest",
   "pytest-cov",
   "pytest-qt",
-  "pyqt5"
+  "qtpy"
 ]
 dev = [
   "black",
@@ -112,7 +115,3 @@ exclude = [
 
 target-version = "py38"
 fix = true
-
-#[project.entry-points."napari.manifest"]
-napari-loadafm = "napari-loadafm.napari.yaml"
-#napari-saveafm = "napari-saveafm.napari.yaml"

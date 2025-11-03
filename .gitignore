@@ -31,6 +31,12 @@ output/config.yaml
 # Example Data
 !cat.spm
 
+# Include icons
+!icons/
+!icons/**
+!readme_images/
+!readme_images/**
+
 # IDE
 .vscode/
 .idea/
