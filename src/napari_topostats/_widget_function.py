@@ -1,6 +1,7 @@
 import functools
 import inspect
-from typing import Any, Callable, Dict
+from collections.abc import Callable
+from typing import Any, Dict
 
 import dask.array as da
 import numpy as np
