@@ -2,7 +2,7 @@ import json
 import re
 from argparse import Namespace
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import yaml
 from magicgui import magicgui
@@ -66,7 +66,7 @@ class ConfigWrapper:
         return result
 
 
-def collect_values(container: Container) -> Dict[str, Any]:
+def collect_values(container: Container) -> dict[str, Any]:
     result = {}
     for widget in container:
         val = widget.value
@@ -85,7 +85,7 @@ def collect_values(container: Container) -> Dict[str, Any]:
 
 
 def build_dynamic_widget(
-    flat_config: Dict[str, Any], descriptions: Dict[str, str] = None
+    flat_config: dict[str, Any], descriptions: dict[str, str] = None
 ) -> Container:
     widgets = []
     for key, value in flat_config.items():
@@ -199,7 +199,7 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
 
 def extract_inline_comments(
     yaml_path: Path, top_level_key: str = None
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Extracts inline comments from a YAML file.
     (This function remains the same as our last debugged version)
