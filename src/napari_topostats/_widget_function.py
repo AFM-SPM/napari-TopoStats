@@ -267,14 +267,13 @@ def get_selected_image(viewer,
         show_error_dialog("No layer selected. Select a layer ")
         return None
     layer = selected[0]
-    if of_type is not None:
-        if layer.__class__ not in of_type:
-            pretty_types = [t.__name__ for t in of_type]
-            show_error_dialog(
-                f"Selected layer is not of a required type: {', '.join(pretty_types)}.",
-                raise_exception=False,
-            )
-            return None
+    if of_type is not None and layer.__class__ not in of_type:
+        pretty_types = [t.__name__ for t in of_type]
+        show_error_dialog(
+            f"Selected layer is not of a required type: {', '.join(pretty_types)}.",
+            raise_exception=False,
+        )
+        return None
     if isinstance(layer, Image):
         data = layer.data
         if isinstance(data, (np.ndarray, da.Array)):  # conforms to ImageData
