@@ -385,7 +385,7 @@ def open_config_editor(viewer: Viewer):
             config_wrapper.flat.copy(), comment_descriptions
         )
 
-def save_config_to_file(file_path: Path, full_config: Dict[str, Any]):
+def save_config_to_file(file_path: Path, full_config: dict[str, Any]):
     try:
         if file_path.suffix.lower() == ".json":
             with open(file_path, "w") as f:
