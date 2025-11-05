@@ -246,7 +246,8 @@ class CallableWithSignature:
         return self.real_func(**bound.arguments)
 
 
-def get_selected_image(viewer) -> Image | None:
+def get_selected_image(viewer,
+                        of_type: list = None) -> Image | None:
     """
     Get the currently selected image layer from the viewer.
 
@@ -263,10 +264,17 @@ def get_selected_image(viewer) -> Image | None:
     selected = list(viewer.layers.selection)
 
     if not selected:
-        show_error_dialog("No layer selected.")
+        show_error_dialog("No layer selected. Select a layer ")
         return None
-
     layer = selected[0]
+    if of_type is not None:
+        if layer.__class__ not in of_type:
+            pretty_types = [t.__name__ for t in of_type]
+            show_error_dialog(
+                f"Selected layer is not of a required type: {', '.join(pretty_types)}.",
+                raise_exception=False,
+            )
+            return None
     if isinstance(layer, Image):
         data = layer.data
         if isinstance(data, (np.ndarray, da.Array)):  # conforms to ImageData
@@ -277,13 +285,11 @@ def get_selected_image(viewer) -> Image | None:
             )
     elif isinstance(layer, Labels):
         return layer
-    else:
-        show_error_dialog(
-            "Selected layer is not an Image layer. Looking for a default layer.",
-            raise_exception=False,
-        )
-        return None
-
+    # else:
+    #     show_error_dialog(
+    #         "Selected layer is not an Image layer. Looking for a default layer.",
+    #         raise_exception=False,
+    #     )
     return None
 
 
@@ -579,6 +585,7 @@ class WidgetFunction:
         path_to_data: str | None = None,
         uses_config: bool = False,
         ndims: int = 2,
+        of_type: list = None,
         metadata_paths: dict = None,
         tooltip: str | None = None,
     ):
@@ -589,6 +596,7 @@ class WidgetFunction:
             self.type_class = type_class
             self.uses_config = uses_config
             self.ndims = ndims
+            self.of_type = of_type
             self.metadata_paths = metadata_paths
         self.function_to_run = function_to_run
         self.tooltip = tooltip
@@ -729,13 +737,10 @@ class WidgetFunction:
                 # Handle image selection if required
                 if "image" in [p.name for p in all_params]:
                     selected_image = get_selected_image(
-                        kwargs.get("viewer", current_viewer())
+                        kwargs.get("viewer", current_viewer()),
+                        of_type=self.of_type,
                     )
                     if selected_image is None:
-                        show_error_dialog(
-                            "Please select an image before running this function.",
-                            raise_exception=True,
-                        )
                         return
                     kwargs["image"] = selected_image
 

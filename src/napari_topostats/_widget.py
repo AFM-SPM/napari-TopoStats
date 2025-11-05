@@ -51,7 +51,7 @@ from typing import TYPE_CHECKING
 
 from magicgui import magicgui
 from magicgui.widgets import CheckBox, Container, FunctionGui, create_widget
-from napari.layers import Image
+from napari.layers import Image, Labels
 from napari.viewer import Viewer
 from skimage.util import img_as_float
 from topostats.filters import Filters
@@ -96,6 +96,7 @@ AVAILABLE_FUNCTIONS = [
         type_class=Filters,
         path_to_data='obj.images["gaussian_filtered"]',
         uses_config=True,
+        of_type=[Image],
         tooltip="Run filters on the selected image layer using the current configuration.",
     ),
     WidgetFunction(
@@ -104,6 +105,7 @@ AVAILABLE_FUNCTIONS = [
         function_to_run=Grains.find_grains,
         type_class=Grains,
         path_to_data='obj.mask_images["above"]["merged_classes"][:, :, 1]',
+        of_type=[Image],
         metadata_paths={"config": "config", "grains": "obj"},
         uses_config=True,
         tooltip="Run grain analysis on the selected image layer using the current configuration.",
@@ -113,6 +115,7 @@ AVAILABLE_FUNCTIONS = [
         function_key="3d",
         function_to_run=afm2stack,
         path_to_data="return",
+        of_type=[Image],
         ndims=3,
         tooltip="Convert the selected image layer to a 3D stack",
     ),
@@ -120,6 +123,7 @@ AVAILABLE_FUNCTIONS = [
         name="run_grainstats",
         function_key="grainstats",
         path_to_data="return",
+        of_type=[Labels],
         function_to_run=grainstats,
         tooltip="Creates a table showing the grainstats of the selected grain labels layer.",
     ),
