@@ -9,7 +9,7 @@ from magicgui import magicgui
 from magicgui.widgets import Container, create_widget
 from napari.viewer import Viewer
 from platformdirs import user_config_dir
-from qtpy.QtCore import Qt
+from qtpy.QtCore import Qt, QTimer
 from qtpy.QtWidgets import QLabel, QPushButton
 
 # This should be moved when no longer necessary
@@ -211,6 +211,7 @@ def _load_config_impl(
         config_path = config_dir / "config.yaml"
         config_dir.mkdir(parents=True, exist_ok=True)
         save_config_to_file(config_path, config)
+    return True
 
 
 @magicgui(
@@ -225,6 +226,22 @@ def _load_config_impl(
 def load_config(viewer: Viewer, config_path: Path | None = None):
     _load_config_impl(viewer, config_path)
 
+def attach_status_label(widget):
+    """Attach a success/error label under the FunctionGui call button."""
+    label = QLabel("")
+    widget.native.layout().addWidget(label)
+    def remove_label():
+        label.setText("")
+
+    def on_success(result):
+        label.setText("✅ Configuration loaded successfully!")
+        # Clear message after 3 seconds
+        
+        QTimer.singleShot(3000, remove_label)
+
+    widget.called.connect(on_success)
+
+attach_status_label(load_config)
 
 def extract_inline_comments(
     yaml_path: Path, top_level_key: str = None
