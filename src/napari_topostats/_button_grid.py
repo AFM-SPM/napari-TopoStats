@@ -14,7 +14,7 @@ from napari_topostats._widget_function import (
 
 from ._alerts import show_error_dialog
 
-RUN_IMMEDIATELY_EXEMPTIONS = {"Load Config"}
+RUN_IMMEDIATELY_EXEMPTIONS = {}
 ICON_ROOT = Path(__file__).parent / "icons"
 STYLES = r"""
     QListWidget{

@@ -624,7 +624,7 @@ class WidgetFunction:
         if self.uses_config and (
             io.config_wrapper is None or io.full_config_container is None
         ):
-            io.load_config(current_viewer())
+            io._load_config_impl(current_viewer(), use_default=True)
         try:
             # If path_to_data is not set, default to "return" or "obj" if type_class is provided
             if self.path_to_data is None:
