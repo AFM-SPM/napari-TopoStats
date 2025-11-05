@@ -8,9 +8,9 @@ import yaml
 from magicgui import magicgui
 from magicgui.widgets import Container, create_widget
 from napari.viewer import Viewer
+from platformdirs import user_config_dir
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QLabel, QPushButton
-from platformdirs import user_config_dir
 
 # This should be moved when no longer necessary
 try:
@@ -125,7 +125,9 @@ def build_dynamic_widget(
     return Container(widgets=widgets)
 
 
-def _load_config_impl(viewer: Viewer, config_path: Path | None = None, use_default: bool = False):
+def _load_config_impl(
+    viewer: Viewer, config_path: Path | None = None, use_default: bool = False
+):
     """
     Load a configuration file and build a dynamic widget to edit it.
     This is a magicgui function that can be called directly from the napari GUI and is an example of a hardcoded
@@ -222,6 +224,7 @@ def _load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defau
 )
 def load_config(viewer: Viewer, config_path: Path | None = None):
     _load_config_impl(viewer, config_path)
+
 
 def extract_inline_comments(
     yaml_path: Path, top_level_key: str = None
@@ -384,6 +387,7 @@ def open_config_editor(viewer: Viewer):
         full_config_container = build_dynamic_widget(
             config_wrapper.flat.copy(), comment_descriptions
         )
+
 
 def save_config_to_file(file_path: Path, full_config: dict[str, Any]):
     try:
