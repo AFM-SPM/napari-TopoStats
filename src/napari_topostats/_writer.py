@@ -10,11 +10,11 @@ Replace code below according to your needs.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Tuple, Union
+from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:
     DataType = Union[Any, Sequence[Any]]
-    FullLayerData = Tuple[DataType, dict, str]
+    FullLayerData = tuple[DataType, dict, str]
 
 
 def write_single_image(path: str, data: Any, meta: dict) -> list[str]:
