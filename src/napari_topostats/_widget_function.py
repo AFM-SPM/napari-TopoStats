@@ -246,8 +246,7 @@ class CallableWithSignature:
         return self.real_func(**bound.arguments)
 
 
-def get_selected_image(viewer,
-                        of_type: list = None) -> Image | None:
+def get_selected_image(viewer, of_type: list = None) -> Image | None:
     """
     Get the currently selected image layer from the viewer.
 
