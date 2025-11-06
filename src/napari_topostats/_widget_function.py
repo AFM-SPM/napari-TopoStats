@@ -13,13 +13,13 @@ from napari.layers.labels._labels_constants import Mode
 from napari.viewer import Viewer
 from pandas import DataFrame
 from qtpy.QtWidgets import (
+    QCheckBox,  # Added QCheckBox import
     QFileDialog,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
-    QCheckBox,  # Added QCheckBox import
 )
 from scipy.ndimage import label
 
@@ -447,7 +447,6 @@ def render_return_value(
                         item = QTableWidgetItem(str(df_m.iat[i, j]))
                         table.setItem(i, j, item)
 
-
         def on_row_clicked(row, column):
             """Triggered when a table row is clicked."""
             # Get the grain number (or label id) from the dataframe
@@ -486,7 +485,7 @@ def render_return_value(
                     table.item(row, 0), QTableWidget.PositionAtCenter
                 )
                 original.show_selected_label = True
-        
+
         nm_checkbox.toggled.connect(on_checkbox_changed)
         layout.addWidget(nm_checkbox)
         original.events.selected_label.connect(on_label_selected)
