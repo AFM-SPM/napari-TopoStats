@@ -226,22 +226,26 @@ def _load_config_impl(
 def load_config(viewer: Viewer, config_path: Path | None = None):
     _load_config_impl(viewer, config_path)
 
+
 def attach_status_label(widget):
     """Attach a success/error label under the FunctionGui call button."""
     label = QLabel("")
     widget.native.layout().addWidget(label)
+
     def remove_label():
         label.setText("")
 
     def on_success(result):
         label.setText("✅ Configuration loaded successfully!")
         # Clear message after 3 seconds
-        
+
         QTimer.singleShot(3000, remove_label)
 
     widget.called.connect(on_success)
 
+
 attach_status_label(load_config)
+
 
 def extract_inline_comments(
     yaml_path: Path, top_level_key: str = None
