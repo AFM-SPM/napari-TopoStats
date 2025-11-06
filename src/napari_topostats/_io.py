@@ -381,6 +381,26 @@ def open_config_editor(viewer: Viewer):
     save_button = QPushButton("Save Config to File")
     button_box.addButton(save_button, QDialogButtonBox.ActionRole)
 
+    set_as_default_button = QPushButton("Set config as your default")
+    button_box.addButton(set_as_default_button, QDialogButtonBox.ActionRole)
+
+    # Temporary status label for feedback when setting default
+    status_label = QLabel("")
+    status_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
+    def set_as_default():
+        updated_values = collect_values(fresh_container)
+        config_wrapper.flat.update(updated_values)
+        full_config = config_wrapper.unflatten()
+
+        config_dir = Path(user_config_dir("TopoStats", "Napari"))
+        config_dir.mkdir(parents=True, exist_ok=True)
+        default_config_path = config_dir / "config.yaml"
+        save_config_to_file(default_config_path, full_config)
+
+        status_label.setText("✅ Default config saved")
+        QTimer.singleShot(3000, lambda: status_label.setText(""))
+
     def save_to_file():
         updated_values = collect_values(fresh_container)
         config_wrapper.flat.update(updated_values)
@@ -391,13 +411,22 @@ def open_config_editor(viewer: Viewer):
             caption="Save Config As",
             filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)",
         )
+        if not file_path:
+            status_label.setText("Config save cancelled.")
+            QTimer.singleShot(3000, lambda: status_label.setText(""))
+            return
         save_config_to_file(Path(file_path), full_config)
 
+        status_label.setText("✅ Config saved to file")
+        QTimer.singleShot(3000, lambda: status_label.setText(""))
+
     save_button.clicked.connect(save_to_file)
+    set_as_default_button.clicked.connect(set_as_default)
     button_box.accepted.connect(dialog.accept)
     button_box.rejected.connect(dialog.reject)
 
     main_layout.addWidget(scroll_area)
+    main_layout.addWidget(status_label)
     main_layout.addWidget(button_box)
 
     if dialog.exec_():
