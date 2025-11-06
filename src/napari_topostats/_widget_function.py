@@ -26,6 +26,7 @@ from scipy.ndimage import label
 from . import _io as io
 from ._alerts import show_error_dialog
 from ._io import ConfigWrapper, collect_values
+from ._state import current_workflows, original_import_layer
 
 
 def enforce_defaults(
@@ -332,202 +333,7 @@ def remove_all_but_last(word: str, text: str) -> str:
         .strip()
     )  # Remove extra spaces and return
 
-
-def render_return_value(
-    return_value: Any,
-    function_key: str,
-    viewer: Viewer,
-    original: Layer,
-    ndims: int = 2,
-    metadata: dict = None,
-):
-    """
-    Render the return value of a function in the napari viewer.
-    This function handles the rendering of the return value based on its type.
-    If the return value is a numpy array, it will be added as an image layer.
-    If it is a binary image, it will be added as a labels layer.
-
-    Parameters
-    ----------
-    return_value : Any
-        The return value of the function which will be rendered.
-    function_key : str
-        The key of the function that was executed, used for naming the layer.
-    viewer : Viewer
-        The napari viewer instance where the layer will be added. If not provided, the current viewer will be used.
-    original : Layer
-        The original image layer, used for metadata and naming. If not provided, it will be set to None.
-    ndims : int, optional
-        The number of dimensions of the data to be rendered. If not provided, it will be set to 2.
-    """
-    # Check if the return value is a numpy array
-    # TODO: handle other types of return values if needed
-
-    if isinstance(return_value, np.ndarray):
-        # If the return value is a binary image, add it as a labels layer
-        # TODO: Some functions may return a binary image which should be added as an image layer so need to handle that
-        if is_binary_image(return_value):
-            labels, num_labels = label(return_value.astype(bool))
-            label_ids = list(range(1, num_labels + 1))
-            properties = {"label_id": label_ids}
-            viewer.add_labels(
-                labels.astype(np.uint16),
-                name=f"{original.name} {function_key.title()} Mask",
-                properties=properties,
-                metadata=(
-                    {"px2nm": original.metadata.get("px2nm", 1.0)}
-                    if original
-                    else {}
-                )
-                | metadata,
-            )
-        # If the return value is a greyscale image array, add it as an image layer
-        else:
-            name = f"{original.name} {function_key.title()} Image"
-            name = remove_all_but_last("Image", name)
-            viewer.add_image(
-                return_value,
-                name=name,
-                contrast_limits=(-1, 5),
-                metadata=(
-                    {"px2nm": original.metadata.get("px2nm", 1.0)}
-                    if original
-                    else {}
-                )
-                | metadata,
-            )
-            viewer.dims.ndisplay = ndims
-    elif (
-        isinstance(return_value, tuple)
-        and len(return_value) == 3
-        and isinstance(return_value[0], DataFrame)
-    ):
-        df = return_value[0]
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        nm_checkbox = QCheckBox("Convert to nm")
-        nm_checkbox.setChecked(False)
-        # Create table widget
-        table = QTableWidget()
-        table.setRowCount(len(df))
-        table.setColumnCount(len(df.columns))
-        table.setHorizontalHeaderLabels(df.columns.tolist())
-        original.mode = Mode.PICK
-
-        def convert_to_nm(df_m: DataFrame) -> DataFrame:
-            """Convert the dataframe from m to nm."""
-            df_nm = df_m.copy()
-            m_to_nm = 1e9
-            for col in df_nm.select_dtypes(include=[np.number]).columns:
-                if df_nm[col].max() == 0:
-                    continue
-                if df_nm[col].max() < 1e-23:  # Volume in m^3
-                    df_nm[col] = df_nm[col] * (m_to_nm**3)
-                elif df_nm[col].max() < 1e-14:  # Area in m^2
-                    df_nm[col] = df_nm[col] * (m_to_nm**2)
-                elif df_nm[col].max() < 1e-5:  # Length in m
-                    df_nm[col] = df_nm[col] * m_to_nm
-            return df_nm
-
-        def on_checkbox_changed(checked):
-            # Convert table from m to nm
-            if checked:
-                df_nm = convert_to_nm(df)
-
-                # Update table
-                for i in range(len(df_nm)):
-                    for j in range(df_nm.shape[1]):
-                        item = QTableWidgetItem(str(df_nm.iat[i, j]))
-                        table.setItem(i, j, item)
-            else:
-                df_m = df.copy()
-                # Update table
-                for i in range(len(df_m)):
-                    for j in range(df_m.shape[1]):
-                        item = QTableWidgetItem(str(df_m.iat[i, j]))
-                        table.setItem(i, j, item)
-
-        def on_row_clicked(row, column):
-            """Triggered when a table row is clicked."""
-            # Get the grain number (or label id) from the dataframe
-            grain_id = df.iloc[row][
-                "grain_number"
-            ]  # or 'label', whatever your column is called
-
-            # Center the view on it
-            # Find coordinates of that label in the image
-            mask = original.data == int(grain_id) + 1
-            if mask.any() and isinstance(original, Labels):
-                coords = np.argwhere(mask)
-                if coords.size > 0:
-                    centroid = coords.mean(axis=0)
-                    # Ensure we're only using (y, x) order for 2D
-                    y, x = centroid[-2], centroid[-1]
-                    # Set the camera center in world coordinates
-                    viewer.camera.center = (y, x)
-                original.show_selected_label = True
-                original.selected_label = int(grain_id) + 1
-                original.mode = Mode.PICK
-                viewer.layers.selection.active = original
-
-        def on_label_selected(event):
-            selected = original.selected_label
-            if selected == 0:  # 0 means background in napari
-                original.show_selected_label = False
-                return
-
-            # Find matching row
-            match = df.index[df["grain_number"] + 1 == selected]
-            if len(match):
-                row = int(match[0])
-                table.selectRow(row)
-                table.scrollToItem(
-                    table.item(row, 0), QTableWidget.PositionAtCenter
-                )
-                original.show_selected_label = True
-
-        nm_checkbox.toggled.connect(on_checkbox_changed)
-        layout.addWidget(nm_checkbox)
-        original.events.selected_label.connect(on_label_selected)
-
-        # Populate table
-        for i in range(len(df)):
-            for j in range(df.shape[1]):
-                item = QTableWidgetItem(str(df.iat[i, j]))
-                table.setItem(i, j, item)
-
-        layout.addWidget(table)
-
-        save_button = QPushButton("Save to CSV")
-        layout.addWidget(save_button)
-
-        def save_to_csv():
-            # Open a file dialog to choose where to save
-            file_path, _ = QFileDialog.getSaveFileName(
-                table,
-                "Save Table as CSV",
-                f"{original.name.lower().replace(' ', '_')}_stats.csv",
-                "CSV Files (*.csv)",
-            )
-            if file_path:
-                if nm_checkbox.isChecked():
-                    df_to_save = convert_to_nm(df)
-                else:
-                    df_to_save = df
-                df_to_save.to_csv(file_path, index=False)
-                print(f"Saved CSV to: {file_path}")
-
-        save_button.clicked.connect(save_to_csv)
-        table.cellClicked.connect(on_row_clicked)
-
-        # Add to viewer
-        viewer.window.add_dock_widget(
-            container, area="right", name="Grain Statistics"
-        )
-    else:
-        show_error_dialog(
-            f"Function {function_key} returned an unsupported type: {type(return_value)}. Expected numpy array."
-        )
+    
 
 
 def evaluate_path_to_data(
@@ -891,12 +697,11 @@ class WidgetFunction:
                         or kwargs.get("viewer")
                         or current_viewer()
                     )
-                    render_return_value(
+                    
+                    self.render_return_value(
                         return_value,
-                        self.function_key,
                         viewer,
                         kwargs.get("image"),
-                        ndims=self.ndims,
                         metadata=metadata,
                     )
                 else:
@@ -942,3 +747,234 @@ class WidgetFunction:
         except Exception as e:
             show_error_dialog(f"❌ Exception in get_widget: {e}")
             raise
+
+    def render_return_value(
+        self,
+        return_value: Any,
+        viewer: Viewer,
+        original: Layer,
+        metadata: dict = None,
+    ):
+        """
+        Render the return value of a function in the napari viewer.
+        This function handles the rendering of the return value based on its type.
+        If the return value is a numpy array, it will be added as an image layer.
+        If it is a binary image, it will be added as a labels layer.
+
+        Parameters
+        ----------
+        return_value : Any
+            The return value of the function which will be rendered.
+        function_key : str
+            The key of the function that was executed, used for naming the layer.
+        viewer : Viewer
+            The napari viewer instance where the layer will be added. If not provided, the current viewer will be used.
+        original : Layer
+            The original image layer, used for metadata and naming. If not provided, it will be set to None.
+        ndims : int, optional
+            The number of dimensions of the data to be rendered. If not provided, it will be set to 2.
+        """
+        # Check if the return value is a numpy array
+        # TODO: handle other types of return values if needed
+
+        if isinstance(return_value, np.ndarray):
+            # If the return value is a binary image, add it as a labels layer
+            # TODO: Some functions may return a binary image which should be added as an image layer so need to handle that
+            if is_binary_image(return_value):
+                labels, num_labels = label(return_value.astype(bool))
+                label_ids = list(range(1, num_labels + 1))
+                properties = {"label_id": label_ids}
+                output_layer_name = f"{original.name} {self.function_key.title()} Mask"
+                viewer.add_labels(
+                    labels.astype(np.uint16),
+                    name=output_layer_name,
+                    properties=properties,
+                    metadata=(
+                        {"px2nm": original.metadata.get("px2nm", 1.0)}
+                        if original
+                        else {}
+                    )
+                    | metadata,
+                )
+            # If the return value is a greyscale image array, add it as an image layer
+            else:
+                output_layer_name = f"{original.name} {self.function_key.title()} Image"
+                output_layer_name = remove_all_but_last("Image", output_layer_name)
+                viewer.add_image(
+                    return_value,
+                    name=output_layer_name,
+                    contrast_limits=(-1, 5),
+                    metadata=(
+                        {"px2nm": original.metadata.get("px2nm", 1.0)}
+                        if original
+                        else {}
+                    )
+                    | metadata,
+                )
+                viewer.dims.ndisplay = self.ndims
+        elif (
+            isinstance(return_value, tuple)
+            and len(return_value) == 3
+            and isinstance(return_value[0], DataFrame)
+        ):
+            df = return_value[0]
+            container = QWidget()
+            layout = QVBoxLayout(container)
+            nm_checkbox = QCheckBox("Convert to nm")
+            nm_checkbox.setChecked(False)
+            # Create table widget
+            table = QTableWidget()
+            table.setRowCount(len(df))
+            table.setColumnCount(len(df.columns))
+            table.setHorizontalHeaderLabels(df.columns.tolist())
+            original.mode = Mode.PICK
+
+            def convert_to_nm(df_m: DataFrame) -> DataFrame:
+                """Convert the dataframe from m to nm."""
+                df_nm = df_m.copy()
+                m_to_nm = 1e9
+                for col in df_nm.select_dtypes(include=[np.number]).columns:
+                    if df_nm[col].max() == 0:
+                        continue
+                    if df_nm[col].max() < 1e-23:  # Volume in m^3
+                        df_nm[col] = df_nm[col] * (m_to_nm**3)
+                    elif df_nm[col].max() < 1e-14:  # Area in m^2
+                        df_nm[col] = df_nm[col] * (m_to_nm**2)
+                    elif df_nm[col].max() < 1e-5:  # Length in m
+                        df_nm[col] = df_nm[col] * m_to_nm
+                return df_nm
+
+            def on_checkbox_changed(checked):
+                # Convert table from m to nm
+                if checked:
+                    df_nm = convert_to_nm(df)
+
+                    # Update table
+                    for i in range(len(df_nm)):
+                        for j in range(df_nm.shape[1]):
+                            item = QTableWidgetItem(str(df_nm.iat[i, j]))
+                            table.setItem(i, j, item)
+                else:
+                    df_m = df.copy()
+                    # Update table
+                    for i in range(len(df_m)):
+                        for j in range(df_m.shape[1]):
+                            item = QTableWidgetItem(str(df_m.iat[i, j]))
+                            table.setItem(i, j, item)
+
+            def on_row_clicked(row, column):
+                """Triggered when a table row is clicked."""
+                # Get the grain number (or label id) from the dataframe
+                grain_id = df.iloc[row][
+                    "grain_number"
+                ]  # or 'label', whatever your column is called
+
+                # Center the view on it
+                # Find coordinates of that label in the image
+                mask = original.data == int(grain_id) + 1
+                if mask.any() and isinstance(original, Labels):
+                    coords = np.argwhere(mask)
+                    if coords.size > 0:
+                        centroid = coords.mean(axis=0)
+                        # Ensure we're only using (y, x) order for 2D
+                        y, x = centroid[-2], centroid[-1]
+                        # Set the camera center in world coordinates
+                        viewer.camera.center = (y, x)
+                    original.show_selected_label = True
+                    original.selected_label = int(grain_id) + 1
+                    original.mode = Mode.PICK
+                    viewer.layers.selection.active = original
+
+            def on_label_selected(event):
+                selected = original.selected_label
+                if selected == 0:  # 0 means background in napari
+                    original.show_selected_label = False
+                    return
+
+                # Find matching row
+                match = df.index[df["grain_number"] + 1 == selected]
+                if len(match):
+                    row = int(match[0])
+                    table.selectRow(row)
+                    table.scrollToItem(
+                        table.item(row, 0), QTableWidget.PositionAtCenter
+                    )
+                    original.show_selected_label = True
+
+            nm_checkbox.toggled.connect(on_checkbox_changed)
+            layout.addWidget(nm_checkbox)
+            original.events.selected_label.connect(on_label_selected)
+
+            # Populate table
+            for i in range(len(df)):
+                for j in range(df.shape[1]):
+                    item = QTableWidgetItem(str(df.iat[i, j]))
+                    table.setItem(i, j, item)
+
+            layout.addWidget(table)
+
+            save_button = QPushButton("Save to CSV")
+            layout.addWidget(save_button)
+
+            def save_to_csv():
+                # Open a file dialog to choose where to save
+                file_path, _ = QFileDialog.getSaveFileName(
+                    table,
+                    "Save Table as CSV",
+                    f"{original.name.lower().replace(' ', '_')}_stats.csv",
+                    "CSV Files (*.csv)",
+                )
+                if file_path:
+                    if nm_checkbox.isChecked():
+                        df_to_save = convert_to_nm(df)
+                    else:
+                        df_to_save = df
+                    df_to_save.to_csv(file_path, index=False)
+                    print(f"Saved CSV to: {file_path}")
+
+            save_button.clicked.connect(save_to_csv)
+            table.cellClicked.connect(on_row_clicked)
+
+            # Add to viewer
+            viewer.window.add_dock_widget(
+                container, area="right", name="Grain Statistics"
+            )
+            output_layer_name = None # No layer added
+        else:
+            show_error_dialog(
+                f"Function {self.function_key} returned an unsupported type: {type(return_value)}. Expected numpy array."
+            )
+        # Once rendered, add to workflow
+        new_step = {}
+        new_step["input_layer"] = original.name 
+        new_step["name"] = self.name
+        new_step["output_layer"] = output_layer_name
+        # Check which workflow it is part of
+        # if original.name
+        workflow_found = False
+        for workflow in current_workflows:
+            if workflow[-1]["output_layer"] == original.name:
+                # Found the workflow
+                new_step["previous"] = workflow[-1]["name"]
+                workflow.append(new_step)
+                workflow_found = True
+                break
+        if not workflow_found:
+            for workflow in current_workflows:
+                for i, step in enumerate(workflow):
+                    if step["output_layer"] == original.name:
+                        # The step is not the last step, but is part of a workflow
+                        # Therefore the workflow needs to be duplicated up to this step and used to create a new workflow
+                        new_workflow = workflow[:i + 1]
+                        new_step["previous"] = step["name"]
+                        new_workflow.append(new_step)
+                        current_workflows.append(new_workflow)
+                        workflow_found = True
+                        break
+                if workflow_found:
+                    break
+        if not workflow_found:
+            new_step["previous"] = None
+            new_workflow = [new_step]
+            current_workflows.append(new_workflow)
+        print(f"Current Workflows: {current_workflows}")
