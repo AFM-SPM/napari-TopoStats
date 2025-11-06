@@ -2,7 +2,7 @@ import json
 import re
 from argparse import Namespace
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import yaml
 from magicgui import magicgui
@@ -66,7 +66,7 @@ class ConfigWrapper:
         return result
 
 
-def collect_values(container: Container) -> Dict[str, Any]:
+def collect_values(container: Container) -> dict[str, Any]:
     result = {}
     for widget in container:
         val = widget.value
@@ -84,29 +84,21 @@ def collect_values(container: Container) -> Dict[str, Any]:
     return result
 
 
-def build_dynamic_widget(
-    flat_config: Dict[str, Any], descriptions: Dict[str, str] = None
-) -> Container:
+def build_dynamic_widget(flat_config: dict[str, Any], descriptions: dict[str, str] = None) -> Container:
     widgets = []
     for key, value in flat_config.items():
-        current_tooltip_text = (
-            descriptions.get(key, "") if descriptions else ""
-        )
+        current_tooltip_text = descriptions.get(key, "") if descriptions else ""
 
         if isinstance(value, bool):
             w = create_widget(name=key, widget_type="CheckBox", value=value)
         elif isinstance(value, int):
             w = create_widget(name=key, widget_type="SpinBox", value=value)
         elif isinstance(value, float):
-            w = create_widget(
-                name=key, widget_type="FloatSpinBox", value=value
-            )
+            w = create_widget(name=key, widget_type="FloatSpinBox", value=value)
         elif isinstance(value, str):
             w = create_widget(name=key, widget_type="LineEdit", value=value)
         elif isinstance(value, list):
-            w = create_widget(
-                name=key, widget_type="LineEdit", value=str(value)
-            )
+            w = create_widget(name=key, widget_type="LineEdit", value=str(value))
         elif value is None:
             w = create_widget(name=key, widget_type="LineEdit", value="None")
         else:
@@ -174,9 +166,7 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
 
     config_wrapper = ConfigWrapper(config)
 
-    full_config_container = build_dynamic_widget(
-        config_wrapper.flat.copy(), comment_descriptions
-    )
+    full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
     if full_config_container is None:
         show_error_dialog("Failed to create full config container.")
         return
@@ -197,9 +187,7 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
         state.docked_widgets.append("Edit Full Config")
 
 
-def extract_inline_comments(
-    yaml_path: Path, top_level_key: str = None
-) -> Dict[str, str]:
+def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> dict[str, str]:
     """
     Extracts inline comments from a YAML file.
     (This function remains the same as our last debugged version)
@@ -218,9 +206,7 @@ def extract_inline_comments(
             if not stripped_line or stripped_line.startswith("#"):
                 continue
 
-            match = re.match(
-                r"^(\s*)([a-zA-Z0-9_]+):\s*(?:[^#\n]*?)(?:#\s*(.*))?$", line
-            )
+            match = re.match(r"^(\s*)([a-zA-Z0-9_]+):\s*(?:[^#\n]*?)(?:#\s*(.*))?$", line)
 
             if match:
                 indent_str, key_name, comment_text = match.groups()
@@ -236,9 +222,7 @@ def extract_inline_comments(
                     if full_yaml_key_path == top_level_key:
                         final_key_for_map = ""
                     elif full_yaml_key_path.startswith(top_level_key + "."):
-                        final_key_for_map = full_yaml_key_path[
-                            len(top_level_key) + 1 :
-                        ]
+                        final_key_for_map = full_yaml_key_path[len(top_level_key) + 1 :]
 
                 if comment_text is not None and final_key_for_map:
                     comment_map[final_key_for_map] = comment_text.strip()
@@ -279,24 +263,16 @@ def open_config_editor(viewer: Viewer):
     filtered_flat_config = {
         k: v
         for k, v in config_wrapper.flat.items()
-        if any(
-            k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS
-        )
-        and k not in EXCLUDED_KEYS
+        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS) and k not in EXCLUDED_KEYS
     }
 
     filtered_descriptions = {
         k: v
         for k, v in comment_descriptions.items()
-        if any(
-            k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS
-        )
-        and k not in EXCLUDED_KEYS
+        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS) and k not in EXCLUDED_KEYS
     }
 
-    fresh_container = build_dynamic_widget(
-        filtered_flat_config, filtered_descriptions
-    )
+    fresh_container = build_dynamic_widget(filtered_flat_config, filtered_descriptions)
 
     dialog = QDialog()
     dialog.setWindowTitle("Edit Filters and Grains Config")
@@ -325,9 +301,7 @@ def open_config_editor(viewer: Viewer):
     scroll_content.setLayout(scroll_layout)
     scroll_area.setWidget(scroll_content)
 
-    button_box = QDialogButtonBox(
-        QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-    )
+    button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
     save_button = QPushButton("Save Config to File")
     button_box.addButton(save_button, QDialogButtonBox.ActionRole)
 
@@ -351,9 +325,7 @@ def open_config_editor(viewer: Viewer):
                         yaml.safe_dump(full_config, f, sort_keys=False)
                 print(f"Config saved to {file_path}")
             except (OSError, TypeError, yaml.YAMLError) as e:
-                show_error_dialog(
-                    f"Failed to save config ({e.__class__.__name__}): {e}"
-                )
+                show_error_dialog(f"Failed to save config ({e.__class__.__name__}): {e}")
 
     save_button.clicked.connect(save_to_file)
     button_box.accepted.connect(dialog.accept)
@@ -367,6 +339,4 @@ def open_config_editor(viewer: Viewer):
         config_wrapper.flat.update(updated_values)
         print("Config updated.")
         # Optionally refresh the full container for other use
-        full_config_container = build_dynamic_widget(
-            config_wrapper.flat.copy(), comment_descriptions
-        )
+        full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)

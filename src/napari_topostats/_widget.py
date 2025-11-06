@@ -40,10 +40,7 @@ from qtpy.QtWidgets import (
 
 from ._alerts import LoadingDialog
 
-if (
-    os.environ.get("QT_QPA_PLATFORM") != "offscreen"
-    and QApplication.instance() is not None
-):
+if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() is not None:
     loading_dialog = LoadingDialog("Loading TopoStats...")
     loading_dialog.show()
     QApplication.processEvents()
@@ -69,10 +66,7 @@ from napari_topostats.utils import (
     remove_tilt,
 )
 
-if (
-    os.environ.get("QT_QPA_PLATFORM") != "offscreen"
-    and QApplication.instance() is not None
-):
+if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() is not None:
     loading_dialog.close()
 
 from ._button_grid import ButtonGrid
@@ -361,12 +355,8 @@ class ImageThreshold(Container):
         super().__init__()
         self._viewer = viewer
         # use create_widget to generate widgets from type annotations
-        self._image_layer_combo = create_widget(
-            label="Image", annotation="napari.layers.Image"
-        )
-        self._threshold_slider = create_widget(
-            label="Threshold", annotation=float, widget_type="FloatSlider"
-        )
+        self._image_layer_combo = create_widget(label="Image", annotation="napari.layers.Image")
+        self._threshold_slider = create_widget(label="Threshold", annotation=float, widget_type="FloatSlider")
         self._threshold_slider.min = 0
         self._threshold_slider.max = 1
         # use magicgui widgets directly
@@ -394,10 +384,7 @@ class ImageThreshold(Container):
         image = img_as_float(image_layer.data)
         name = image_layer.name + "_thresholded"
         threshold = self._threshold_slider.value
-        if self._invert_checkbox.value:
-            thresholded = image < threshold
-        else:
-            thresholded = image > threshold
+        thresholded = image < threshold if self._invert_checkbox.value else image > threshold
         if name in self._viewer.layers:
             self._viewer.layers[name].data = thresholded
         else:
@@ -419,14 +406,10 @@ class TopoStatsRootWidget(QWidget):
         # Make layout so children are arranged vertically
         layout = QVBoxLayout(self)
         # Add the function grid to the layout with the available functions
-        self.function_grid = ButtonGrid(
-            self, functions=self.get_functions(), viewer=self._viewer
-        )
+        self.function_grid = ButtonGrid(self, functions=self.get_functions(), viewer=self._viewer)
         # Set the size policy to allow the widget to expand
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.function_grid.setSizePolicy(
-            QSizePolicy.Expanding, QSizePolicy.Expanding
-        )
+        self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         # Set the layout margins and add the function grid
         layout.setContentsMargins(5, 5, 5, 5)
         layout.addWidget(self.function_grid)
