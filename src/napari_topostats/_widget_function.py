@@ -19,6 +19,7 @@ from qtpy.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QCheckBox,  # Added QCheckBox import
 )
 from scipy.ndimage import label
 
@@ -404,12 +405,48 @@ def render_return_value(
         df = return_value[0]
         container = QWidget()
         layout = QVBoxLayout(container)
+        nm_checkbox = QCheckBox("Convert to nm")
+        nm_checkbox.setChecked(False)
         # Create table widget
         table = QTableWidget()
         table.setRowCount(len(df))
         table.setColumnCount(len(df.columns))
         table.setHorizontalHeaderLabels(df.columns.tolist())
         original.mode = Mode.PICK
+
+        def convert_to_nm(df_m: DataFrame) -> DataFrame:
+            """Convert the dataframe from m to nm."""
+            df_nm = df_m.copy()
+            m_to_nm = 1e9
+            for col in df_nm.select_dtypes(include=[np.number]).columns:
+                if df_nm[col].max() == 0:
+                    continue
+                if df_nm[col].max() < 1e-23:  # Volume in m^3
+                    df_nm[col] = df_nm[col] * (m_to_nm**3)
+                elif df_nm[col].max() < 1e-14:  # Area in m^2
+                    df_nm[col] = df_nm[col] * (m_to_nm**2)
+                elif df_nm[col].max() < 1e-5:  # Length in m
+                    df_nm[col] = df_nm[col] * m_to_nm
+            return df_nm
+
+        def on_checkbox_changed(checked):
+            # Convert table from m to nm
+            if checked:
+                df_nm = convert_to_nm(df)
+
+                # Update table
+                for i in range(len(df_nm)):
+                    for j in range(df_nm.shape[1]):
+                        item = QTableWidgetItem(str(df_nm.iat[i, j]))
+                        table.setItem(i, j, item)
+            else:
+                df_m = df.copy()
+                # Update table
+                for i in range(len(df_m)):
+                    for j in range(df_m.shape[1]):
+                        item = QTableWidgetItem(str(df_m.iat[i, j]))
+                        table.setItem(i, j, item)
+
 
         def on_row_clicked(row, column):
             """Triggered when a table row is clicked."""
@@ -449,7 +486,9 @@ def render_return_value(
                     table.item(row, 0), QTableWidget.PositionAtCenter
                 )
                 original.show_selected_label = True
-
+        
+        nm_checkbox.toggled.connect(on_checkbox_changed)
+        layout.addWidget(nm_checkbox)
         original.events.selected_label.connect(on_label_selected)
 
         # Populate table
@@ -472,7 +511,11 @@ def render_return_value(
                 "CSV Files (*.csv)",
             )
             if file_path:
-                df.to_csv(file_path, index=False)
+                if nm_checkbox.isChecked():
+                    df_to_save = convert_to_nm(df)
+                else:
+                    df_to_save = df
+                df_to_save.to_csv(file_path, index=False)
                 print(f"Saved CSV to: {file_path}")
 
         save_button.clicked.connect(save_to_csv)
