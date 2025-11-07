@@ -26,7 +26,7 @@ from qtpy.QtWidgets import (
 from topostats.config import write_config_with_comments
 
 from . import _state as state
-from ._alerts import show_error_dialog
+from ._alerts import show_error_dialog, attach_status_label
 
 config_wrapper = None
 full_config_container = None
@@ -222,17 +222,15 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
 
 
 def set_up_load_config_widget(widget):
-    label = QLabel("")
-    widget.native.layout().addWidget(label)
-    widget.status_label = label  # Store label as widget property
-    label_timer = QTimer()
-    label_timer.setSingleShot(True)
+    """Attach a success/error label under the FunctionGui call button."""
 
-    def remove_label():
-        label.setText("")
+    def on_success(result):
+        if result:
+            widget.set_status_message("✅ Configuration loaded successfully!")
+        else:
+            widget.set_status_message("❌ Configuration did not load.")
 
-    label_timer.timeout.connect(remove_label)
-    widget.label_timer = label_timer
+    widget.called.connect(on_success)
 
 
 def save_as_default_config(config: dict[str, Any]):
@@ -240,22 +238,6 @@ def save_as_default_config(config: dict[str, Any]):
     config_path = config_dir / "config.yaml"
     config_dir.mkdir(parents=True, exist_ok=True)
     save_config_to_file(config_path, config)
-
-
-def attach_status_label(widget):
-    """Attach a success/error label under the FunctionGui call button."""
-
-    def on_success(result):
-        if result:
-            widget.status_label.setText(
-                "✅ Configuration loaded successfully!"
-            )
-        else:
-            widget.status_label.setText("❌ Load configuration cancelled.")
-        widget.label_timer.stop()
-        widget.label_timer.start(3000)
-
-    widget.called.connect(on_success)
 
 
 def add_save_as_default_button(widget):
@@ -273,40 +255,17 @@ def add_save_as_default_button(widget):
             return
         full_config = config_wrapper.unflatten()
         save_as_default_config(full_config)
-        widget.status_label.setText("✅ New default configuration saved!")
-        widget.label_timer.stop()
-        widget.label_timer.start(3000)
+        widget.set_status_message("✅ New default configuration saved!")
 
     save_button.clicked.connect(on_save_clicked)
 
-    reset_button = QPushButton("Reset Default Config")
-    reset_button.setToolTip(
-        "Reset the default configuration to the original TopoStats default."
-    )
-
-    def on_reset_clicked():
-        config_dir = Path(user_config_dir("TopoStats", "Napari"))
-        default_config_path = config_dir / "config.yaml"
-        if default_config_path.exists():
-            write_new_default_config(default_config_path)
-            _load_config_impl(
-                widget.viewer.value, config_path=None, use_default=True
-            )
-            widget.status_label.setText("✅ Default configuration reset!")
-        else:
-            widget.status_label.setText("ℹ️ No default configuration to reset.")
-        widget.label_timer.stop()
-        widget.label_timer.start(3000)
-
-    reset_button.clicked.connect(on_reset_clicked)
-    button_row.addWidget(reset_button)
     button_row.addWidget(save_button)
     widget.native.layout().insertLayout(2, button_row)
 
 
+attach_status_label(load_config)
 set_up_load_config_widget(load_config)
 add_save_as_default_button(load_config)
-attach_status_label(load_config)
 
 
 def extract_inline_comments(
