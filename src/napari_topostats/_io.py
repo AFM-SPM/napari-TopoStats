@@ -12,11 +12,7 @@ from platformdirs import user_config_dir
 from qtpy.QtCore import Qt, QTimer
 from qtpy.QtWidgets import QLabel, QPushButton
 
-# This should be moved when no longer necessary
-try:
-    from topostats.config import write_config_with_comments
-except (ModuleNotFoundError, ImportError):
-    from topostats.io import write_config_with_comments
+from topostats.config import write_config_with_comments
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
     QDialog,
@@ -124,29 +120,25 @@ def build_dynamic_widget(
         widgets.append(w)
     return Container(widgets=widgets)
 
+def write_new_default_config(config_path: Path):
+    args = Namespace()
+    args.config = None
+    args.filename = config_path.name
+    args.output_dir = config_path.parent
+    args.module = "topostats"
+    write_config_with_comments(args)
+
 
 def _load_config_impl(
     viewer: Viewer, config_path: Path | None = None, use_default: bool = False
 ):
-    """
-    Load a configuration file and build a dynamic widget to edit it.
-    This is a magicgui function that can be called directly from the napari GUI and is an example of a hardcoded
-    function being implemented using the dynamic function widget system.
-    """
     global comment_descriptions, config_wrapper, full_config_container  # Updated global name
     if config_path is None:
         if use_default:
             config_dir = Path(user_config_dir("TopoStats", "Napari"))
             config_path = config_dir / "config.yaml"
             if not config_path.exists():
-                args = Namespace()
-                args.config = None
-                args.filename = "_generated_config.yaml"
-                args.output_dir = config_dir
-                args.simple = False  # This is to allow backwards compatibility with old version of topostatsdir
-                args.module = "topostats"
-                write_config_with_comments(args)
-                config_path = Path(config_dir / args.filename)
+                write_new_default_config(config_path)
         else:
             file_path, _ = QFileDialog.getOpenFileName(
                 parent=None,
@@ -155,7 +147,7 @@ def _load_config_impl(
             )
             if not file_path:
                 # User cancelled the file selection; do nothing.
-                return
+                return False
             config_path = Path(file_path)
             widget = load_config
             widget.viewer.value = viewer
@@ -169,7 +161,7 @@ def _load_config_impl(
                 config = json.load(f)
             else:
                 show_error_dialog("Unsupported config format.")
-                return
+                return False
     except (
         FileNotFoundError,
         PermissionError,
@@ -206,13 +198,8 @@ def _load_config_impl(
         )
         # Add the button to the docked widgets list so it can be accessed
         state.docked_widgets.append("Edit Full Config")
-    if not use_default:
-        config_dir = Path(user_config_dir("TopoStats", "Napari"))
-        config_path = config_dir / "config.yaml"
-        config_dir.mkdir(parents=True, exist_ok=True)
-        save_config_to_file(config_path, config)
+    
     return True
-
 
 @magicgui(
     config_path={
@@ -224,26 +211,93 @@ def _load_config_impl(
     auto_call=True,
 )
 def load_config(viewer: Viewer, config_path: Path | None = None):
-    _load_config_impl(viewer, config_path)
+    """
+    Load a configuration file and build a dynamic widget to edit it.
+    This is a magicgui function that can be called directly from the napari GUI and is an example of a hardcoded
+    function being implemented using the dynamic function widget system.
+    """
+    return _load_config_impl(viewer, config_path)
 
-
-def attach_status_label(widget):
-    """Attach a success/error label under the FunctionGui call button."""
+def set_up_load_config_widget(widget):
     label = QLabel("")
     widget.native.layout().addWidget(label)
+    widget.status_label = label  # Store label as widget property
+    label_timer = QTimer()
+    label_timer.setSingleShot(True)
 
     def remove_label():
         label.setText("")
 
-    def on_success(result):
-        label.setText("✅ Configuration loaded successfully!")
-        # Clear message after 3 seconds
+    label_timer.timeout.connect(remove_label)
+    widget.label_timer = label_timer
 
-        QTimer.singleShot(3000, remove_label)
+
+def save_as_default_config(config: dict[str, Any]):
+    config_dir = Path(user_config_dir("TopoStats", "Napari"))
+    config_path = config_dir / "config.yaml"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    save_config_to_file(config_path, config)
+
+
+
+def attach_status_label(widget):
+    """Attach a success/error label under the FunctionGui call button."""
+
+    def on_success(result):
+        if result:
+            widget.status_label.setText("✅ Configuration loaded successfully!")
+        else:
+            widget.status_label.setText("❌ Load configuration cancelled.")
+        widget.label_timer.stop()
+        widget.label_timer.start(3000)
 
     widget.called.connect(on_success)
 
+def add_save_as_default_button(widget):
+    """Add a 'Save as Default' and 'Reset default' button to the load_config widget."""
+    button_row = QHBoxLayout()
+    save_button = QPushButton("Save as Default Config")
+    save_button.setToolTip(
+        "Save the currently loaded configuration as the default config."
+    )
 
+    def on_save_clicked():
+        global config_wrapper
+        if config_wrapper is None:
+            show_error_dialog("No configuration loaded to save.")
+            return
+        full_config = config_wrapper.unflatten()
+        save_as_default_config(full_config)
+        widget.status_label.setText("✅ New default configuration saved!")
+        widget.label_timer.stop()
+        widget.label_timer.start(3000)
+
+    save_button.clicked.connect(on_save_clicked)
+
+    reset_button = QPushButton("Reset Default Config")
+    reset_button.setToolTip(
+        "Reset the default configuration to the original TopoStats default."
+    )
+    def on_reset_clicked():
+        config_dir = Path(user_config_dir("TopoStats", "Napari"))
+        default_config_path = config_dir / "config.yaml"
+        if default_config_path.exists():
+            write_new_default_config(default_config_path)
+            _load_config_impl(
+                widget.viewer.value, config_path=None, use_default=True
+            )
+            widget.status_label.setText("✅ Default configuration reset!")
+        else:
+            widget.status_label.setText("ℹ️ No default configuration to reset.")
+        widget.label_timer.stop()
+        widget.label_timer.start(3000)
+    reset_button.clicked.connect(on_reset_clicked)
+    button_row.addWidget(reset_button)
+    button_row.addWidget(save_button)
+    widget.native.layout().insertLayout(2, button_row)
+
+set_up_load_config_widget(load_config)
+add_save_as_default_button(load_config)
 attach_status_label(load_config)
 
 
