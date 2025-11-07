@@ -38,7 +38,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from ._alerts import LoadingDialog
+from ._alerts import LoadingDialog, attach_status_label
 
 if (
     os.environ.get("QT_QPA_PLATFORM") != "offscreen"
@@ -47,12 +47,14 @@ if (
     loading_dialog = LoadingDialog("Loading TopoStats...")
     loading_dialog.show()
     QApplication.processEvents()
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from magicgui import magicgui
 from magicgui.widgets import CheckBox, Container, FunctionGui, create_widget
-from napari.layers import Image
+from napari.layers import Image, Labels
 from napari.viewer import Viewer
+from platformdirs import user_config_dir
 from skimage.util import img_as_float
 from topostats.filters import Filters
 from topostats.grains import Grains
@@ -76,12 +78,12 @@ if (
     loading_dialog.close()
 
 from ._button_grid import ButtonGrid
-from ._io import load_config
+from ._io import _load_config_impl, load_config, write_new_default_config
 from ._widget_function import WidgetFunction
 
 if TYPE_CHECKING:
     import napari
-
+from qtpy.QtWidgets import QHBoxLayout, QPushButton
 
 AVAILABLE_FUNCTIONS = [
     WidgetFunction(
@@ -96,6 +98,7 @@ AVAILABLE_FUNCTIONS = [
         type_class=Filters,
         path_to_data='obj.images["gaussian_filtered"]',
         uses_config=True,
+        of_type=[Image],
         tooltip="Run filters on the selected image layer using the current configuration.",
     ),
     WidgetFunction(
@@ -104,6 +107,7 @@ AVAILABLE_FUNCTIONS = [
         function_to_run=Grains.find_grains,
         type_class=Grains,
         path_to_data='obj.mask_images["above"]["merged_classes"][:, :, 1]',
+        of_type=[Image],
         metadata_paths={"config": "config", "grains": "obj"},
         uses_config=True,
         tooltip="Run grain analysis on the selected image layer using the current configuration.",
@@ -113,6 +117,7 @@ AVAILABLE_FUNCTIONS = [
         function_key="3d",
         function_to_run=afm2stack,
         path_to_data="return",
+        of_type=[Image],
         ndims=3,
         tooltip="Convert the selected image layer to a 3D stack",
     ),
@@ -120,10 +125,122 @@ AVAILABLE_FUNCTIONS = [
         name="run_grainstats",
         function_key="grainstats",
         path_to_data="return",
+        of_type=[Labels],
         function_to_run=grainstats,
         tooltip="Creates a table showing the grainstats of the selected grain labels layer.",
     ),
 ]
+
+
+def open_options():
+    """
+    Open the options dialog for TopoStats.
+    """
+
+
+# Added comments
+class TopoStatsRootWidget(QWidget):
+    """
+    A root widget where all topostats functions can be accessed.
+    This widget serves as a container for the button grid and provides
+    a layout for the various controls.
+    """
+
+    def __init__(self, viewer: Viewer):
+        super().__init__()
+        # Initialize the widget with a viewer
+        self._viewer = viewer
+        # Make layout so children are arranged vertically
+        layout = QVBoxLayout(self)
+        # Add the function grid to the layout with the available functions
+        self.function_grid = ButtonGrid(
+            self, functions=self.get_functions(), viewer=self._viewer
+        )
+        # Set the size policy to allow the widget to expand
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.function_grid.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Expanding
+        )
+        # Set the layout margins and add the function grid
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.addWidget(self.function_grid)
+
+        # Bottom-right button row
+        bottom_row = QHBoxLayout()
+
+        # Create a container for the status label that doesn't expand
+        status_container = QWidget()
+        status_container.setSizePolicy(
+            QSizePolicy.Preferred, QSizePolicy.Fixed
+        )
+        status_layout = QHBoxLayout(status_container)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(status_container)
+        bottom_row.addStretch()  # Push button to the right
+
+        reset_button = QPushButton("Reset Default Config")
+        reset_button.setToolTip(
+            "Reset the default configuration to the original TopoStats default."
+        )
+
+        def on_reset_clicked():
+            config_dir = Path(user_config_dir("TopoStats", "Napari"))
+            default_config_path = config_dir / "config.yaml"
+            if default_config_path.exists():
+                write_new_default_config(default_config_path)
+                _load_config_impl(
+                    self._viewer, config_path=None, use_default=True
+                )
+                bottom_widget.set_status_message(
+                    "✅ Default configuration reset successfully."
+                )
+            else:
+                bottom_widget.set_status_message(
+                    "No default configuration file found to reset."
+                )
+
+        reset_button.clicked.connect(on_reset_clicked)
+        bottom_row.addWidget(reset_button)
+
+        bottom_widget = QWidget()
+        bottom_widget.setLayout(bottom_row)
+        bottom_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        # Attach status label to the status container instead of bottom_widget
+        attach_status_label(status_container)
+
+        # Store reference to status_container for the button callback
+        bottom_widget.set_status_message = status_container.set_status_message
+
+        layout.addWidget(bottom_widget)
+
+        # Set the layout for the widget
+        self.setLayout(layout)
+
+    def get_functions(self):
+        """
+        Get the available functions for the button grid.
+
+        Returns
+        -------
+        functions : dict[str, WidgetFunction | FunctionGui]
+            A dictionary of function names and their corresponding WidgetFunction or FunctionGui objects.
+        """
+        functions = {}
+        for function in AVAILABLE_FUNCTIONS:
+            function_name = function.name
+            display_name = function_name.replace("_", " ").title()
+            if function.path_to_data is not None:
+                # This option is used for functions that will be dynamically converted to a widget
+                functions[display_name] = function
+            else:
+                # This option is used for functions that are hardcoded
+                func = function.function_to_run
+                if isinstance(func, FunctionGui):
+                    functions[display_name] = func
+                elif callable(func):
+                    functions[display_name] = magicgui(func)
+        return functions
 
 
 def remove_scars_from_image(
@@ -403,58 +520,3 @@ class ImageThreshold(Container):
             self._viewer.layers[name].data = thresholded
         else:
             self._viewer.add_labels(thresholded, name=name)
-
-
-# Added comments
-class TopoStatsRootWidget(QWidget):
-    """
-    A root widget where all topostats functions can be accessed.
-    This widget serves as a container for the button grid and provides
-    a layout for the various controls.
-    """
-
-    def __init__(self, viewer: Viewer):
-        super().__init__()
-        # Initialize the widget with a viewer
-        self._viewer = viewer
-        # Make layout so children are arranged vertically
-        layout = QVBoxLayout(self)
-        # Add the function grid to the layout with the available functions
-        self.function_grid = ButtonGrid(
-            self, functions=self.get_functions(), viewer=self._viewer
-        )
-        # Set the size policy to allow the widget to expand
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.function_grid.setSizePolicy(
-            QSizePolicy.Expanding, QSizePolicy.Expanding
-        )
-        # Set the layout margins and add the function grid
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.addWidget(self.function_grid)
-        # Set the layout for the widget
-        self.setLayout(layout)
-
-    def get_functions(self):
-        """
-        Get the available functions for the button grid.
-
-        Returns
-        -------
-        functions : dict[str, WidgetFunction | FunctionGui]
-            A dictionary of function names and their corresponding WidgetFunction or FunctionGui objects.
-        """
-        functions = {}
-        for function in AVAILABLE_FUNCTIONS:
-            function_name = function.name
-            display_name = function_name.replace("_", " ").title()
-            if function.path_to_data is not None:
-                # This option is used for functions that will be dynamically converted to a widget
-                functions[display_name] = function
-            else:
-                # This option is used for functions that are hardcoded
-                func = function.function_to_run
-                if isinstance(func, FunctionGui):
-                    functions[display_name] = func
-                elif callable(func):
-                    functions[display_name] = magicgui(func)
-        return functions

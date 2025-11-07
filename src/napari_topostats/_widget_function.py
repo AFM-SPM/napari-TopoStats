@@ -5,14 +5,15 @@ from typing import Any
 
 import dask.array as da
 import numpy as np
+import pandas as pd
 from magicgui import magicgui
 from magicgui.widgets import FunctionGui
 from napari import current_viewer
 from napari.layers import Image, Labels, Layer
 from napari.layers.labels._labels_constants import Mode
 from napari.viewer import Viewer
-from pandas import DataFrame
 from qtpy.QtWidgets import (
+    QCheckBox,
     QFileDialog,
     QPushButton,
     QTableWidget,
@@ -246,7 +247,7 @@ class CallableWithSignature:
         return self.real_func(**bound.arguments)
 
 
-def get_selected_image(viewer) -> Image | None:
+def get_selected_image(viewer, of_type: list = None) -> Image | None:
     """
     Get the currently selected image layer from the viewer.
 
@@ -263,10 +264,16 @@ def get_selected_image(viewer) -> Image | None:
     selected = list(viewer.layers.selection)
 
     if not selected:
-        show_error_dialog("No layer selected.")
+        show_error_dialog("No layer selected. Select a layer ")
         return None
-
     layer = selected[0]
+    if of_type is not None and layer.__class__ not in of_type:
+        pretty_types = [t.__name__ for t in of_type]
+        show_error_dialog(
+            f"Selected layer is not of a required type: {', '.join(pretty_types)}.",
+            raise_exception=False,
+        )
+        return None
     if isinstance(layer, Image):
         data = layer.data
         if isinstance(data, (np.ndarray, da.Array)):  # conforms to ImageData
@@ -277,13 +284,6 @@ def get_selected_image(viewer) -> Image | None:
             )
     elif isinstance(layer, Labels):
         return layer
-    else:
-        show_error_dialog(
-            "Selected layer is not an Image layer. Looking for a default layer.",
-            raise_exception=False,
-        )
-        return None
-
     return None
 
 
@@ -395,17 +395,52 @@ def render_return_value(
     elif (
         isinstance(return_value, tuple)
         and len(return_value) == 3
-        and isinstance(return_value[0], DataFrame)
+        and isinstance(return_value[0], pd.DataFrame)
     ):
         df = return_value[0]
         container = QWidget()
         layout = QVBoxLayout(container)
+        nm_checkbox = QCheckBox("Convert to nm")
+        nm_checkbox.setChecked(False)
         # Create table widget
         table = QTableWidget()
         table.setRowCount(len(df))
         table.setColumnCount(len(df.columns))
         table.setHorizontalHeaderLabels(df.columns.tolist())
         original.mode = Mode.PICK
+
+        def convert_to_nm(df_m: pd.DataFrame) -> pd.DataFrame:
+            """Convert the pd.DataFrame from m to nm."""
+            df_nm = df_m.copy()
+            m_to_nm = 1e9
+            for col in df_nm.select_dtypes(include=[np.number]).columns:
+                if df_nm[col].max() == 0:
+                    continue
+                if df_nm[col].max() < 1e-23:  # Volume in m^3
+                    df_nm[col] = df_nm[col] * (m_to_nm**3)
+                elif df_nm[col].max() < 1e-14:  # Area in m^2
+                    df_nm[col] = df_nm[col] * (m_to_nm**2)
+                elif df_nm[col].max() < 1e-5:  # Length in m
+                    df_nm[col] = df_nm[col] * m_to_nm
+            return df_nm
+
+        def on_checkbox_changed(checked):
+            # Convert table from m to nm
+            if checked:
+                df_nm = convert_to_nm(df)
+
+                # Update table
+                for i in range(len(df_nm)):
+                    for j in range(df_nm.shape[1]):
+                        item = QTableWidgetItem(str(df_nm.iat[i, j]))
+                        table.setItem(i, j, item)
+            else:
+                df_m = df.copy()
+                # Update table
+                for i in range(len(df_m)):
+                    for j in range(df_m.shape[1]):
+                        item = QTableWidgetItem(str(df_m.iat[i, j]))
+                        table.setItem(i, j, item)
 
         def on_row_clicked(row, column):
             """Triggered when a table row is clicked."""
@@ -446,6 +481,8 @@ def render_return_value(
                 )
                 original.show_selected_label = True
 
+        nm_checkbox.toggled.connect(on_checkbox_changed)
+        layout.addWidget(nm_checkbox)
         original.events.selected_label.connect(on_label_selected)
 
         # Populate table
@@ -468,7 +505,10 @@ def render_return_value(
                 "CSV Files (*.csv)",
             )
             if file_path:
-                df.to_csv(file_path, index=False)
+                df_to_save = (
+                    convert_to_nm(df) if nm_checkbox.isChecked() else df
+                )
+                df_to_save.to_csv(file_path, index=False)
                 print(f"Saved CSV to: {file_path}")
 
         save_button.clicked.connect(save_to_csv)
@@ -579,6 +619,7 @@ class WidgetFunction:
         path_to_data: str | None = None,
         uses_config: bool = False,
         ndims: int = 2,
+        of_type: list = None,
         metadata_paths: dict = None,
         tooltip: str | None = None,
     ):
@@ -589,6 +630,7 @@ class WidgetFunction:
             self.type_class = type_class
             self.uses_config = uses_config
             self.ndims = ndims
+            self.of_type = of_type
             self.metadata_paths = metadata_paths
         self.function_to_run = function_to_run
         self.tooltip = tooltip
@@ -624,7 +666,7 @@ class WidgetFunction:
         if self.uses_config and (
             io.config_wrapper is None or io.full_config_container is None
         ):
-            io.load_config(current_viewer())
+            io._load_config_impl(current_viewer(), use_default=True)
         try:
             # If path_to_data is not set, default to "return" or "obj" if type_class is provided
             if self.path_to_data is None:
@@ -729,13 +771,10 @@ class WidgetFunction:
                 # Handle image selection if required
                 if "image" in [p.name for p in all_params]:
                     selected_image = get_selected_image(
-                        kwargs.get("viewer", current_viewer())
+                        kwargs.get("viewer", current_viewer()),
+                        of_type=self.of_type,
                     )
                     if selected_image is None:
-                        show_error_dialog(
-                            "Please select an image before running this function.",
-                            raise_exception=True,
-                        )
                         return
                     kwargs["image"] = selected_image
 

@@ -8,28 +8,25 @@ import yaml
 from magicgui import magicgui
 from magicgui.widgets import Container, create_widget
 from napari.viewer import Viewer
-from qtpy.QtCore import Qt
-from qtpy.QtWidgets import QLabel, QPushButton
-
-# This should be moved when no longer necessary
-try:
-    from topostats.config import write_config_with_comments
-except (ModuleNotFoundError, ImportError):
-    from topostats.io import write_config_with_comments
+from platformdirs import user_config_dir
+from qtpy.QtCore import QTimer, Qt
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
+    QLabel,
+    QPushButton,
     QScrollArea,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
+from topostats.config import write_config_with_comments
 
 from . import _state as state
-from ._alerts import show_error_dialog
+from ._alerts import attach_status_label, show_error_dialog
 
 config_wrapper = None
 full_config_container = None
@@ -124,31 +121,38 @@ def build_dynamic_widget(
     return Container(widgets=widgets)
 
 
-@magicgui(
-    config_path={
-        "label": "Config file",
-        "mode": "r",
-        "filter": "*.yaml;*.json",
-    },  # Added .json filter
-    call_button="Load Config",
-    auto_call=True,
-)
-def load_config(viewer: Viewer, config_path: Path | None = None):
-    """
-    Load a configuration file and build a dynamic widget to edit it.
-    This is a magicgui function that can be called directly from the napari GUI and is an example of a hardcoded
-    function being implemented using the dynamic function widget system.
-    """
+def write_new_default_config(config_path: Path):
+    args = Namespace()
+    args.config = None
+    args.filename = config_path.name
+    args.output_dir = config_path.parent
+    args.module = "topostats"
+    write_config_with_comments(args)
+
+
+def _load_config_impl(
+    viewer: Viewer, config_path: Path | None = None, use_default: bool = False
+):
     global comment_descriptions, config_wrapper, full_config_container  # Updated global name
     if config_path is None:
-        args = Namespace()
-        args.config = None
-        args.filename = "_generated_config.yaml"
-        args.output_dir = None
-        args.simple = False  # This is to allow backwards compatibility with old version of topostatsdir
-        args.module = "topostats"
-        write_config_with_comments(args)
-        config_path = Path("_generated_config.yaml")
+        if use_default:
+            config_dir = Path(user_config_dir("TopoStats", "Napari"))
+            config_path = config_dir / "config.yaml"
+            if not config_path.exists():
+                write_new_default_config(config_path)
+        else:
+            file_path, _ = QFileDialog.getOpenFileName(
+                parent=None,
+                caption="Select Config File",
+                filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)",
+            )
+            if not file_path:
+                # User cancelled the file selection; do nothing.
+                return False
+            config_path = Path(file_path)
+            widget = load_config
+            widget.viewer.value = viewer
+            widget.config_path.value = config_path
 
     try:
         with open(config_path) as f:
@@ -158,7 +162,7 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
                 config = json.load(f)
             else:
                 show_error_dialog("Unsupported config format.")
-                return
+                return False
     except (
         FileNotFoundError,
         PermissionError,
@@ -195,6 +199,73 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
         )
         # Add the button to the docked widgets list so it can be accessed
         state.docked_widgets.append("Edit Full Config")
+
+    return True
+
+
+@magicgui(
+    config_path={
+        "label": "Config file",
+        "mode": "r",
+        "filter": "*.yaml;*.json",
+    },  # Added .json filter
+    call_button="Load Config",
+    auto_call=True,
+)
+def load_config(viewer: Viewer, config_path: Path | None = None):
+    """
+    Load a configuration file and build a dynamic widget to edit it.
+    This is a magicgui function that can be called directly from the napari GUI and is an example of a hardcoded
+    function being implemented using the dynamic function widget system.
+    """
+    return _load_config_impl(viewer, config_path)
+
+
+def set_up_load_config_widget(widget):
+    """Attach a success/error label under the FunctionGui call button."""
+
+    def on_success(result):
+        if result:
+            widget.set_status_message("✅ Configuration loaded successfully!")
+        else:
+            widget.set_status_message("❌ Configuration did not load.")
+
+    widget.called.connect(on_success)
+
+
+def save_as_default_config(config: dict[str, Any]):
+    config_dir = Path(user_config_dir("TopoStats", "Napari"))
+    config_path = config_dir / "config.yaml"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    save_config_to_file(config_path, config)
+
+
+def add_save_as_default_button(widget):
+    """Add a 'Save as Default' and 'Reset default' button to the load_config widget."""
+    button_row = QHBoxLayout()
+    save_button = QPushButton("Save as Default Config")
+    save_button.setToolTip(
+        "Save the currently loaded configuration as the default config."
+    )
+
+    def on_save_clicked():
+        global config_wrapper
+        if config_wrapper is None:
+            show_error_dialog("No configuration loaded to save.")
+            return
+        full_config = config_wrapper.unflatten()
+        save_as_default_config(full_config)
+        widget.set_status_message("✅ New default configuration saved!")
+
+    save_button.clicked.connect(on_save_clicked)
+
+    button_row.addWidget(save_button)
+    widget.native.layout().insertLayout(2, button_row)
+
+
+attach_status_label(load_config)
+set_up_load_config_widget(load_config)
+add_save_as_default_button(load_config)
 
 
 def extract_inline_comments(
@@ -331,6 +402,26 @@ def open_config_editor(viewer: Viewer):
     save_button = QPushButton("Save Config to File")
     button_box.addButton(save_button, QDialogButtonBox.ActionRole)
 
+    set_as_default_button = QPushButton("Set config as your default")
+    button_box.addButton(set_as_default_button, QDialogButtonBox.ActionRole)
+
+    # Temporary status label for feedback when setting default
+    status_label = QLabel("")
+    status_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
+    def set_as_default():
+        updated_values = collect_values(fresh_container)
+        config_wrapper.flat.update(updated_values)
+        full_config = config_wrapper.unflatten()
+
+        config_dir = Path(user_config_dir("TopoStats", "Napari"))
+        config_dir.mkdir(parents=True, exist_ok=True)
+        default_config_path = config_dir / "config.yaml"
+        save_config_to_file(default_config_path, full_config)
+
+        status_label.setText("✅ Default config saved")
+        QTimer.singleShot(3000, lambda: status_label.setText(""))
+
     def save_to_file():
         updated_values = collect_values(fresh_container)
         config_wrapper.flat.update(updated_values)
@@ -341,25 +432,22 @@ def open_config_editor(viewer: Viewer):
             caption="Save Config As",
             filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)",
         )
-        if file_path:
-            try:
-                if file_path.endswith(".json"):
-                    with open(file_path, "w") as f:
-                        json.dump(full_config, f, indent=2)
-                else:
-                    with open(file_path, "w") as f:
-                        yaml.safe_dump(full_config, f, sort_keys=False)
-                print(f"Config saved to {file_path}")
-            except (OSError, TypeError, yaml.YAMLError) as e:
-                show_error_dialog(
-                    f"Failed to save config ({e.__class__.__name__}): {e}"
-                )
+        if not file_path:
+            status_label.setText("Config save cancelled.")
+            QTimer.singleShot(3000, lambda: status_label.setText(""))
+            return
+        save_config_to_file(Path(file_path), full_config)
+
+        status_label.setText("✅ Config saved to file")
+        QTimer.singleShot(3000, lambda: status_label.setText(""))
 
     save_button.clicked.connect(save_to_file)
+    set_as_default_button.clicked.connect(set_as_default)
     button_box.accepted.connect(dialog.accept)
     button_box.rejected.connect(dialog.reject)
 
     main_layout.addWidget(scroll_area)
+    main_layout.addWidget(status_label)
     main_layout.addWidget(button_box)
 
     if dialog.exec_():
@@ -370,3 +458,16 @@ def open_config_editor(viewer: Viewer):
         full_config_container = build_dynamic_widget(
             config_wrapper.flat.copy(), comment_descriptions
         )
+
+
+def save_config_to_file(file_path: Path, full_config: dict[str, Any]):
+    try:
+        if file_path.suffix.lower() == ".json":
+            with open(file_path, "w") as f:
+                json.dump(full_config, f, indent=2)
+        else:
+            with open(file_path, "w") as f:
+                yaml.safe_dump(full_config, f, sort_keys=False)
+        print(f"Config saved to {file_path}")
+    except (OSError, TypeError, yaml.YAMLError) as e:
+        show_error_dialog(f"Failed to save config: {e}")

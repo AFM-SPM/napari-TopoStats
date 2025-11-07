@@ -1,4 +1,13 @@
-from qtpy.QtWidgets import QApplication, QDialog, QLabel, QVBoxLayout
+from magicgui.widgets import FunctionGui
+from qtpy.QtCore import QTimer
+from qtpy.QtWidgets import (
+    QApplication,
+    QDialog,
+    QLabel,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from . import _state as state
 
@@ -81,3 +90,70 @@ class LoadingDialog(QDialog):
         self.setModal(True)
 
         self.adjustSize()
+
+
+def attach_status_label(widget: FunctionGui | QWidget):
+    label = QLabel("")
+    label.setStyleSheet(
+        """
+        QLabel {
+            border: none;
+            padding: 0px;
+            margin: 0px;
+        }
+    """
+    )
+    label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+    label.setMinimumWidth(0)
+    label.setMaximumWidth(300)  # Prevent excessive width
+    label.setWordWrap(True)
+
+    if isinstance(widget, FunctionGui):
+        widget.native.layout().addWidget(label)
+    else:
+        widget.layout().addWidget(label)
+
+    widget.status_label = label  # Store label as widget property
+    label_timer = QTimer()
+    label_timer.setSingleShot(True)
+
+    def remove_label():
+        label.setText("")
+        label.adjustSize()
+        # Force the parent widget to recalculate its size
+        to_adjust = widget.native if hasattr(widget, "native") else widget
+        to_adjust.adjustSize()
+        to_adjust.updateGeometry()
+        if to_adjust.parent():
+            to_adjust.parent().adjustSize()
+            to_adjust.parent().updateGeometry()
+            if to_adjust.parent().parent():
+                to_adjust.parent().parent().adjustSize()
+                to_adjust.parent().parent().updateGeometry()
+        label.setStyleSheet(
+            """
+            QLabel {
+                font-size: 4px
+            }
+        """
+        )
+
+    label_timer.timeout.connect(remove_label)
+    widget.label_timer = label_timer
+
+    def set_status_message(message: str):
+        label.setText(message)
+        label.setStyleSheet(
+            """
+            QLabel {
+                font-size: 12px
+            }
+        """
+        )
+        label.adjustSize()
+        to_adjust = widget.native if hasattr(widget, "native") else widget
+        to_adjust.updateGeometry()
+        label_timer.stop()
+        label_timer.start(3000)  # Clear message after 3 seconds
+
+    widget.set_status_message = set_status_message
