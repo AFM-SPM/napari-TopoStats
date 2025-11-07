@@ -381,6 +381,35 @@ def evaluate_path_to_data(
     else:
         show_error_dialog(f"Invalid path_to_data: {path_to_data}")
         return None
+    
+def run_workflow(workflow: list, viewer: Viewer):
+    """
+    Run a sequence of WidgetFunction steps as a workflow in the napari viewer.
+
+    Parameters
+    ----------
+    workflow : list
+        A list of WidgetFunction instances representing the workflow steps.
+    viewer : Viewer
+        The napari viewer instance where the workflow will be executed.
+    """
+    global current_workflows
+    for i, step in enumerate(workflow):
+        widget = step["gui"]
+        # Set the viewer for the widget
+        if hasattr(widget, "viewer"):
+            widget.viewer.value = viewer
+        # Set the image parameter to the last output layer if applicable
+        if hasattr(widget, "image"):
+            if step["input_layer"] is not None:
+                input_layer_name = step["input_layer"]
+                input_layer = viewer.layers.get(input_layer_name)
+                if input_layer is not None:
+                    widget.image.value = input_layer
+            else:
+                input_layer = get_selected_image(viewer)
+        # Execute the widget function
+        widget.raw_function()
 
 
 # Class representation of each function in the button grid.
@@ -447,6 +476,7 @@ class WidgetFunction:
         self.function_to_run = function_to_run
         self.tooltip = tooltip
         self.overide_viewer = None
+        self.raw_function = None
 
     def add_overide_viewer(self, viewer: Viewer):
         self.overide_viewer = viewer
@@ -709,6 +739,7 @@ class WidgetFunction:
                         f"Function {self.function_to_run.__name__} returned None."
                     )
 
+            self.raw_function = func
             # Collect the parameters for the function and ensure defaults are set (these defaults are shown in the GUI)
             new_parameters = []
             for p in (
@@ -949,6 +980,7 @@ class WidgetFunction:
         new_step["input_layer"] = original.name 
         new_step["name"] = self.name
         new_step["output_layer"] = output_layer_name
+        new_step["gui"] = self
         # Check which workflow it is part of
         # if original.name
         workflow_found = False
