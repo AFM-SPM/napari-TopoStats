@@ -10,10 +10,10 @@ Replace code below according to your needs.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    DataType = Union[Any, Sequence[Any]]
+    DataType = Any | Sequence[Any]
     FullLayerData = tuple[DataType, dict, str]
 
 
