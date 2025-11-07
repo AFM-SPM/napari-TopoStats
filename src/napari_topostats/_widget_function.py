@@ -13,7 +13,7 @@ from napari.layers.labels._labels_constants import Mode
 from napari.viewer import Viewer
 from pandas import DataFrame
 from qtpy.QtWidgets import (
-    QCheckBox,  # Added QCheckBox import
+    QCheckBox,
     QFileDialog,
     QPushButton,
     QTableWidget,
