@@ -394,10 +394,11 @@ class ImageThreshold(Container):
         image = img_as_float(image_layer.data)
         name = image_layer.name + "_thresholded"
         threshold = self._threshold_slider.value
-        if self._invert_checkbox.value:
-            thresholded = image < threshold
-        else:
-            thresholded = image > threshold
+        thresholded = (
+            image < threshold
+            if self._invert_checkbox.value
+            else image > threshold
+        )
         if name in self._viewer.layers:
             self._viewer.layers[name].data = thresholded
         else:

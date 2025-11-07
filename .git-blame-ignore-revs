@@ -1,0 +1,9 @@
+# This file lists commit hashes which should be ignored when viewing `git blame`.
+#
+# Please include a comment of the form shown below above the commits when adding them
+#
+#  # YYYY-MM-DD @<git-hub-username> - <comment>
+
+# 2025-11-06 @ns-rse - linting
+351a1190bd3aabef24e29a4b3b35b254894377ab
+f81390541c3f84532cdcfd542f4a23a5b619ae71
