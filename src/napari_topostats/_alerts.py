@@ -121,10 +121,7 @@ def attach_status_label(widget: FunctionGui | QWidget):
         label.setText("")
         label.adjustSize()
         # Force the parent widget to recalculate its size
-        if hasattr(widget, "native"):
-            to_adjust = widget.native
-        else:
-            to_adjust = widget
+        to_adjust = widget.native if hasattr(widget, "native") else widget
         to_adjust.adjustSize()
         to_adjust.updateGeometry()
         if to_adjust.parent():
@@ -154,10 +151,7 @@ def attach_status_label(widget: FunctionGui | QWidget):
         """
         )
         label.adjustSize()
-        if hasattr(widget, "native"):
-            to_adjust = widget.native
-        else:
-            to_adjust = widget
+        to_adjust = widget.native if hasattr(widget, "native") else widget
         to_adjust.updateGeometry()
         label_timer.stop()
         label_timer.start(3000)  # Clear message after 3 seconds

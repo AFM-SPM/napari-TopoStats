@@ -510,10 +510,7 @@ def render_return_value(
                 "CSV Files (*.csv)",
             )
             if file_path:
-                if nm_checkbox.isChecked():
-                    df_to_save = convert_to_nm(df)
-                else:
-                    df_to_save = df
+                df_to_save = convert_to_nm(df) if nm_checkbox.isChecked() else df
                 df_to_save.to_csv(file_path, index=False)
                 print(f"Saved CSV to: {file_path}")
 
