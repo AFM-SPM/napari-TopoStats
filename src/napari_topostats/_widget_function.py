@@ -1,7 +1,7 @@
 import functools
 import inspect
 from collections.abc import Callable
-from typing import Any, Dict
+from typing import Any
 
 import dask.array as da
 import numpy as np
@@ -28,21 +28,21 @@ from ._io import ConfigWrapper, collect_values
 
 
 def enforce_defaults(
-    args: Dict[str, Any], params: list[Any]
-) -> Dict[str, Any]:
+    args: dict[str, Any], params: list[Any]
+) -> dict[str, Any]:
     """
     Ensure that all required parameters have default values.
 
     Parameters
     ----------
-    args : Dict[str, Any]
+    args : dict[str, Any]
         The current dictionary of arguments to which the default values will be checked for and added.
     params : list[Any]
         The list of parameters for the function.
 
     Returns
     -------
-    args : Dict[str, Any]
+    args : dict[str, Any]
         The updated dictionary of arguments with default values added for any missing parameters.
     """
     param_names = [p.name for p in params]
@@ -76,10 +76,10 @@ def enforce_defaults(
 
 
 def add_values_to_dict_from_config(
-    config: Dict[str, Any],
+    config: dict[str, Any],
     wrapper: ConfigWrapper,
     function_key: str,
-    args: Dict[str, Any],
+    args: dict[str, Any],
     params: list,
 ):
     """
@@ -88,20 +88,20 @@ def add_values_to_dict_from_config(
 
     Parameters
     ----------
-    config : Dict[str, Any]
+    config : dict[str, Any]
         The configuration dictionary containing the function parameters.
     wrapper : ConfigWrapper
         The ConfigWrapper instance used to access flattened configuration values.
     function_key : str
         The key for the function in the configuration dictionary.
-    args : Dict[str, Any]
+    args : dict[str, Any]
         The current dictionary of arguments to which the configuration values will be added.
     params : list
         The list of parameter names for the function.
 
     Returns
     -------
-    args : Dict[str, Any]
+    args : dict[str, Any]
         The updated dictionary of arguments with values from the config added.
     """
     for param_name in [p.name for p in params]:

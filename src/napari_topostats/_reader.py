@@ -76,10 +76,11 @@ def reader_function(path):
     available_channels = None
     while True:
         try:
-            if available_channels is None:
-                message = "Channel Name: "
-            else:
-                message = f"Available channels: {available_channels}"
+            message = (
+                "Channel Name: "
+                if available_channels is None
+                else f"Available channels: {available_channels}"
+            )
             # adds dialog box for channel input
             user_input, ok = QInputDialog.getText(
                 None, "Input Channel", message
