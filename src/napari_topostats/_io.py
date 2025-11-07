@@ -9,7 +9,7 @@ from magicgui import magicgui
 from magicgui.widgets import Container, create_widget
 from napari.viewer import Viewer
 from platformdirs import user_config_dir
-from qtpy.QtCore import Qt, QTimer
+from qtpy.QtCore import QTimer, Qt
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
     QDialog,
