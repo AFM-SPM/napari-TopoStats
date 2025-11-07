@@ -10,20 +10,20 @@ from magicgui.widgets import Container, create_widget
 from napari.viewer import Viewer
 from platformdirs import user_config_dir
 from qtpy.QtCore import Qt, QTimer
-from qtpy.QtWidgets import QLabel, QPushButton
-
-from topostats.config import write_config_with_comments
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
+    QLabel,
+    QPushButton,
     QScrollArea,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
+from topostats.config import write_config_with_comments
 
 from . import _state as state
 from ._alerts import show_error_dialog
@@ -120,6 +120,7 @@ def build_dynamic_widget(
         widgets.append(w)
     return Container(widgets=widgets)
 
+
 def write_new_default_config(config_path: Path):
     args = Namespace()
     args.config = None
@@ -198,8 +199,9 @@ def _load_config_impl(
         )
         # Add the button to the docked widgets list so it can be accessed
         state.docked_widgets.append("Edit Full Config")
-    
+
     return True
+
 
 @magicgui(
     config_path={
@@ -217,6 +219,7 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
     function being implemented using the dynamic function widget system.
     """
     return _load_config_impl(viewer, config_path)
+
 
 def set_up_load_config_widget(widget):
     label = QLabel("")
@@ -239,19 +242,21 @@ def save_as_default_config(config: dict[str, Any]):
     save_config_to_file(config_path, config)
 
 
-
 def attach_status_label(widget):
     """Attach a success/error label under the FunctionGui call button."""
 
     def on_success(result):
         if result:
-            widget.status_label.setText("✅ Configuration loaded successfully!")
+            widget.status_label.setText(
+                "✅ Configuration loaded successfully!"
+            )
         else:
             widget.status_label.setText("❌ Load configuration cancelled.")
         widget.label_timer.stop()
         widget.label_timer.start(3000)
 
     widget.called.connect(on_success)
+
 
 def add_save_as_default_button(widget):
     """Add a 'Save as Default' and 'Reset default' button to the load_config widget."""
@@ -278,6 +283,7 @@ def add_save_as_default_button(widget):
     reset_button.setToolTip(
         "Reset the default configuration to the original TopoStats default."
     )
+
     def on_reset_clicked():
         config_dir = Path(user_config_dir("TopoStats", "Napari"))
         default_config_path = config_dir / "config.yaml"
@@ -291,10 +297,12 @@ def add_save_as_default_button(widget):
             widget.status_label.setText("ℹ️ No default configuration to reset.")
         widget.label_timer.stop()
         widget.label_timer.start(3000)
+
     reset_button.clicked.connect(on_reset_clicked)
     button_row.addWidget(reset_button)
     button_row.addWidget(save_button)
     widget.native.layout().insertLayout(2, button_row)
+
 
 set_up_load_config_widget(load_config)
 add_save_as_default_button(load_config)
