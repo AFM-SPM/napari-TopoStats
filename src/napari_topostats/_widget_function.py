@@ -11,7 +11,7 @@ from napari import current_viewer
 from napari.layers import Image, Labels, Layer
 from napari.layers.labels._labels_constants import Mode
 from napari.viewer import Viewer
-from pandas import DataFrame
+import pandas as pd
 from qtpy.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -284,11 +284,6 @@ def get_selected_image(viewer, of_type: list = None) -> Image | None:
             )
     elif isinstance(layer, Labels):
         return layer
-    # else:
-    #     show_error_dialog(
-    #         "Selected layer is not an Image layer. Looking for a default layer.",
-    #         raise_exception=False,
-    #     )
     return None
 
 
@@ -400,7 +395,7 @@ def render_return_value(
     elif (
         isinstance(return_value, tuple)
         and len(return_value) == 3
-        and isinstance(return_value[0], DataFrame)
+        and isinstance(return_value[0], pd.DataFrame)
     ):
         df = return_value[0]
         container = QWidget()
@@ -414,8 +409,8 @@ def render_return_value(
         table.setHorizontalHeaderLabels(df.columns.tolist())
         original.mode = Mode.PICK
 
-        def convert_to_nm(df_m: DataFrame) -> DataFrame:
-            """Convert the dataframe from m to nm."""
+        def convert_to_nm(df_m: pd.DataFrame) -> pd.DataFrame:
+            """Convert the pd.DataFrame from m to nm."""
             df_nm = df_m.copy()
             m_to_nm = 1e9
             for col in df_nm.select_dtypes(include=[np.number]).columns:
