@@ -5,13 +5,13 @@ from typing import Any
 
 import dask.array as da
 import numpy as np
+import pandas as pd
 from magicgui import magicgui
 from magicgui.widgets import FunctionGui
 from napari import current_viewer
 from napari.layers import Image, Labels, Layer
 from napari.layers.labels._labels_constants import Mode
 from napari.viewer import Viewer
-import pandas as pd
 from qtpy.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -505,7 +505,9 @@ def render_return_value(
                 "CSV Files (*.csv)",
             )
             if file_path:
-                df_to_save = convert_to_nm(df) if nm_checkbox.isChecked() else df
+                df_to_save = (
+                    convert_to_nm(df) if nm_checkbox.isChecked() else df
+                )
                 df_to_save.to_csv(file_path, index=False)
                 print(f"Saved CSV to: {file_path}")
 
