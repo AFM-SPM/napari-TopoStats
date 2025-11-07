@@ -26,7 +26,7 @@ from qtpy.QtWidgets import (
 from topostats.config import write_config_with_comments
 
 from . import _state as state
-from ._alerts import show_error_dialog, attach_status_label
+from ._alerts import attach_status_label, show_error_dialog
 
 config_wrapper = None
 full_config_container = None

@@ -1,8 +1,15 @@
-from qtpy.QtWidgets import QApplication, QDialog, QLabel, QVBoxLayout, QSizePolicy, QWidget
+from magicgui.widgets import FunctionGui
 from qtpy.QtCore import QTimer
+from qtpy.QtWidgets import (
+    QApplication,
+    QDialog,
+    QLabel,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from . import _state as state
-from magicgui.widgets import FunctionGui
 
 
 class ErrorDialog(QDialog):
@@ -84,25 +91,28 @@ class LoadingDialog(QDialog):
 
         self.adjustSize()
 
+
 def attach_status_label(widget: FunctionGui | QWidget):
     label = QLabel("")
-    label.setStyleSheet("""
+    label.setStyleSheet(
+        """
         QLabel {
             border: none;
             padding: 0px;
             margin: 0px;
         }
-    """)
+    """
+    )
     label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
     label.setMinimumWidth(0)
     label.setMaximumWidth(300)  # Prevent excessive width
     label.setWordWrap(True)
-    
+
     if isinstance(widget, FunctionGui):
         widget.native.layout().addWidget(label)
     else:
         widget.layout().addWidget(label)
-    
+
     widget.status_label = label  # Store label as widget property
     label_timer = QTimer()
     label_timer.setSingleShot(True)
@@ -111,7 +121,7 @@ def attach_status_label(widget: FunctionGui | QWidget):
         label.setText("")
         label.adjustSize()
         # Force the parent widget to recalculate its size
-        if hasattr(widget, 'native'):
+        if hasattr(widget, "native"):
             to_adjust = widget.native
         else:
             to_adjust = widget
@@ -123,24 +133,28 @@ def attach_status_label(widget: FunctionGui | QWidget):
             if to_adjust.parent().parent():
                 to_adjust.parent().parent().adjustSize()
                 to_adjust.parent().parent().updateGeometry()
-        label.setStyleSheet("""
+        label.setStyleSheet(
+            """
             QLabel {
                 font-size: 4px
             }
-        """)
+        """
+        )
 
     label_timer.timeout.connect(remove_label)
     widget.label_timer = label_timer
 
     def set_status_message(message: str):
         label.setText(message)
-        label.setStyleSheet("""
+        label.setStyleSheet(
+            """
             QLabel {
                 font-size: 12px
             }
-        """)
+        """
+        )
         label.adjustSize()
-        if hasattr(widget, 'native'):
+        if hasattr(widget, "native"):
             to_adjust = widget.native
         else:
             to_adjust = widget

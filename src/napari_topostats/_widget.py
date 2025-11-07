@@ -47,15 +47,15 @@ if (
     loading_dialog = LoadingDialog("Loading TopoStats...")
     loading_dialog.show()
     QApplication.processEvents()
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from magicgui import magicgui
 from magicgui.widgets import CheckBox, Container, FunctionGui, create_widget
 from napari.layers import Image, Labels
 from napari.viewer import Viewer
-from skimage.util import img_as_float
 from platformdirs import user_config_dir
-from pathlib import Path
+from skimage.util import img_as_float
 from topostats.filters import Filters
 from topostats.grains import Grains
 
@@ -78,13 +78,12 @@ if (
     loading_dialog.close()
 
 from ._button_grid import ButtonGrid
-from ._io import load_config, write_new_default_config, _load_config_impl
+from ._io import _load_config_impl, load_config, write_new_default_config
 from ._widget_function import WidgetFunction
 
 if TYPE_CHECKING:
     import napari
-from qtpy.QtWidgets import QPushButton, QHBoxLayout
-
+from qtpy.QtWidgets import QHBoxLayout, QPushButton
 
 AVAILABLE_FUNCTIONS = [
     WidgetFunction(
@@ -132,11 +131,12 @@ AVAILABLE_FUNCTIONS = [
     ),
 ]
 
+
 def open_options():
     """
     Open the options dialog for TopoStats.
     """
-    
+
 
 # Added comments
 class TopoStatsRootWidget(QWidget):
@@ -167,15 +167,17 @@ class TopoStatsRootWidget(QWidget):
 
         # Bottom-right button row
         bottom_row = QHBoxLayout()
-        
+
         # Create a container for the status label that doesn't expand
         status_container = QWidget()
-        status_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        status_container.setSizePolicy(
+            QSizePolicy.Preferred, QSizePolicy.Fixed
+        )
         status_layout = QHBoxLayout(status_container)
         status_layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(status_container)
         bottom_row.addStretch()  # Push button to the right
-        
+
         reset_button = QPushButton("Reset Default Config")
         reset_button.setToolTip(
             "Reset the default configuration to the original TopoStats default."
@@ -189,20 +191,24 @@ class TopoStatsRootWidget(QWidget):
                 _load_config_impl(
                     self._viewer, config_path=None, use_default=True
                 )
-                bottom_widget.set_status_message("✅ Default configuration reset successfully.")
+                bottom_widget.set_status_message(
+                    "✅ Default configuration reset successfully."
+                )
             else:
-                bottom_widget.set_status_message("No default configuration file found to reset.")
+                bottom_widget.set_status_message(
+                    "No default configuration file found to reset."
+                )
 
         reset_button.clicked.connect(on_reset_clicked)
         bottom_row.addWidget(reset_button)
-        
+
         bottom_widget = QWidget()
         bottom_widget.setLayout(bottom_row)
         bottom_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        
+
         # Attach status label to the status container instead of bottom_widget
         attach_status_label(status_container)
-        
+
         # Store reference to status_container for the button callback
         bottom_widget.set_status_message = status_container.set_status_message
 
@@ -235,7 +241,6 @@ class TopoStatsRootWidget(QWidget):
                 elif callable(func):
                     functions[display_name] = magicgui(func)
         return functions
-    
 
 
 def remove_scars_from_image(
