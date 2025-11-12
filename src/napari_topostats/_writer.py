@@ -6,13 +6,15 @@ see: https://napari.org/stable/plugins/guides.html?#writers
 
 Replace code below according to your needs.
 """
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Sequence, Tuple, Union
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    DataType = Union[Any, Sequence[Any]]
-    FullLayerData = Tuple[DataType, dict, str]
+    DataType = Any | Sequence[Any]
+    FullLayerData = tuple[DataType, dict, str]
 
 
 def write_single_image(path: str, data: Any, meta: dict) -> list[str]:

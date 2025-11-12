@@ -13,8 +13,10 @@ readme = "README.md"
 license = {text = "GNU GPLv3 only"}
 dynamic = ["version"]
 authors = [
-  {name = "TopoStats Team", email = "topostats@sheffield.ac.uk"},
   {name = "Max Gamill", email = "mcgamill1@sheffield.ac.uk"},
+  {name = "Aran Hobbs", email = "ahobbs834@gmail.com"},
+  {name = "Laura Wiggins", email = "l.wiggins@sheffield.ac.uk"},
+  {name = "TopoStats Team", email = "topostats@sheffield.ac.uk"},
 ]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
@@ -25,8 +27,6 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Topic :: Scientific/Engineering :: Image Processing",
@@ -69,26 +69,8 @@ target-version = ['py38', 'py39', 'py310', 'py311']
 
 
 [tool.ruff]
-line-length = 79
-select = [
-    "E", "F", "W", #flake8
-    "UP", # pyupgrade
-    "I", # isort
-    "BLE", # flake8-blind-exception
-    "B", # flake8-bugbear
-    "A", # flake8-builtins
-    "C4", # flake8-comprehensions
-    "ISC", # flake8-implicit-str-concat
-    "G", # flake8-logging-format
-    "PIE", # flake8-pie
-    "SIM", # flake8-simplify
-]
-ignore = [
-    "E501", # line too long. let black handle this
-    "UP006", "UP007", # type annotation. As using magicgui require runtime type annotation then we disable this.
-    "SIM117", # flake8-simplify - some of merged with statements are not looking great with black, reanble after drop python 3.9
-]
-
+target-version = "py310"
+line-length = 120
 exclude = [
     ".bzr",
     ".direnv",
@@ -111,10 +93,60 @@ exclude = [
     "*_vendor*",
 ]
 
-target-version = "py38"
-fix = true
+[tool.ruff.lint]
 
-#[project.entry-points."napari.manifest"]
-#napari-TopoStats = "napari-TopoStats.napari.yaml"
-#napari-loadafm = "napari-loadafm.napari.yaml"
-#napari-saveafm = "napari-saveafm.napari.yaml"
+select = [
+    "E", "F", "W", #flake8
+    "UP", # pyupgrade
+    "I", # isort
+    "BLE", # flake8-blind-exception
+    "B", # flake8-bugbear
+    "A", # flake8-builtins
+    "C4", # flake8-comprehensions
+    "ISC", # flake8-implicit-str-concat
+    "G", # flake8-logging-format
+    "PIE", # flake8-pie
+    "SIM", # flake8-simplify
+]
+
+ignore = [
+    "E501", # line too long. let black handle this
+    "UP006", "UP007", # type annotation. As using magicgui require runtime type annotation then we disable this.
+    "SIM117", # flake8-simplify - some of merged with statements are not looking great with black, reanble after drop python 3.9
+]
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+fixable = [
+  "A", # flake8-builtins
+  "B", # flake8-bugbear
+  "C", #
+  "D", # pydocstyle
+  "E", # pycodestyle error
+  "F",
+  "I", # isort
+  "NPY", # numpy
+  "PT", # flake8-pytest-style
+  "PTH", # flake8-use-pathlib
+  "R",
+  "S", #flake8-bandit
+  "W", # pycodestyle warning
+  "U",
+  "UP", # pyupgrade
+]
+unfixable = []
+
+# Numpy2 deprecation checks
+extend-select = ["NPY201"]
+preview = false
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+[tool.ruff.lint.isort]
+case-sensitive = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = true
