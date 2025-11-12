@@ -1,5 +1,6 @@
 from magicgui.widgets import FunctionGui
-from qtpy.QtCore import QTimer
+from qtpy.QtCore import QTimer, Qt
+from qtpy.QtGui import QMovie
 from qtpy.QtWidgets import (
     QApplication,
     QDialog,
@@ -157,3 +158,88 @@ def attach_status_label(widget: FunctionGui | QWidget):
         label_timer.start(3000)  # Clear message after 3 seconds
 
     widget.set_status_message = set_status_message
+
+class LoadingSpinner(QWidget):
+    """A semi-transparent overlay with a centered spinner for napari viewer."""
+    
+    def __init__(self, viewer):
+        # Parent to the main napari window so it covers everything
+        super().__init__(viewer.window._qt_window)
+        self.viewer = viewer
+        
+        # Make overlay semi-transparent
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+        self.setStyleSheet("background-color: rgba(0, 0, 0, 120);")
+        
+        # Center layout
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignCenter)
+        
+        # Create spinner container with rounded background
+        spinner_container = QWidget()
+        spinner_container.setStyleSheet("""
+            QWidget {
+                background-color: rgba(40, 40, 40, 240);
+                border-radius: 15px;
+                padding: 30px;
+            }
+        """)
+        
+        spinner_layout = QVBoxLayout()
+        spinner_layout.setAlignment(Qt.AlignCenter)
+        
+        self.spinner_label = QLabel()
+        self.spinner_label.setStyleSheet("""
+            QLabel {
+                color: white;
+                font-size: 18px;
+                font-weight: bold;
+                background-color: transparent;
+            }
+        """)
+        self.spinner_label.setAlignment(Qt.AlignCenter)
+        
+        spinner_layout.addWidget(self.spinner_label)
+        spinner_container.setLayout(spinner_layout)
+        
+        layout.addWidget(spinner_container)
+        self.setLayout(layout)
+        
+        # Animation setup
+        self.frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+        self.current_frame = 0
+        self.timer = QTimer()
+        self.timer.timeout.connect(self._update_frame)
+        self.message = ""
+        
+        self.hide()
+            
+    def start(self, message="Loading"):
+        """Show the spinner with a message."""
+        self.message = message
+        self.current_frame = 0
+        self._update_frame()
+        
+        # Cover the entire napari window
+        self.setGeometry(self.parent().rect())
+        
+        self.show()
+        self.raise_()  # Bring to front
+        self.timer.start(80)  # Update every 80ms
+        
+    def stop(self):
+        """Hide the spinner."""
+        self.timer.stop()
+        self.hide()
+        
+    def _update_frame(self):
+        """Update the spinner animation frame."""
+        spinner = self.frames[self.current_frame]
+        self.spinner_label.setText(f"{spinner}  {self.message}  {spinner}")
+        self.current_frame = (self.current_frame + 1) % len(self.frames)
+        
+    def resizeEvent(self, event):
+        """Keep overlay covering the parent when window resizes."""
+        if self.parent():
+            self.setGeometry(self.parent().rect())
+        super().resizeEvent(event)
