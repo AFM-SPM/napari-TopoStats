@@ -23,15 +23,16 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 from . import _state as state
 from ._alerts import attach_status_label, show_error_dialog
-
 
 try:
     from topostats.config import write_config_with_comments
 except ImportError:
     show_error_dialog(
-        f"TopoStats version {state.TOPOSTATS_VERSION} is not supported. Please install the latest version of TopoStats or if that fails, install version {state.MIN_TOPOSTATS_VERSION}.")
+        f"TopoStats version {state.TOPOSTATS_VERSION} is not supported. Please install the latest version of TopoStats or if that fails, install version {state.MIN_TOPOSTATS_VERSION}."
+    )
 
 
 config_wrapper = None

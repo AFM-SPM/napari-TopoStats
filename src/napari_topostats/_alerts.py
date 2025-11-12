@@ -31,29 +31,32 @@ class ErrorDialog(QDialog):
         super().__init__()
         self.setWindowTitle("Error")
         self.setMinimumWidth(300)
-        
+
         # Main layout
         layout = QVBoxLayout()
         layout.setSpacing(10)
-        
+
         # Error message
         self.label = QLabel(message)
         self.label.setWordWrap(True)
-        self.label.setStyleSheet("""
+        self.label.setStyleSheet(
+            """
             QLabel {
                 font-size: 13px;
                 color: #333333;
                 padding: 10px;
             }
-        """)
+        """
+        )
         layout.addWidget(self.label)
-        
+
         # OK button
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         ok_button = QPushButton("OK")
         ok_button.setMinimumWidth(80)
-        ok_button.setStyleSheet("""
+        ok_button.setStyleSheet(
+            """
             QPushButton {
                 background-color: #0078d4;
                 color: white;
@@ -68,23 +71,30 @@ class ErrorDialog(QDialog):
             QPushButton:pressed {
                 background-color: #005a9e;
             }
-        """)
+        """
+        )
         ok_button.clicked.connect(self.accept)
         button_layout.addWidget(ok_button)
         layout.addLayout(button_layout)
-        
+
         self.setLayout(layout)
         self.setModal(True)
-        
+
         # Dialog styling
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             QDialog {
                 background-color: white;
             }
-        """)
+        """
+        )
 
 
-def show_error_dialog(message: str = "", raise_exception: bool = False, check_version: bool = False):
+def show_error_dialog(
+    message: str = "",
+    raise_exception: bool = False,
+    check_version: bool = False,
+):
     """
     Show an error dialog with the given message. Optionally raise an exception.
 
@@ -99,18 +109,18 @@ def show_error_dialog(message: str = "", raise_exception: bool = False, check_ve
         message += f"\nYour TopoStats version is {state.TOPOSTATS_VERSION} which may be outdated or may not be yet supported by this napari plugin. The minimum supported version is {state.MIN_TOPOSTATS_VERSION}. Try updating or downgrading TopoStats accordingly."
 
     print(f"Error: {message}")
-    
+
     # Close any existing error dialog before showing a new one
     if state.current_error_dialog is not None:
         state.current_error_dialog.close()
-    
+
     # Create and show new error dialog
     state.current_error_dialog = ErrorDialog(message)
     state.current_error_dialog.show()
-    
+
     # Ensure the dialog is shown immediately
     QApplication.processEvents()
-    
+
     # If raise_exception is True, raise a ValueError
     if raise_exception:
         raise ValueError(message)

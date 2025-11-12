@@ -568,7 +568,9 @@ def evaluate_path_to_data(
             return None
 
     else:
-        show_error_dialog(f"Invalid path_to_data: {path_to_data}", check_version=True)
+        show_error_dialog(
+            f"Invalid path_to_data: {path_to_data}", check_version=True
+        )
         return None
 
 
