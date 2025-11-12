@@ -838,6 +838,7 @@ class WidgetFunction:
 
                 # Execute function or method
                 if self.type_class:
+                    # ruff: noqa: BLE001
                     try:
                         instance = self.type_class(**class_args)
                     except Exception as e:
@@ -849,7 +850,8 @@ class WidgetFunction:
                     method = getattr(
                         instance, self.function_to_run.__name__, None
                     )
-                    if method:
+                    if method:    
+                        # ruff: noqa: BLE001
                         try:
                             return_value = method(**method_args)
                         except Exception as e:
@@ -865,7 +867,16 @@ class WidgetFunction:
                         )
                         return
                 else:
-                    return_value = self.function_to_run(**method_args)
+                    # ruff: noqa: BLE001
+                    try:
+                        return_value = self.function_to_run(**method_args)
+                    except Exception as e:
+                        show_error_dialog(
+                            f"Topostats is failing with: {e}.",
+                            raise_exception=True,
+                            check_version=True,
+                        )
+                        return
 
                 # Evaluate path_to_data
                 metadata = {}
