@@ -520,7 +520,8 @@ def render_return_value(
         )
     else:
         show_error_dialog(
-            f"Function {function_key} returned an unsupported type: {type(return_value)}. Expected numpy array."
+            f"Function {function_key} returned an unsupported type: {type(return_value)}.",
+            check_version=True,
         )
 
 
@@ -567,7 +568,7 @@ def evaluate_path_to_data(
             return None
 
     else:
-        show_error_dialog(f"Invalid path_to_data: {path_to_data}")
+        show_error_dialog(f"Invalid path_to_data: {path_to_data}", check_version=True)
         return None
 
 

@@ -96,7 +96,7 @@ def show_error_dialog(message: str = "", raise_exception: bool = False, check_ve
         If True, raise a ValueError after showing the dialog. Used for errors that should halt execution.
     """
     if check_version:
-        message += f"\nYour TopoStats version is {state.TOPOSTATS_VERSION}. The minimum supported version is {state.MIN_TOPOSTATS_VERSION}. Try updating or downgrading TopoStats accordingly."
+        message += f"\nYour TopoStats version is {state.TOPOSTATS_VERSION} which may be outdated or may not be yet supported by this napari plugin. The minimum supported version is {state.MIN_TOPOSTATS_VERSION}. Try updating or downgrading TopoStats accordingly."
 
     print(f"Error: {message}")
     
