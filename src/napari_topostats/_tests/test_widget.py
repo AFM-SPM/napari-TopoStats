@@ -42,6 +42,7 @@ def load_test_image(viewer, image_path):
             )
     return test_image_layer
 
+
 def run_functions_in_grid(
     qtbot: QtBot, topostats_widget, viewer, run_function_on, expected_layers
 ):
@@ -53,7 +54,9 @@ def run_functions_in_grid(
         viewer.layers.selection = [viewer.layers[run_function_on[i]]]
         item = button_grid.findItems(pretty_name, Qt.MatchExactly)[0]
         rect = button_grid.visualItemRect(item)
-        qtbot.mouseClick(button_grid.viewport(), Qt.LeftButton, pos=rect.center())
+        qtbot.mouseClick(
+            button_grid.viewport(), Qt.LeftButton, pos=rect.center()
+        )
         qtbot.wait(100)
 
     for expected_name in expected_layers:
@@ -61,7 +64,9 @@ def run_functions_in_grid(
             expected_name in viewer.layers
         ), f"Layer '{expected_name}' not found"
 
+
 # --- Tests ---
+
 
 def test_button_grid_exists(qtbot: QtBot, topostats_widget):
     """Ensure the function grid loads correctly."""
