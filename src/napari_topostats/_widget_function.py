@@ -835,12 +835,27 @@ class WidgetFunction:
 
                 # Execute function or method
                 if self.type_class:
-                    instance = self.type_class(**class_args)
+                    try:
+                        instance = self.type_class(**class_args)
+                    except Exception as e:
+                        show_error_dialog(
+                            f"Topostats is failing with {self.type_class.__name__}: {e}.",
+                            check_version=True,
+                        )
+                        return
                     method = getattr(
                         instance, self.function_to_run.__name__, None
                     )
                     if method:
-                        return_value = method(**method_args)
+                        try:
+                            return_value = method(**method_args)
+                        except Exception as e:
+                            show_error_dialog(
+                                f"Topostats is failing with: {e}.",
+                                raise_exception=True,
+                                check_version=True,
+                            )
+                            return
                     else:
                         show_error_dialog(
                             f"Method {self.function_to_run.__name__} not found on instance."
