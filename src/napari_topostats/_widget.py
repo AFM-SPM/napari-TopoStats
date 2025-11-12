@@ -31,13 +31,13 @@ Replace code below according to your needs.
 
 import os
 
+from napari import current_viewer
 from qtpy.QtWidgets import (
     QApplication,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
-from napari import current_viewer
 
 from ._alerts import LoadingWidget, attach_status_label
 

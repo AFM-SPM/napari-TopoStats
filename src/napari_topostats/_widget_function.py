@@ -24,7 +24,7 @@ from qtpy.QtWidgets import (
 from scipy.ndimage import label
 
 from . import _io as io
-from ._alerts import show_error_dialog, LoadingWidget
+from ._alerts import LoadingWidget, show_error_dialog
 from ._io import ConfigWrapper, collect_values
 
 
@@ -764,7 +764,12 @@ class WidgetFunction:
                     or current_viewer()
                 )
                 loading_widget = LoadingWidget(viewer)
-                loading_widget.start(self.name.replace("_", " ").replace("run", "running").replace("make", "making").title())
+                loading_widget.start(
+                    self.name.replace("_", " ")
+                    .replace("run", "running")
+                    .replace("make", "making")
+                    .title()
+                )
                 method_args = {}
                 class_args = {}
 
