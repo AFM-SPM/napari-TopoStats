@@ -24,7 +24,7 @@ from qtpy.QtWidgets import (
 from scipy.ndimage import label
 
 from . import _io as io
-from ._alerts import show_error_dialog
+from ._alerts import show_error_dialog, LoadingWidget
 from ._io import ConfigWrapper, collect_values
 
 
@@ -758,6 +758,13 @@ class WidgetFunction:
                             ]
 
             def func(**kwargs):
+                viewer = (
+                    self.overide_viewer
+                    or kwargs.get("viewer")
+                    or current_viewer()
+                )
+                loading_widget = LoadingWidget(viewer)
+                loading_widget.start(self.name.replace("_", " ").replace("run", "running").replace("make", "making").title())
                 method_args = {}
                 class_args = {}
 
@@ -775,6 +782,7 @@ class WidgetFunction:
                         of_type=self.of_type,
                     )
                     if selected_image is None:
+                        loading_widget.stop()
                         return
                     kwargs["image"] = selected_image
 
@@ -845,6 +853,7 @@ class WidgetFunction:
                         show_error_dialog(
                             f"Method {self.function_to_run.__name__} not found on instance."
                         )
+                        loading_widget.stop()
                         return
                 else:
                     return_value = self.function_to_run(**method_args)
@@ -875,16 +884,12 @@ class WidgetFunction:
                         self.path_to_data, return_value
                     )
                 if result is None:
+                    loading_widget.stop()
                     return
                 return_value = result
 
                 # Render return value
                 if return_value is not None:
-                    viewer = (
-                        self.overide_viewer
-                        or kwargs.get("viewer")
-                        or current_viewer()
-                    )
                     render_return_value(
                         return_value,
                         self.function_key,
@@ -897,6 +902,7 @@ class WidgetFunction:
                     show_error_dialog(
                         f"Function {self.function_to_run.__name__} returned None."
                     )
+                loading_widget.stop()
 
             # Collect the parameters for the function and ensure defaults are set (these defaults are shown in the GUI)
             new_parameters = []

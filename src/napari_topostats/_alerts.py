@@ -159,7 +159,7 @@ def attach_status_label(widget: FunctionGui | QWidget):
 
     widget.set_status_message = set_status_message
 
-class LoadingSpinner(QWidget):
+class LoadingWidget(QWidget):
     """A semi-transparent overlay with a centered spinner for napari viewer."""
     
     def __init__(self, viewer):
@@ -226,11 +226,13 @@ class LoadingSpinner(QWidget):
         self.show()
         self.raise_()  # Bring to front
         self.timer.start(80)  # Update every 80ms
+        QApplication.processEvents()
         
     def stop(self):
         """Hide the spinner."""
         self.timer.stop()
         self.hide()
+        QApplication.processEvents()
         
     def _update_frame(self):
         """Update the spinner animation frame."""

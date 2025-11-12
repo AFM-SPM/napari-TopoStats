@@ -39,13 +39,13 @@ from qtpy.QtWidgets import (
 )
 from napari import current_viewer
 
-from ._alerts import LoadingSpinner, attach_status_label
+from ._alerts import LoadingWidget, attach_status_label
 
 if (
     os.environ.get("QT_QPA_PLATFORM") != "offscreen"
     and QApplication.instance() is not None
 ):
-    loading_spinner = LoadingSpinner(current_viewer())
+    loading_spinner = LoadingWidget(current_viewer())
     loading_spinner.start()
     QApplication.processEvents()
 
