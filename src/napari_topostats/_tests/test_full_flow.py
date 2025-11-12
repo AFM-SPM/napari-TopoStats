@@ -26,7 +26,7 @@ def topostats_widget(viewer, qtbot: QtBot):
     widget = TopoStatsRootWidget(viewer)
     qtbot.addWidget(widget)
     qtbot.wait(50)  # Allow Qt event loop to process
-    return widget.function_grid
+    return widget
 
 
 # --- Helper Functions ---
@@ -42,30 +42,7 @@ def load_test_image(viewer, image_path):
             )
     return test_image_layer
 
-
-# --- Tests ---
-
-
-@pytest.mark.parametrize(
-    ("run_function_on", "expected_layers"),
-    [
-        (
-            [
-                "test image",
-                "test image",
-                "test image Filter Image",
-                "test image Filter Image",
-            ],
-            [
-                "test image",
-                "test image Filter Image",
-                "test image Filter Image Grains Mask",
-                "test image Filter 3D Image",
-            ],
-        )
-    ],
-)
-def test_functions_in_grid(
+def run_functions_in_grid(
     qtbot: QtBot, topostats_widget, viewer, run_function_on, expected_layers
 ):
     """Simulate clicking functions and verify new layers are created."""
@@ -75,10 +52,8 @@ def test_functions_in_grid(
         pretty_name = func_name.replace("_", " ").title()
         viewer.layers.selection = [viewer.layers[run_function_on[i]]]
         item = button_grid.findItems(pretty_name, Qt.MatchExactly)[0]
-        qtbot.mouseClick(
-            button_grid.viewport(), Qt.LeftButton, pos=item.rect().center()
-        )
-        button_grid.add_function_as_widget(item)
+        rect = button_grid.visualItemRect(item)
+        qtbot.mouseClick(button_grid.viewport(), Qt.LeftButton, pos=rect.center())
         qtbot.wait(100)
 
     for expected_name in expected_layers:
@@ -86,11 +61,12 @@ def test_functions_in_grid(
             expected_name in viewer.layers
         ), f"Layer '{expected_name}' not found"
 
+# --- Tests ---
 
-def test_button_grid_exists(qtbot: QtBot, button_grid):
+def test_button_grid_exists(qtbot: QtBot, topostats_widget):
     """Ensure the function grid loads correctly."""
     assert (
-        button_grid.functions is not None
+        topostats_widget.function_grid.functions is not None
     ), "Function grid did not initialize"
 
 
@@ -114,6 +90,7 @@ def test_load_image(viewer, image_path):
                 "test image",
                 "test image Filter Image",
                 "test image Filter Image",
+                "test image Filter Image Grains Mask",
             ],
             [
                 "test image",
@@ -124,7 +101,7 @@ def test_load_image(viewer, image_path):
         )
     ],
 )
-def test_end_to_end(
+def test_functions_in_grid(
     qtbot: QtBot,
     viewer,
     topostats_widget,
@@ -136,7 +113,7 @@ def test_end_to_end(
     load_test_image(viewer, image_path)
     test_functions_in_grid(
         qtbot,
-        topostats_widget.function_grid,
+        topostats_widget,
         viewer,
         run_function_on,
         expected_layers,
