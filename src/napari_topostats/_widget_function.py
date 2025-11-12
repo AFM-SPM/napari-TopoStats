@@ -850,7 +850,7 @@ class WidgetFunction:
                     method = getattr(
                         instance, self.function_to_run.__name__, None
                     )
-                    if method:    
+                    if method:
                         # ruff: noqa: BLE001
                         try:
                             return_value = method(**method_args)
