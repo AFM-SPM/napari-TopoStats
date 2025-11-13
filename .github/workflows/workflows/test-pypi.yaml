@@ -1,0 +1,37 @@
+name: Publish package to test-PyPi
+# See https://docs.pypi.org/trusted-publishers/adding-a-publisher/
+
+on:
+  push:
+    tags:
+      - t*
+  workflow_dispatch: # Uncomment line if you also want to trigger action manually
+
+jobs:
+  build-release:
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    environment: test-pypi-publish
+    name: Publish package to Test-PyPi
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.11
+      - name: Installing the package
+        run: |
+          pip3 install .[pypi]
+      - name: Build package
+        run: |
+          export DEB_PYTHON_INSTALL_LAYOUT=deb_system
+          python -m build --no-isolation
+      - name: Publish package to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
