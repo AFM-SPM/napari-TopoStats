@@ -1,33 +1,14 @@
+""" "Tests for the widget functionalities of the plugin."""
+
+# pylint: disable=redefined-outer-name
 from pathlib import Path
 
-import napari
 import pytest
 from napari_afmreader._reader import reader_function
 from pytestqt.qtbot import QtBot
 from qtpy.QtCore import Qt
 
-from napari_topostats._widget import AVAILABLE_FUNCTIONS, TopoStatsRootWidget
-
-# --- Fixtures ---
-
-
-@pytest.fixture
-def viewer(qtbot: QtBot):
-    """Create a Napari viewer with Qtbot cleanup."""
-    viewer = napari.Viewer(show=False)
-    qtbot.addWidget(viewer.window._qt_window)
-    yield viewer
-    viewer.close()
-
-
-@pytest.fixture
-def topostats_widget(viewer, qtbot: QtBot):
-    """Create the TopoStatsRootWidget and return its function grid."""
-    widget = TopoStatsRootWidget(viewer)
-    qtbot.addWidget(widget)
-    qtbot.wait(50)  # Allow Qt event loop to process
-    return widget
-
+from napari_topostats._widget import AVAILABLE_FUNCTIONS
 
 # --- Helper Functions ---
 
@@ -35,6 +16,7 @@ def topostats_widget(viewer, qtbot: QtBot):
 def load_test_image(viewer, image_path):
     """Load a test AFM image using the napari_afmreader."""
     layers = reader_function(image_path, channel="Height")
+    test_image_layer = None
     for data, metadata, layer_type in layers:
         if layer_type == "image":
             test_image_layer = viewer.add_image(
@@ -42,18 +24,23 @@ def load_test_image(viewer, image_path):
             )
     return test_image_layer
 
+
 def run_functions_in_grid(
     qtbot: QtBot, topostats_widget, viewer, run_function_on, expected_layers
 ):
     """Simulate clicking functions and verify new layers are created."""
-    function_names = [f.name for f in AVAILABLE_FUNCTIONS]
+    function_names = [f.name for f in AVAILABLE_FUNCTIONS].remove(
+        "load_config"
+    )
     button_grid = topostats_widget.function_grid
     for i, func_name in enumerate(function_names):
         pretty_name = func_name.replace("_", " ").title()
         viewer.layers.selection = [viewer.layers[run_function_on[i]]]
         item = button_grid.findItems(pretty_name, Qt.MatchExactly)[0]
         rect = button_grid.visualItemRect(item)
-        qtbot.mouseClick(button_grid.viewport(), Qt.LeftButton, pos=rect.center())
+        qtbot.mouseClick(
+            button_grid.viewport(), Qt.LeftButton, pos=rect.center()
+        )
         qtbot.wait(100)
 
     for expected_name in expected_layers:
@@ -61,9 +48,11 @@ def run_functions_in_grid(
             expected_name in viewer.layers
         ), f"Layer '{expected_name}' not found"
 
+
 # --- Tests ---
 
-def test_button_grid_exists(qtbot: QtBot, topostats_widget):
+
+def test_button_grid_exists(topostats_widget):
     """Ensure the function grid loads correctly."""
     assert (
         topostats_widget.function_grid.functions is not None
@@ -80,6 +69,7 @@ def test_load_image(viewer, image_path):
     assert layer is not None, "Failed to load test image"
 
 
+# pylint: disable=too-many-positional-arguments
 @pytest.mark.parametrize(
     ("image_path", "run_function_on", "expected_layers"),
     [
