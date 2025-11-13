@@ -1,4 +1,4 @@
-""" "Tests for the widget functionalities of the plugin."""
+"""Tests for the widget functionalities of the plugin."""
 
 # pylint: disable=redefined-outer-name
 from pathlib import Path
