@@ -1,4 +1,7 @@
+"""Module used for providing error alerts in the gui and show/ handle loading messages"""
+
 from magicgui.widgets import FunctionGui
+from packaging.version import parse as parse_version
 from qtpy.QtCore import QTimer
 from qtpy.QtWidgets import (
     QApplication,
@@ -10,11 +13,12 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from topostats import __version__ as topostats_version
 
 from . import _state as state
 
 
-class ErrorDialog(QDialog):
+class ErrorDialog(QDialog):  # pylint: disable=too-few-public-methods
     """
     A simple dialog window to display error messages.
     """
@@ -106,7 +110,22 @@ def show_error_dialog(
         If True, raise a ValueError after showing the dialog. Used for errors that should halt execution.
     """
     if check_version:
-        message += f"\nYour TopoStats version is {state.TOPOSTATS_VERSION} which may be outdated or may not be yet supported by this napari plugin. The minimum supported version is {state.MIN_TOPOSTATS_VERSION}. Try updating or downgrading TopoStats accordingly."
+        if parse_version(topostats_version) > parse_version(
+            state.MAX_TOPOSTATS_VERSION
+        ):
+            message += (
+                f"\nYour TopoStats version is {topostats_version}, which may not yet be supported "
+                f"by this napari plugin.\n"
+                f"The latest confirmed supported version is {state.MAX_TOPOSTATS_VERSION}.\n"
+                f"Reverting your TopoStats install to that version with "
+                f"`pip install topostats=={state.MAX_TOPOSTATS_VERSION}` may fix your problem.\n"
+                f"Alternatively, report your error as an issue on the TopoStats GitHub page."
+            )
+        else:
+            message += (
+                "\nThis error is potentially caused by an error in TopoStats rather than in this "
+                "napari implementation. You can report your issue on the TopoStats GitHub page."
+            )
 
     print(f"Error: {message}")
 
@@ -126,7 +145,7 @@ def show_error_dialog(
         raise ValueError(message)
 
 
-class LoadingDialog(QDialog):
+class LoadingDialog(QDialog):  # pylint: disable=too-few-public-methods
     """
     A dialog window to indicate a loading or processing state.
     """
@@ -157,6 +176,10 @@ class LoadingDialog(QDialog):
 
 
 def attach_status_label(widget: FunctionGui | QWidget):
+    """
+    Add status label to passed in widget, which can be updated when then function associated with that widget runs.
+    """
+
     label = QLabel("")
     label.setStyleSheet(
         """
