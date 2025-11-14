@@ -521,7 +521,7 @@ def render_return_value(
     else:
         show_error_dialog(
             f"Function {function_key} returned an unsupported type: {type(return_value)}.",
-            check_version=True,
+            topostats_error=True,
         )
 
 
@@ -569,7 +569,7 @@ def evaluate_path_to_data(
 
     else:
         show_error_dialog(
-            f"Invalid path_to_data: {path_to_data}", check_version=True
+            f"Invalid path_to_data: {path_to_data}", topostats_error=True
         )
         return None
 
@@ -844,7 +844,7 @@ class WidgetFunction:
                     except Exception as e:
                         show_error_dialog(
                             f"Topostats is failing with {self.type_class.__name__}: {e}.",
-                            check_version=True,
+                            topostats_error=True,
                         )
                         return
                     method = getattr(
@@ -858,7 +858,7 @@ class WidgetFunction:
                             show_error_dialog(
                                 f"Topostats is failing with: {e}.",
                                 raise_exception=True,
-                                check_version=True,
+                                topostats_error=True,
                             )
                             return
                     else:
@@ -874,7 +874,7 @@ class WidgetFunction:
                         show_error_dialog(
                             f"Topostats is failing with: {e}.",
                             raise_exception=True,
-                            check_version=True,
+                            topostats_error=True,
                         )
                         return
 
