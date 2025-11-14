@@ -1,7 +1,9 @@
 """Tests for the I/O functionalities of the plugin."""
 
 # pylint: disable=redefined-outer-name
+import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from pytestqt.qtbot import QtBot
@@ -72,23 +74,35 @@ def test_load_config(
 
     else:
 
-        # Simulate selecting a config file (assuming a test config file path)
-        result = io._load_config_impl(napari_viewer, test_config_path)
-        if result:
-            updated_values = io.collect_values(io.full_config_container)
-            io.config_wrapper.flat.update(updated_values)
-            full_current_config = io.config_wrapper.unflatten()
+        def get_file_path():
+            return test_config_path
 
-            with open(test_config_path, encoding="utf-8") as f:
-                expected_config = io.yaml.safe_load(f)
-            overlap_keys = set(full_current_config.keys()).intersection(
-                set(expected_config.keys())
-            )
-            for key in overlap_keys.remove("run"):
+        with patch(
+            "napari_topostats._io.QFileDialog.getOpenFileName",
+            side_effect=get_file_path,
+        ):
+
+            # Simulate selecting a config file (assuming a test config file path)
+            result = io._load_config_impl(napari_viewer, test_config_path)
+            if result:
+                updated_values = io.collect_values(io.full_config_container)
+                io.config_wrapper.flat.update(updated_values)
+                full_current_config = io.config_wrapper.unflatten()
+
+                with open(test_config_path, encoding="utf-8") as f:
+                    expected_config = io.yaml.safe_load(f)
+                overlap_keys = set(full_current_config.keys()).intersection(
+                    set(expected_config.keys())
+                )
+                if "run" in overlap_keys:
+                    overlap_keys.remove("run")
+                print(json.dumps(full_current_config, indent=2))
+                print(json.dumps(expected_config, indent=2))
+                for key in overlap_keys:
+                    assert (
+                        full_current_config[key] == expected_config[key]
+                    ), f"Config key '{key}' does not match expected value."
+            else:
                 assert (
-                    full_current_config[key] == expected_config[key]
-                ), f"Config key '{key}' does not match expected value."
-        else:
-            assert (
-                expected_result == "FAILURE"
-            ), "Config load was expected to succeed but failed."
+                    expected_result == "FAILURE"
+                ), "Config load was expected to succeed but failed."
