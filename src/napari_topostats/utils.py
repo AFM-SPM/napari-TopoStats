@@ -57,7 +57,6 @@ def afm2stack(
 
 
 def grainstats(image: Labels):
-    print(image.metadata)
     cfg = image.metadata["config"]["grainstats"]
     cfg.pop("run")
     cfg.pop("class_names")
