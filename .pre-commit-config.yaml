@@ -17,7 +17,7 @@ repos:
         types: [python, yaml, markdown]
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.18.1
+    rev: v0.19.0
     hooks:
       - id: markdownlint-cli2
         args: []
@@ -30,7 +30,7 @@ repos:
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: v0.14.4
+    rev: v0.14.5
     hooks:
       - id: ruff
         args: [ --fix, --exit-non-zero-on-fix, --show-fixes ]
@@ -45,7 +45,7 @@ repos:
       - id: black-jupyter
 
   - repo: https://github.com/kynan/nbstripout
-    rev: 0.8.1
+    rev: 0.8.2
     hooks:
       - id: nbstripout
 
