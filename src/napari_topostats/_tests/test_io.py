@@ -1,7 +1,6 @@
 """Tests for the I/O functionalities of the plugin."""
 
 # pylint: disable=redefined-outer-name
-import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,26 +10,34 @@ from qtpy.QtCore import Qt
 
 from napari_topostats import _io as io
 
-from .conft_test import napari_viewer
-
 # --- Helper Functions ---
 
 
 def open_load_config_widget(qtbot: QtBot, topostats_widget):
     """Simulate clicking the Load Config button in the function grid."""
-    button_grid = topostats_widget.function_grid
-    load_config_button = button_grid.findItems("Load Config", Qt.MatchExactly)[
-        0
-    ]
-    rect = button_grid.visualItemRect(load_config_button)
-    qtbot.mouseClick(button_grid.viewport(), Qt.LeftButton, pos=rect.center())
-    qtbot.wait(100)
+
+    def get_file_path(*args, **kwargs):
+        return (None, None)
+
+    with patch(
+        "napari_topostats._io.QFileDialog.getOpenFileName",
+        side_effect=get_file_path,
+    ):
+        button_grid = topostats_widget.function_grid
+        load_config_button = button_grid.findItems(
+            "Load Config", Qt.MatchExactly
+        )[0]
+        rect = button_grid.visualItemRect(load_config_button)
+        qtbot.mouseClick(
+            button_grid.viewport(), Qt.LeftButton, pos=rect.center()
+        )
+        qtbot.wait(100)
 
 
 # --- Actual Tests ---
 
 
-def test_load_config_widget(qtbot: QtBot, topostats_widget):
+def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
     """Test that the load config widget is created properly when it is clicked in the root widget."""
 
     open_load_config_widget(qtbot, topostats_widget)
@@ -61,32 +68,35 @@ def test_load_config(
 ):
     """Test that loading a config file updates the function parameters correctly."""
 
-    if use_default:
-        assert io._load_config_impl(
-            napari_viewer, None
-        ), "Default config load failed"
-        updated_values = io.collect_values(io.full_config_container)
-        io.config_wrapper.flat.update(updated_values)
-        full_current_config = io.config_wrapper.unflatten()
-        assert (
-            full_current_config is not None
-        ), "Failed to retrieve current config after loading default."
+    def get_file_path(*args, **kwargs):
+        return (test_config_path, None)
 
-    else:
+    def print_error_message(message: str, raise_exception: bool = False):
+        print(f"Error: {message}")
+        # If raise_exception is True, raise a ValueError
+        if raise_exception:
+            raise ValueError(message)
 
-        def get_file_path():
-            return test_config_path
+    with patch(
+        "napari_topostats._io.QFileDialog.getOpenFileName",
+        side_effect=get_file_path,
+    ), patch(
+        "napari_topostats._alerts.show_error_dialog",
+        side_effect=print_error_message,
+    ):
+        if use_default:
+            assert io._load_config_impl(
+                napari_viewer, None, use_default=use_default
+            ), "Default config load failed"
+            full_current_config = io.config_wrapper.unflatten()
+            assert (
+                full_current_config is not None
+            ), "Failed to retrieve current config after loading default."
 
-        with patch(
-            "napari_topostats._io.QFileDialog.getOpenFileName",
-            side_effect=get_file_path,
-        ):
-
+        else:
             # Simulate selecting a config file (assuming a test config file path)
             result = io._load_config_impl(napari_viewer, test_config_path)
             if result:
-                updated_values = io.collect_values(io.full_config_container)
-                io.config_wrapper.flat.update(updated_values)
                 full_current_config = io.config_wrapper.unflatten()
 
                 with open(test_config_path, encoding="utf-8") as f:
@@ -96,8 +106,6 @@ def test_load_config(
                 )
                 if "run" in overlap_keys:
                     overlap_keys.remove("run")
-                print(json.dumps(full_current_config, indent=2))
-                print(json.dumps(expected_config, indent=2))
                 for key in overlap_keys:
                     assert (
                         full_current_config[key] == expected_config[key]

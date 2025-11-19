@@ -95,11 +95,9 @@ def build_dynamic_widget(
         elif isinstance(value, int):
             w = create_widget(name=key, widget_type="SpinBox", value=value)
         elif isinstance(value, float):
-            print(f"Original: {value}")
             w = create_widget(
                 name=key, widget_type="FloatSpinBox", value=value
             )
-            print(f"After render: {w.value}")
         elif isinstance(value, str):
             w = create_widget(name=key, widget_type="LineEdit", value=value)
         elif isinstance(value, list):
@@ -174,7 +172,7 @@ def _load_config_impl(
         OSError,
     ) as e:
         show_error_dialog(f"Failed to load config: {e}")
-        return
+        return False
 
     comment_descriptions = extract_inline_comments(config_path)
 
@@ -185,7 +183,7 @@ def _load_config_impl(
     )
     if full_config_container is None:
         show_error_dialog("Failed to create full config container.")
-        return
+        return False
     if "Edit Full Config" not in state.docked_widgets:
         # Create a button to open the config editor
         btn = QPushButton("Edit Config")
