@@ -520,7 +520,8 @@ def render_return_value(
         )
     else:
         show_error_dialog(
-            f"Function {function_key} returned an unsupported type: {type(return_value)}. Expected numpy array."
+            f"Function {function_key} returned an unsupported type: {type(return_value)}.",
+            topostats_error=True,
         )
 
 
@@ -567,7 +568,9 @@ def evaluate_path_to_data(
             return None
 
     else:
-        show_error_dialog(f"Invalid path_to_data: {path_to_data}")
+        show_error_dialog(
+            f"Invalid path_to_data: {path_to_data}", topostats_error=True
+        )
         return None
 
 
@@ -848,12 +851,29 @@ class WidgetFunction:
 
                 # Execute function or method
                 if self.type_class:
-                    instance = self.type_class(**class_args)
+                    # ruff: noqa: BLE001
+                    try:
+                        instance = self.type_class(**class_args)
+                    except Exception as e:
+                        show_error_dialog(
+                            f"Topostats is failing with {self.type_class.__name__}: {e}.",
+                            topostats_error=True,
+                        )
+                        return
                     method = getattr(
                         instance, self.function_to_run.__name__, None
                     )
                     if method:
-                        return_value = method(**method_args)
+                        # ruff: noqa: BLE001
+                        try:
+                            return_value = method(**method_args)
+                        except Exception as e:
+                            show_error_dialog(
+                                f"Topostats is failing with: {e}.",
+                                raise_exception=True,
+                                topostats_error=True,
+                            )
+                            return
                     else:
                         show_error_dialog(
                             f"Method {self.function_to_run.__name__} not found on instance."
@@ -861,7 +881,16 @@ class WidgetFunction:
                         loading_widget.stop()
                         return
                 else:
-                    return_value = self.function_to_run(**method_args)
+                    # ruff: noqa: BLE001
+                    try:
+                        return_value = self.function_to_run(**method_args)
+                    except Exception as e:
+                        show_error_dialog(
+                            f"Topostats is failing with: {e}.",
+                            raise_exception=True,
+                            topostats_error=True,
+                        )
+                        return
 
                 # Evaluate path_to_data
                 metadata = {}

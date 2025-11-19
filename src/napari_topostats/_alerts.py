@@ -1,9 +1,13 @@
+"""Module used for providing error alerts in the gui and show/ handle loading messages"""
+
 from magicgui.widgets import FunctionGui
 from qtpy.QtCore import QTimer, Qt
 from qtpy.QtWidgets import (
     QApplication,
     QDialog,
+    QHBoxLayout,
     QLabel,
+    QPushButton,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -11,8 +15,10 @@ from qtpy.QtWidgets import (
 
 from . import _state as state
 
+NAPARI_TOPOSTATS_REPORT = "https://github.com/AFM-SPM/napari-TopoStats/issues/new?template=bug_report.yaml"
 
-class ErrorDialog(QDialog):
+
+class ErrorDialog(QDialog):  # pylint: disable=too-few-public-methods
     """
     A simple dialog window to display error messages.
     """
@@ -28,14 +34,71 @@ class ErrorDialog(QDialog):
         """
         super().__init__()
         self.setWindowTitle("Error")
+        self.setMinimumWidth(300)
+
+        # Main layout
         layout = QVBoxLayout()
+        layout.setSpacing(10)
+
+        # Error message
         self.label = QLabel(message)
+        self.label.setWordWrap(True)
+        self.label.setStyleSheet(
+            """
+            QLabel {
+                font-size: 13px;
+                color: #333333;
+                padding: 10px;
+            }
+        """
+        )
         layout.addWidget(self.label)
+
+        # OK button
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        ok_button = QPushButton("OK")
+        ok_button.setMinimumWidth(80)
+        ok_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #0078d4;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #106ebe;
+            }
+            QPushButton:pressed {
+                background-color: #005a9e;
+            }
+        """
+        )
+        ok_button.clicked.connect(self.accept)
+        button_layout.addWidget(ok_button)
+        layout.addLayout(button_layout)
+
         self.setLayout(layout)
         self.setModal(True)
 
+        # Dialog styling
+        self.setStyleSheet(
+            """
+            QDialog {
+                background-color: white;
+            }
+        """
+        )
 
-def show_error_dialog(message: str, raise_exception: bool = False):
+
+def show_error_dialog(
+    message: str = "",
+    raise_exception: bool = False,
+    topostats_error: bool = False,
+):
     """
     Show an error dialog with the given message. Optionally raise an exception.
 
@@ -46,23 +109,67 @@ def show_error_dialog(message: str, raise_exception: bool = False):
     raise_exception : bool, optional
         If True, raise a ValueError after showing the dialog. Used for errors that should halt execution.
     """
-    global current_error_dialog
+    if topostats_error:
+        message += (
+            f"\nThis error is potentially caused in the TopoStats package rather than in the Napari "
+            f"front-end you are using.\nPlease report your issue at {NAPARI_TOPOSTATS_REPORT}."
+        )
+    else:
+        message += f"\nYou can report this error at {NAPARI_TOPOSTATS_REPORT}"
+
     print(f"Error: {message}")
+
     # Close any existing error dialog before showing a new one
     if state.current_error_dialog is not None:
         state.current_error_dialog.close()
-    # Create a new error dialog
+
+    # Create and show new error dialog
     state.current_error_dialog = ErrorDialog(message)
     state.current_error_dialog.show()
 
     # Ensure the dialog is shown immediately
     QApplication.processEvents()
+
     # If raise_exception is True, raise a ValueError
     if raise_exception:
         raise ValueError(message)
 
 
+class LoadingDialog(QDialog):  # pylint: disable=too-few-public-methods
+    """
+    A dialog window to indicate a loading or processing state.
+    """
+
+    def __init__(self, text="Loading..."):
+        """
+        Initialize the loading dialog with optional text.
+
+        Parameters
+        ----------
+        text : str, optional
+            The message to display in the loading dialog (default is "Loading...").
+        """
+        super().__init__()
+        self.setWindowTitle("Please wait")
+        layout = QVBoxLayout()
+
+        self.label_text = QLabel(text)
+        layout.addWidget(self.label_text)
+
+        self.spinner_label = QLabel()
+        layout.addWidget(self.spinner_label)
+
+        self.setLayout(layout)
+        self.setModal(True)
+
+        self.adjustSize()
+
+
 def attach_status_label(widget: FunctionGui | QWidget):
+    """
+    Add status label to passed in widget, which can be updated when then function associated with that widget runs.
+    """
+
     label = QLabel("")
     label.setStyleSheet(
         """
