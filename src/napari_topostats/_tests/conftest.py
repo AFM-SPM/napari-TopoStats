@@ -1,5 +1,9 @@
+# pylint: skip-file
 """Repeated fixtures for napari_topostats tests."""
 
+import os
+
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
 # pylint: disable=redefined-outer-name
 import napari
 import pytest
