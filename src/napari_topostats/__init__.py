@@ -26,7 +26,7 @@ from ._writer import write_multiple, write_single_image
 if parse_version(topostats_version) < parse_version(MIN_TOPOSTATS_VERSION):
     show_error_dialog(
         f"TopoStats version {topostats_version} is outdated and does not work with this plugin."
-        f"Please install at least topostats version {MIN_TOPOSTATS_VERSION}.\n"
+        f"Please install at least TopoStats version {MIN_TOPOSTATS_VERSION}.\n"
         f"This can be done with `pip install topostats=={MIN_TOPOSTATS_VERSION}`",
         raise_exception=True,
     )
