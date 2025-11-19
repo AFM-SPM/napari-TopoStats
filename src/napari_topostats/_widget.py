@@ -56,8 +56,10 @@ from magicgui import magicgui
 from magicgui.widgets import CheckBox, Container, FunctionGui, create_widget
 from napari.layers import Image, Labels
 from napari.viewer import Viewer
+from packaging.version import parse as parse_version
 from platformdirs import user_config_dir
 from skimage.util import img_as_float
+from topostats import __version__ as topostats_version
 from topostats.filters import Filters
 from topostats.grains import Grains
 
@@ -79,13 +81,23 @@ if (
 ):
     loading_spinner.stop()
 
+from ._alerts import show_error_dialog
 from ._button_grid import ButtonGrid
 from ._io import _load_config_impl, load_config, write_new_default_config
+from ._state import MIN_TOPOSTATS_VERSION
 from ._widget_function import WidgetFunction
 
 if TYPE_CHECKING:
     import napari
 from qtpy.QtWidgets import QHBoxLayout, QPushButton
+
+if parse_version(topostats_version) < parse_version(MIN_TOPOSTATS_VERSION):
+    show_error_dialog(
+        f"TopoStats version {topostats_version} is outdated and does not work with this plugin."
+        f"Please install at least TopoStats version {MIN_TOPOSTATS_VERSION}.\n"
+        f"This can be done with `pip install topostats=={MIN_TOPOSTATS_VERSION}`",
+        raise_exception=True,
+    )
 
 AVAILABLE_FUNCTIONS = [
     WidgetFunction(
