@@ -43,9 +43,11 @@ jobs:
           virtualenv --upgrade-embed-wheels
           # virtualenv --reset-app-data
           pip install -e .[tests]
-      - name: Test with pytest
-        run: |
-          pytest --cov=napari-topostats -x
+      - name: Install xvfb
+        run: sudo apt-get install xvfb
+
+      - name: Run tests with virtual display
+        run: xvfb-run -a pytest --cov=napari-topostats -x
       - name: Determine coverage
         run: |
           coverage xml
