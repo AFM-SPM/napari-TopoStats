@@ -31,6 +31,7 @@ Replace code below according to your needs.
 
 import os
 
+from napari import current_viewer
 from qtpy.QtWidgets import (
     QApplication,
     QSizePolicy,
@@ -38,15 +39,16 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from ._alerts import LoadingDialog, attach_status_label
+from ._alerts import LoadingWidget, attach_status_label
 
 if (
     os.environ.get("QT_QPA_PLATFORM") != "offscreen"
     and QApplication.instance() is not None
 ):
-    loading_dialog = LoadingDialog("Loading TopoStats...")
-    loading_dialog.show()
+    loading_spinner = LoadingWidget(current_viewer())
+    loading_spinner.start()
     QApplication.processEvents()
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -75,7 +77,7 @@ if (
     os.environ.get("QT_QPA_PLATFORM") != "offscreen"
     and QApplication.instance() is not None
 ):
-    loading_dialog.close()
+    loading_spinner.stop()
 
 from ._button_grid import ButtonGrid
 from ._io import _load_config_impl, load_config, write_new_default_config
