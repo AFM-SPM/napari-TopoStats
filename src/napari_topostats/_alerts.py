@@ -114,8 +114,6 @@ def show_error_dialog(
             f"\nThis error is potentially caused in the TopoStats package rather than in the Napari "
             f"front-end you are using.\nPlease report your issue at {NAPARI_TOPOSTATS_REPORT}."
         )
-    else:
-        message += f"\nYou can report this error at {NAPARI_TOPOSTATS_REPORT}"
 
     print(f"Error: {message}")
 
