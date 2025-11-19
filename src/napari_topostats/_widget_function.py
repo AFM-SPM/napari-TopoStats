@@ -24,7 +24,7 @@ from qtpy.QtWidgets import (
 from scipy.ndimage import label
 
 from . import _io as io
-from ._alerts import show_error_dialog
+from ._alerts import LoadingWidget, show_error_dialog
 from ._io import ConfigWrapper, collect_values
 
 
@@ -520,7 +520,8 @@ def render_return_value(
         )
     else:
         show_error_dialog(
-            f"Function {function_key} returned an unsupported type: {type(return_value)}. Expected numpy array."
+            f"Function {function_key} returned an unsupported type: {type(return_value)}.",
+            topostats_error=True,
         )
 
 
@@ -567,7 +568,9 @@ def evaluate_path_to_data(
             return None
 
     else:
-        show_error_dialog(f"Invalid path_to_data: {path_to_data}")
+        show_error_dialog(
+            f"Invalid path_to_data: {path_to_data}", topostats_error=True
+        )
         return None
 
 
@@ -758,6 +761,18 @@ class WidgetFunction:
                             ]
 
             def func(**kwargs):
+                viewer = (
+                    self.overide_viewer
+                    or kwargs.get("viewer")
+                    or current_viewer()
+                )
+                loading_widget = LoadingWidget(viewer)
+                loading_widget.start(
+                    self.name.replace("_", " ")
+                    .replace("run", "running")
+                    .replace("make", "making")
+                    .title()
+                )
                 method_args = {}
                 class_args = {}
 
@@ -775,6 +790,7 @@ class WidgetFunction:
                         of_type=self.of_type,
                     )
                     if selected_image is None:
+                        loading_widget.stop()
                         return
                     kwargs["image"] = selected_image
 
@@ -835,19 +851,46 @@ class WidgetFunction:
 
                 # Execute function or method
                 if self.type_class:
-                    instance = self.type_class(**class_args)
+                    # ruff: noqa: BLE001
+                    try:
+                        instance = self.type_class(**class_args)
+                    except Exception as e:
+                        show_error_dialog(
+                            f"Topostats is failing with {self.type_class.__name__}: {e}.",
+                            topostats_error=True,
+                        )
+                        return
                     method = getattr(
                         instance, self.function_to_run.__name__, None
                     )
                     if method:
-                        return_value = method(**method_args)
+                        # ruff: noqa: BLE001
+                        try:
+                            return_value = method(**method_args)
+                        except Exception as e:
+                            show_error_dialog(
+                                f"Topostats is failing with: {e}.",
+                                raise_exception=True,
+                                topostats_error=True,
+                            )
+                            return
                     else:
                         show_error_dialog(
                             f"Method {self.function_to_run.__name__} not found on instance."
                         )
+                        loading_widget.stop()
                         return
                 else:
-                    return_value = self.function_to_run(**method_args)
+                    # ruff: noqa: BLE001
+                    try:
+                        return_value = self.function_to_run(**method_args)
+                    except Exception as e:
+                        show_error_dialog(
+                            f"Topostats is failing with: {e}.",
+                            raise_exception=True,
+                            topostats_error=True,
+                        )
+                        return
 
                 # Evaluate path_to_data
                 metadata = {}
@@ -875,16 +918,12 @@ class WidgetFunction:
                         self.path_to_data, return_value
                     )
                 if result is None:
+                    loading_widget.stop()
                     return
                 return_value = result
 
                 # Render return value
                 if return_value is not None:
-                    viewer = (
-                        self.overide_viewer
-                        or kwargs.get("viewer")
-                        or current_viewer()
-                    )
                     render_return_value(
                         return_value,
                         self.function_key,
@@ -897,6 +936,7 @@ class WidgetFunction:
                     show_error_dialog(
                         f"Function {self.function_to_run.__name__} returned None."
                     )
+                loading_widget.stop()
 
             # Collect the parameters for the function and ensure defaults are set (these defaults are shown in the GUI)
             new_parameters = []
