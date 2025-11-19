@@ -45,7 +45,7 @@ jobs:
           pip install -e .[tests]
       - name: Test with pytest
         run: |
-          pytest --cov=napari-afmreader -x
+          pytest --cov=napari-topostats -x
       - name: Determine coverage
         run: |
           coverage xml
