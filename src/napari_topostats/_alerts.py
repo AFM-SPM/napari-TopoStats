@@ -15,6 +15,8 @@ from qtpy.QtWidgets import (
 
 from . import _state as state
 
+NAPARI_TOPOSTATS_REPORT = "https://github.com/AFM-SPM/napari-TopoStats/issues/new?template=bug_report.yaml"
+
 
 class ErrorDialog(QDialog):  # pylint: disable=too-few-public-methods
     """
@@ -109,9 +111,11 @@ def show_error_dialog(
     """
     if topostats_error:
         message += (
-            "\nThis error is potentially caused by an error in TopoStats rather than in this "
-            "napari implementation. You can report your issue on the TopoStats GitHub page."
+            f"\nThis error is potentially caused in the TopoStats package rather than in the Napari "
+            f"front-end you are using.\nPlease report your issue at {NAPARI_TOPOSTATS_REPORT}."
         )
+    else:
+        message += f"\nYou can report this error at {NAPARI_TOPOSTATS_REPORT}"
 
     print(f"Error: {message}")
 
