@@ -93,7 +93,6 @@ disable=C0103,
         useless-suppression,
         deprecated-pragma,
         use-symbolic-message-instead,
-        protected-access,
 
 
 # Enable the message, report, category or checker with the given id(s). You can

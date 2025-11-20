@@ -1,5 +1,6 @@
 """Tests for the I/O functionalities of the plugin."""
 
+# pylint: disable=protected-access
 # pylint: disable=redefined-outer-name
 from pathlib import Path
 from unittest.mock import patch
@@ -16,6 +17,7 @@ from napari_topostats import _io as io
 def open_load_config_widget(qtbot: QtBot, topostats_widget):
     """Simulate clicking the Load Config button in the function grid."""
 
+    # pylint: disable=unused-argument
     def get_file_path(*args, **kwargs):
         return (None, None)
 
@@ -68,9 +70,11 @@ def test_load_config(
 ):
     """Test that loading a config file updates the function parameters correctly."""
 
+    # pylint: disable=unused-argument
     def get_file_path(*args, **kwargs):
         return (test_config_path, None)
 
+    # pylint: disable=unused-argument
     def print_error_message(message: str, raise_exception: bool = False):
         print(f"Error: {message}")
         # If raise_exception is True, raise a ValueError
@@ -81,7 +85,7 @@ def test_load_config(
         "napari_topostats._io.QFileDialog.getOpenFileName",
         side_effect=get_file_path,
     ), patch(
-        "napari_topostats._alerts.show_error_dialog",
+        "napari_topostats._io.show_error_dialog",
         side_effect=print_error_message,
     ):
         if use_default:
