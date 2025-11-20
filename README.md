@@ -43,16 +43,16 @@ To load an image into the napari viewer, drag and drop your image file into the 
 A small window will open prompting you to input the input channel for the image you are loading.
 Enter the channel used by your image (e.g. Height). The loaded image will appear as a layer in the GUI.
 
-![Input channel window](readme_images/input_channel_window.png)
+<img src="readme_images/input_channel_window.png" width="800" alt="Input channel window"/>
 
 Topostats tools can be accessed from the toolbar of napari (top left) as shown.
 
-![Toolbar](readme_images/toolbar.png)
+<img src="readme_images/toolbar.png" width="800" alt="Toolbar"/>
 
 This will then open a window containing buttons with available functions.
 Select a layer, then click the button corresponding to the function you want to run on the layer.
 
-![Button Grid](readme_images/button_grid.png)
+<img src="readme_images/button_grid.png" width="800" alt="Button Grid"/>
 
 Before running the function, you can choose to load a config file using the button and selecting the file.
 Both json and yaml file formats are supported.
@@ -61,7 +61,7 @@ There is also a button to save that file as the new default (instead of the topo
 be reset to the topostats default at anytime by clicking the Reset
 Default Config button in the bottom right of the main window.
 
-![Loading a config file](readme_images/config_file.png)
+<img src="readme_images/config_file.png" width="800" alt="Loading a config file"/>
 
 If you don't load a config file manually, a default config file ("_generated_config.yaml") is created (in your user
 config directory for napari topostats) when you run a function which will then be used for all subsequent functions.
@@ -70,7 +70,7 @@ to be edited directly through the napari gui. Changes made are not automatically
 however, the updated config file can be saved as a file with the Save to file button at the bottom of the window.
 In this window, there is also a button to save the editted config file as the new default.
 
-![Edit config window](readme_images/edit_config_window.png)
+<img src="readme_images/edit_config_window.png" width="800" alt="Edit config window"/>
 
 When you run a function for the first time, a window will open with options to adjust for that function
 (which are applied next time the function is run) if that function has options which can be adjusted.
@@ -78,7 +78,7 @@ There is also a run button in that window. This runs the function on the selecte
 same thing as clicking the function button in the grid). Note this window will only appear if there are options which
 can be adjusted outside of those in the config file.
 
-![Function window](readme_images/function_window.png)
+<img src="readme_images/function_window.png" width="800" alt="Function window"/>
 
 Current functions:
 
