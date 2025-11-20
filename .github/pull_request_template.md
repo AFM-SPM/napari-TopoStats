@@ -12,7 +12,7 @@ description of why a particular item is not relevant.
 
 Before submitting a Pull Request please check the following.
 
-- [ ] Existing tests pass.
+- [ ] Make sure all existing tests pass. **Tests must be run locally as this is a qt based plugin**
 - [ ] Documentation has been updated and builds.
 - [ ] Pre-commit checks pass.
 - [ ] New functions/methods have typehints and docstrings.
