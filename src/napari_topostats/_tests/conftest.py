@@ -15,8 +15,7 @@ from napari_topostats._widget import TopoStatsRootWidget
 @pytest.fixture
 def napari_viewer(qtbot: QtBot):
     """Create a Napari viewer with Qtbot cleanup."""
-    # pylint: disable=not-callable
-    viewer = napari.Viewer(show=False)
+    viewer = napari.Viewer(show=False)  # pylint: disable=not-callable
     qtbot.addWidget(viewer.window._qt_window)
     yield viewer
     viewer.close()

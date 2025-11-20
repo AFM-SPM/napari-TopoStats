@@ -1,3 +1,5 @@
+# pylint: disable=wrong-import-order, wrong-import-position
+
 """
 This module contains four napari widgets declared in
 different ways:
@@ -30,6 +32,8 @@ Replace code below according to your needs.
 """
 
 import os
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from napari import current_viewer
 from qtpy.QtWidgets import (
@@ -48,9 +52,6 @@ if (
     loading_spinner = LoadingWidget(current_viewer())
     loading_spinner.start()
     QApplication.processEvents()
-
-from pathlib import Path
-from typing import TYPE_CHECKING
 
 from magicgui import magicgui
 from magicgui.widgets import CheckBox, Container, FunctionGui, create_widget
@@ -83,12 +84,13 @@ if (
 
 from ._alerts import show_error_dialog
 from ._button_grid import ButtonGrid
-from ._io import _load_config_impl, load_config, write_new_default_config
+from ._io import load_config, load_config_impl, write_new_default_config
 from ._state import MIN_TOPOSTATS_VERSION
 from ._widget_function import WidgetFunction
 
 if TYPE_CHECKING:
     import napari
+
 from qtpy.QtWidgets import QHBoxLayout, QPushButton
 
 if parse_version(topostats_version) < parse_version(MIN_TOPOSTATS_VERSION):
@@ -202,7 +204,7 @@ class TopoStatsRootWidget(QWidget):
             default_config_path = config_dir / "config.yaml"
             if default_config_path.exists():
                 write_new_default_config(default_config_path)
-                _load_config_impl(
+                load_config_impl(
                     self._viewer, config_path=None, use_default=True
                 )
                 bottom_widget.set_status_message(

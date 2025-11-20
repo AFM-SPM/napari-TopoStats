@@ -7,36 +7,10 @@ from unittest.mock import patch
 
 import pytest
 from pytestqt.qtbot import QtBot
-from qtpy.QtCore import Qt
 
 from napari_topostats import _io as io
 
-# --- Helper Functions ---
-
-
-def open_load_config_widget(qtbot: QtBot, topostats_widget):
-    """Simulate clicking the Load Config button in the function grid."""
-
-    # pylint: disable=unused-argument
-    def get_file_path(*args, **kwargs):
-        return (None, None)
-
-    with patch(
-        "napari_topostats._io.QFileDialog.getOpenFileName",
-        side_effect=get_file_path,
-    ):
-        button_grid = topostats_widget.function_grid
-        load_config_button = button_grid.findItems(
-            "Load Config", Qt.MatchExactly
-        )[0]
-        rect = button_grid.visualItemRect(load_config_button)
-        qtbot.mouseClick(
-            button_grid.viewport(), Qt.LeftButton, pos=rect.center()
-        )
-        qtbot.wait(100)
-
-
-# --- Actual Tests ---
+from ._helpers import open_load_config_widget
 
 
 def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
@@ -53,13 +27,24 @@ def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
 @pytest.mark.parametrize(
     ("test_config_path", "use_default", "expected_result"),
     [
-        (
+        pytest.param(
             Path("src/napari_topostats/_tests/_test_data/test_config.yaml"),
             False,
             "SUCCESS",
+            id="Test valid path as if inputted by user in gui",
         ),
-        (Path("This/is/definitely/not/a_real/path"), False, "FAILURE"),
-        (None, True, "SUCCESS"),
+        pytest.param(
+            Path("This/is/definitely/not/a_real/path"),
+            False,
+            "FAILURE",
+            id="Test invalid path as if inputted by user in gui",
+        ),
+        pytest.param(
+            None,
+            True,
+            "SUCCESS",
+            id="Test valid path as if function run automatically",
+        ),
     ],
 )
 def test_load_config(
@@ -89,7 +74,7 @@ def test_load_config(
         side_effect=print_error_message,
     ):
         if use_default:
-            assert io._load_config_impl(
+            assert io.load_config_impl(
                 napari_viewer, None, use_default=use_default
             ), "Default config load failed"
             full_current_config = io.config_wrapper.unflatten()
@@ -99,7 +84,7 @@ def test_load_config(
 
         else:
             # Simulate selecting a config file (assuming a test config file path)
-            result = io._load_config_impl(napari_viewer, test_config_path)
+            result = io.load_config_impl(napari_viewer, test_config_path)
             if result:
                 full_current_config = io.config_wrapper.unflatten()
 
