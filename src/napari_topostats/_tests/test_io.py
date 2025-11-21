@@ -55,23 +55,24 @@ def test_load_config(
 ):
     """Test that loading a config file updates the function parameters correctly."""
 
-    # pylint: disable=unused-argument
-    def get_file_path(*args, **kwargs):
+    def get_file_path():
         return (test_config_path, None)
 
-    # pylint: disable=unused-argument
     def print_error_message(message: str, raise_exception: bool = False):
         print(f"Error: {message}")
         # If raise_exception is True, raise a ValueError
         if raise_exception:
             raise ValueError(message)
 
-    with patch(
-        "napari_topostats._io.QFileDialog.getOpenFileName",
-        side_effect=get_file_path,
-    ), patch(
-        "napari_topostats._io.show_error_dialog",
-        side_effect=print_error_message,
+    with (
+        patch(
+            "napari_topostats._io.QFileDialog.getOpenFileName",
+            side_effect=get_file_path,
+        ),
+        patch(
+            "napari_topostats._io.show_error_dialog",
+            side_effect=print_error_message,
+        ),
     ):
         if use_default:
             assert io.load_config_impl(

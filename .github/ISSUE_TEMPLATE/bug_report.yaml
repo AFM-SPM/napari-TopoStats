@@ -57,7 +57,7 @@ body:
     id: version-napari-topostats
     attributes:
       label: Napari-TopoStats Version
-      description: What version of our napari plugin are you running? You can find this out using `pip show napari-topostats`.
+      description: What version of our napari-TopoStats plugin are you running? You can find this out using `pip show napari-topostats`.
       options:
         - 0.1
         - Git main branch
@@ -68,7 +68,7 @@ body:
     id: version-topostats
     attributes:
       label: TopoStats Version
-      description: What version of our software are you running? You can find this out using `pip show topostats`.
+      description: What version of TopoStats are you running? You can find this out using `pip show topostats`.
       options:
         - 2.3.1
         - 2.3.2
@@ -80,7 +80,7 @@ body:
     id: version-napari-afmreader
     attributes:
       label: Napari-AFMReader Version
-      description: What version of napari-afmreader are you running? You can find this out using `pip show napari-afmreader`.
+      description: What version of napari-AFMReader are you running? You can find this out using `pip show napari-afmreader`.
       options:
         - 0.0.1
         - 0.0.2
@@ -92,12 +92,9 @@ body:
       description: |
         What version of Python are you running? If unsure type `python --version`.
       options:
-        - 3.8
-        - 3.9
         - 3.10
         - 3.11
-        - 3.12
-      default: 3
+      default: 1
     validations:
       required: true
   - type: dropdown
