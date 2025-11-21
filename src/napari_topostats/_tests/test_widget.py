@@ -1,66 +1,72 @@
-import numpy as np
+"""Tests for the widget functionalities of the plugin."""
 
-from napari_topostats._widget import (
-    ExampleQWidget,
-    ImageThreshold,
-    threshold_autogenerate_widget,
-    threshold_magic_widget,
+# pylint: disable=redefined-outer-name
+from pathlib import Path
+
+import pytest
+from pytestqt.qtbot import QtBot
+
+from ._helpers import load_test_image, run_functions_in_grid
+
+
+def test_button_grid_exists(topostats_widget):
+    """Ensure the function grid loads correctly."""
+    assert (
+        topostats_widget.function_grid.functions is not None
+    ), "Function grid did not initialize"
+
+
+@pytest.mark.parametrize(
+    "image_path",
+    [
+        pytest.param(
+            str(Path("src/napari_topostats/_tests/_test_data/test_spm.spm")),
+            id="Testing loading with valid image path",
+        )
+    ],
 )
+def test_load_image(napari_viewer, image_path):
+    """Verify that a test AFM image loads properly."""
+    layer = load_test_image(napari_viewer, image_path)
+    assert layer is not None, "Failed to load test image"
 
 
-def test_threshold_autogenerate_widget():
-    # because our "widget" is a pure function, we can call it and
-    # test it independently of napari
-    im_data = np.random.random((100, 100))
-    thresholded = threshold_autogenerate_widget(im_data, 0.5)
-    assert thresholded.shape == im_data.shape
-    # etc.
-
-
-# make_napari_viewer is a pytest fixture that returns a napari viewer object
-# you don't need to import it, as long as napari is installed
-# in your testing environment
-def test_threshold_magic_widget(make_napari_viewer):
-    viewer = make_napari_viewer()
-    layer = viewer.add_image(np.random.random((100, 100)))
-
-    # our widget will be a MagicFactory or FunctionGui instance
-    my_widget = threshold_magic_widget()
-
-    # if we "call" this object, it'll execute our function
-    thresholded = my_widget(viewer.layers[0], 0.5)
-    assert thresholded.shape == layer.data.shape
-    # etc.
-
-
-def test_image_threshold_widget(make_napari_viewer):
-    viewer = make_napari_viewer()
-    layer = viewer.add_image(np.random.random((100, 100)))
-    my_widget = ImageThreshold(viewer)
-
-    # because we saved our widgets as attributes of the container
-    # we can set their values without having to "interact" with the viewer
-    my_widget._image_layer_combo.value = layer
-    my_widget._threshold_slider.value = 0.5
-
-    # this allows us to run our functions directly and ensure
-    # correct results
-    my_widget._threshold_im()
-    assert len(viewer.layers) == 2
-
-
-# capsys is a pytest fixture that captures stdout and stderr output streams
-def test_example_q_widget(make_napari_viewer, capsys):
-    # make viewer and add an image layer using our fixture
-    viewer = make_napari_viewer()
-    viewer.add_image(np.random.random((100, 100)))
-
-    # create our widget, passing in the viewer
-    my_widget = ExampleQWidget(viewer)
-
-    # call our widget method
-    my_widget._on_click()
-
-    # read captured output and check that it's as we expected
-    captured = capsys.readouterr()
-    assert captured.out == "napari has 1 layers\n"
+# pylint: disable=too-many-positional-arguments
+@pytest.mark.parametrize(
+    ("image_path", "run_function_on", "expected_layers"),
+    [
+        pytest.param(
+            str(Path("src/napari_topostats/_tests/_test_data/test_spm.spm")),
+            [
+                "test image",
+                "test image Filter Image",
+                "test image Filter Image",
+                "test image Filter Image Grains Mask",
+            ],
+            [
+                "test image",
+                "test image Filter Image",
+                "test image Filter Image Grains Mask",
+                "test image Filter 3D Image",
+            ],
+            id="Testing all the functions in standard order",
+        )
+    ],
+)
+def test_functions_in_grid(
+    qtbot: QtBot,
+    napari_viewer,
+    topostats_widget,
+    image_path,
+    run_function_on,
+    expected_layers,
+):
+    """End-to-end test: load image, run functions, and verify layers."""
+    load_test_image(napari_viewer, image_path)
+    run_functions_in_grid(
+        qtbot,
+        topostats_widget,
+        napari_viewer,
+        run_function_on,
+        expected_layers,
+    )

@@ -589,12 +589,13 @@ class WidgetFunction:
     function_key : str | None, optional
         The key for the function in the configuration dictionary.
     function_to_run : Callable | None, optional
-        The function to run when the widget is triggered. This can be a FunctionGui or a regular function. This function
-        can be directly from the topostats module or a custom function that is defined in the napari-TopoStats plugin.
+        The function to run when the widget is triggered. This can be a FunctionGui or a regular function. This
+        function can be directly from the topostats module or a custom function that is defined in the napari-TopoStats
+        plugin.
     type_class : Any | None, optional
         The class type that the function belongs to, if applicable. This is used to instantiate the class and call the
-        method. This may not be required for all functions, so it can be None. It is used if an instance of the enclosing
-        class is required to run the function.
+        method. This may not be required for all functions, so it can be None. It is used if an instance of the
+        enclosing class is required to run the function.
     uses_config : bool, optional
         Whether the function uses a configuration file to set its parameters. If True, the function will
         load the configuration file and use it to set the parameters. If False, the function will
@@ -669,7 +670,7 @@ class WidgetFunction:
         if self.uses_config and (
             io.config_wrapper is None or io.full_config_container is None
         ):
-            io._load_config_impl(current_viewer(), use_default=True)
+            io.load_config_impl(current_viewer(), use_default=True)
         try:
             # If path_to_data is not set, default to "return" or "obj" if type_class is provided
             if self.path_to_data is None:
@@ -946,7 +947,8 @@ class WidgetFunction:
                 else parameters_from_function
             ):
                 if p.name == "image":
-                    # Sets the default image to the currently selected image in the viewer (at the time of opening the widget)
+                    # Sets the default image to the currently selected image in the viewer
+                    # Doneat the time of opening the widget
                     selected_image = get_selected_image(current_viewer())
                     if selected_image is not None:
                         new_p = p.replace(

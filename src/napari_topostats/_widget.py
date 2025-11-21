@@ -1,3 +1,5 @@
+# pylint: disable=wrong-import-order, wrong-import-position
+
 """
 This module contains four napari widgets declared in
 different ways:
@@ -30,6 +32,8 @@ Replace code below according to your needs.
 """
 
 import os
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from napari import current_viewer
 from qtpy.QtWidgets import (
@@ -49,15 +53,14 @@ if (
     loading_spinner.start()
     QApplication.processEvents()
 
-from pathlib import Path
-from typing import TYPE_CHECKING
-
 from magicgui import magicgui
 from magicgui.widgets import CheckBox, Container, FunctionGui, create_widget
 from napari.layers import Image, Labels
 from napari.viewer import Viewer
+from packaging.version import parse as parse_version
 from platformdirs import user_config_dir
 from skimage.util import img_as_float
+from topostats import __version__ as topostats_version
 from topostats.filters import Filters
 from topostats.grains import Grains
 
@@ -79,13 +82,24 @@ if (
 ):
     loading_spinner.stop()
 
+from ._alerts import show_error_dialog
 from ._button_grid import ButtonGrid
-from ._io import _load_config_impl, load_config, write_new_default_config
+from ._io import load_config, load_config_impl, write_new_default_config
+from ._state import MIN_TOPOSTATS_VERSION
 from ._widget_function import WidgetFunction
 
 if TYPE_CHECKING:
     import napari
+
 from qtpy.QtWidgets import QHBoxLayout, QPushButton
+
+if parse_version(topostats_version) < parse_version(MIN_TOPOSTATS_VERSION):
+    show_error_dialog(
+        f"TopoStats version {topostats_version} is outdated and does not work with this plugin."
+        f"Please install at least TopoStats version {MIN_TOPOSTATS_VERSION}.\n"
+        f"This can be done with `pip install topostats=={MIN_TOPOSTATS_VERSION}`",
+        raise_exception=True,
+    )
 
 AVAILABLE_FUNCTIONS = [
     WidgetFunction(
@@ -190,7 +204,7 @@ class TopoStatsRootWidget(QWidget):
             default_config_path = config_dir / "config.yaml"
             if default_config_path.exists():
                 write_new_default_config(default_config_path)
-                _load_config_impl(
+                load_config_impl(
                     self._viewer, config_path=None, use_default=True
                 )
                 bottom_widget.set_status_message(

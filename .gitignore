@@ -13,6 +13,7 @@ _version.py
 # User-Specific config file
 output/config.yaml
 
+
 # Source / output data
 .dropbox
 *.png
@@ -36,6 +37,10 @@ output/config.yaml
 !icons/**
 !readme_images/
 !readme_images/**
+
+# Include test data
+!src/napari_topostats/_tests/_test_data/
+!src/napari_topostats/_tests/_test_data/**
 
 # IDE
 .vscode/

@@ -1,3 +1,7 @@
+# pylint: disable=too-few-public-methods
+
+"""Provides functionality for loading and editting config files"""
+
 import json
 import re
 from argparse import Namespace
@@ -32,7 +36,8 @@ try:
     from topostats.config import write_config_with_comments
 except ImportError:
     show_error_dialog(
-        f"TopoStats version {topostats_version} is not supported. Please install the latest version of TopoStats or if that fails, install version {state.MIN_TOPOSTATS_VERSION}."
+        f"TopoStats version {topostats_version} is not supported. Please install the latest version of TopoStats"
+        f"or if that fails, install version {state.MIN_TOPOSTATS_VERSION}."
     )
 
 
@@ -61,6 +66,7 @@ class ConfigWrapper:
         return items
 
     def unflatten(self) -> dict:
+        """Function used for reverting to the dict form where keys can correspond to dict values like json format"""
         result = {}
         for k, v in self.flat.items():
             keys = k.split(".")
@@ -72,12 +78,14 @@ class ConfigWrapper:
 
 
 def collect_values(container: Container) -> dict[str, Any]:
+    """Collect config values from edit config window"""
     result = {}
     for widget in container:
         val = widget.value
         name = widget.name
         if isinstance(val, str) and val.strip().startswith("["):
             try:
+                # pylint: disable=import-outside-toplevel
                 import ast
 
                 val = ast.literal_eval(val)
@@ -92,6 +100,7 @@ def collect_values(container: Container) -> dict[str, Any]:
 def build_dynamic_widget(
     flat_config: dict[str, Any], descriptions: dict[str, str] = None
 ) -> Container:
+    """Builds a widget for each editable item in the config and add it to a container"""
     widgets = []
     for key, value in flat_config.items():
         current_tooltip_text = (
@@ -130,6 +139,7 @@ def build_dynamic_widget(
 
 
 def write_new_default_config(config_path: Path):
+    """Writes a default config file to the provided path using the topostats backend"""
     args = Namespace()
     args.config = None
     args.filename = config_path.name
@@ -138,9 +148,11 @@ def write_new_default_config(config_path: Path):
     write_config_with_comments(args)
 
 
-def _load_config_impl(
+def load_config_impl(
     viewer: Viewer, config_path: Path | None = None, use_default: bool = False
 ):
+    """Loads config file using default if no path is provided and asking for data from user as required"""
+    # pylint: disable=global-statement
     global comment_descriptions, config_wrapper, full_config_container  # Updated global name
     if config_path is None:
         if use_default:
@@ -163,7 +175,7 @@ def _load_config_impl(
             widget.config_path.value = config_path
 
     try:
-        with open(config_path) as f:
+        with open(config_path, encoding="utf-8") as f:
             if config_path.suffix.lower() in [".yaml", ".yml"]:
                 config = yaml.safe_load(f)
             elif config_path.suffix.lower() == ".json":
@@ -180,7 +192,7 @@ def _load_config_impl(
         OSError,
     ) as e:
         show_error_dialog(f"Failed to load config: {e}")
-        return
+        return False
 
     comment_descriptions = extract_inline_comments(config_path)
     if config is None:
@@ -193,7 +205,7 @@ def _load_config_impl(
     )
     if full_config_container is None:
         show_error_dialog("Failed to create full config container.")
-        return
+        return False
     if "Edit Full Config" not in state.docked_widgets:
         # Create a button to open the config editor
         btn = QPushButton("Edit Config")
@@ -228,7 +240,7 @@ def load_config(viewer: Viewer, config_path: Path | None = None):
     This is a magicgui function that can be called directly from the napari GUI and is an example of a hardcoded
     function being implemented using the dynamic function widget system.
     """
-    return _load_config_impl(viewer, config_path)
+    return load_config_impl(viewer, config_path)
 
 
 def set_up_load_config_widget(widget):
@@ -244,6 +256,7 @@ def set_up_load_config_widget(widget):
 
 
 def save_as_default_config(config: dict[str, Any]):
+    """Saves the config as the new default"""
     config_dir = Path(user_config_dir("TopoStats", "Napari"))
     config_path = config_dir / "config.yaml"
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -251,7 +264,7 @@ def save_as_default_config(config: dict[str, Any]):
 
 
 def add_save_as_default_button(widget):
-    """Add a 'Save as Default' and 'Reset default' button to the load_config widget."""
+    """Add a 'Save as Default' button to the load_config widget."""
     button_row = QHBoxLayout()
     save_button = QPushButton("Save as Default Config")
     save_button.setToolTip(
@@ -259,7 +272,6 @@ def add_save_as_default_button(widget):
     )
 
     def on_save_clicked():
-        global config_wrapper
         if config_wrapper is None:
             show_error_dialog("No configuration loaded to save.")
             return
@@ -327,6 +339,7 @@ def extract_inline_comments(
 
 
 def create_info_icon(tooltip_text: str) -> QToolButton:
+    """Creates an info icon that can be hovered over to explain each config attribute"""
     button = QToolButton()
     icon = QIcon.fromTheme("help-about")
 
@@ -345,6 +358,7 @@ def create_info_icon(tooltip_text: str) -> QToolButton:
 
 
 def open_config_editor(viewer: Viewer):
+    """Opens and renders the config editor with only certain top level keys available"""
     global config_wrapper, full_config_container, comment_descriptions
 
     if config_wrapper is None:
@@ -471,7 +485,9 @@ def open_config_editor(viewer: Viewer):
 
 
 def save_config_to_file(file_path: Path, full_config: dict[str, Any]):
+    """Saves the config to a file, displaying an error message if it fails."""
     try:
+        print(json.dumps(full_config, indent=2))
         if file_path.suffix.lower() == ".json":
             with open(file_path, "w") as f:
                 json.dump(full_config, f, indent=2)

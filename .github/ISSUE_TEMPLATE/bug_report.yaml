@@ -1,0 +1,124 @@
+name: Bug report
+description: Create a report to help us improve
+title: "[Bug]: "
+labels: "bug"
+assignees:
+  - ""
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **NB** Napari-TopoStats relies on the [napari-AFMReader](https://github.com/AFM-SPM/napari-AFMReader) package and the [TopoStats](https://github.com/AFM-SPM/TopoStats) package. Please ensure that the bug you experience is related to this repository, or post it on the [napari-AFMReader](https://github.com/AFM-SPM/napari-AFMReader/) repository or the [TopoStats](https://github.com/AFM-SPM/TopoStats) repository as appropriate.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      description: A Checklist is provided below for you to track each of the subsequent tasks.
+      options:
+        - label: Find the offending file.
+          required: true
+        - label: Describe the bug.
+          required: true
+        - label: Copy of the command-line output while Napari was running and produced the error.
+          required: true
+        - label: The Napari-TopoStats version, this is reported by `pip show napari-TopoStats`
+          required: true
+        - label: The TopoStats version, this is reported by `pip show topostats`
+          required: true
+        - label: The Napari-AFMReader version, this is reported by `pip show napari-afmreader`
+          required: true
+        - label: Operating System and Python Version
+          required: true
+  - type: textarea
+    id: describe-the-bug
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is and what may be causing it.
+    validations:
+      required: true
+  - type: textarea
+    id: copy-of-output
+    attributes:
+      label: Copy of the command-line output while Napari was running and produced the error.
+      description: |
+        Please copy of the command-line output while Napari was running and produced the error below (you can use [GitHub Markdown](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax) to format as a [code block](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#quoting-code) using triple backticks). At a minimum this should include the bottom section showing where the error arose and the subsequent output. If there is no output and an image shows the problem please paste a URL to that image here. If able to include any images which demonstrate the problem please attach them using the paper clip in the menu above. Screenshots invariably miss out some information.
+    validations:
+      required: true
+  - type: textarea
+    id: to-reproduce
+    attributes:
+      label: To Reproduce
+      description: |
+        If it is possible to share the file (e.g. via cloud services) that caused the error that would greatly assist in reproducing and investigating the problem. In addition, the _exact_ process that was used and failed should be pasted below.
+    validations:
+      required: false
+  - type: dropdown
+    id: version-napari-topostats
+    attributes:
+      label: Napari-TopoStats Version
+      description: What version of our napari plugin are you running? You can find this out using `pip show napari-topostats`.
+      options:
+        - 0.1
+        - Git main branch
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: version-topostats
+    attributes:
+      label: TopoStats Version
+      description: What version of our software are you running? You can find this out using `pip show topostats`.
+      options:
+        - 2.3.1
+        - 2.3.2
+        - Git main branch
+      default: 1
+    validations:
+      required: true
+  - type: dropdown
+    id: version-napari-afmreader
+    attributes:
+      label: Napari-AFMReader Version
+      description: What version of napari-afmreader are you running? You can find this out using `pip show napari-afmreader`.
+      options:
+        - 0.0.1
+        - 0.0.2
+        - Git main branch
+  - type: dropdown
+    id: version-python
+    attributes:
+      label: Python Version
+      description: |
+        What version of Python are you running? If unsure type `python --version`.
+      options:
+        - 3.8
+        - 3.9
+        - 3.10
+        - 3.11
+        - 3.12
+      default: 3
+    validations:
+      required: true
+  - type: dropdown
+    id: version-os
+    attributes:
+      label: Operating System
+      description: |
+        What Operating System are you running?
+      options:
+        - Windows
+        - MacOS Intel (pre-2021)
+        - MacOS M1/M2 (post-2021)
+        - GNU/Linux
+      default: 3
+    validations:
+      required: true
+  - type: textarea
+    id: version-dependencies
+    attributes:
+      label: Python Packages
+      description: |
+        If you are able to provide a list of your installed packages that may be useful. The best way to get this is to copy and paste the results of typing `pip freeze`.
+    validations:
+      required: false
