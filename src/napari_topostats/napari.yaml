@@ -6,23 +6,6 @@ visibility: public
 categories: ["Annotation", "Segmentation", "Acquisition"]
 contributions:
   commands:
-
-    - id: napari-TopoStats.get_topostats_filter_widget
-      python_name: napari_topostats._widget:get_topostats_filter_widget
-      title: Run Filters
-
-    - id: napari-TopoStats.make_3d_widget
-      python_name: napari_topostats:make_3d
-      title: Turn 2D image into 3D stack
-    
-    - id: napari-TopoStats.load_grains_config_widget
-      python_name: napari_topostats._widget:get_load_config_widget
-      title: Load TopoStats Config
-
-    - id: napari-TopoStats.run_grains_widget
-      python_name: napari_topostats._widget:get_grains_widget
-      title: Run Grains
-
     - id: napari-TopoStats.write_multiple
       python_name: napari_topostats._writer:write_multiple
       title: Save multi-layer data with TopoStats
@@ -35,10 +18,6 @@ contributions:
       python_name: napari_topostats._sample_data:make_sample_data
       title: Load sample data from TopoStats
 
-    - id: napari-TopoStats.make_container_widget
-      python_name: napari_topostats:ImageThreshold
-      title: Make threshold Container widget
-    
     - id: napari-TopoStats.make_root_widget
       python_name: napari_topostats:TopoStatsRootWidget
       title: TopoStats
