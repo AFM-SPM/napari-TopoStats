@@ -183,7 +183,9 @@ def _load_config_impl(
         return
 
     comment_descriptions = extract_inline_comments(config_path)
-
+    if config is None:
+        show_error_dialog("Please select a file containing valid config data.")
+        return False
     config_wrapper = ConfigWrapper(config)
 
     full_config_container = build_dynamic_widget(
