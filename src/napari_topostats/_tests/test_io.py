@@ -47,27 +47,24 @@ def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
         ),
     ],
 )
+# ns-rse 2025-11-26 : See issue #72
 def test_load_config(
     napari_viewer,
-    test_config_path,
-    use_default,
-    expected_result,
+    test_config_path: Path,
+    use_default: bool,
+    expected_result: str,
 ):
     """Test that loading a config file updates the function parameters correctly."""
 
-    def get_file_path():
-        return (test_config_path, None)
-
     def print_error_message(message: str, raise_exception: bool = False):
         print(f"Error: {message}")
-        # If raise_exception is True, raise a ValueError
         if raise_exception:
             raise ValueError(message)
 
     with (
         patch(
             "napari_topostats._io.QFileDialog.getOpenFileName",
-            side_effect=get_file_path,
+            side_effect=(test_config_path, None),
         ),
         patch(
             "napari_topostats._io.show_error_dialog",
