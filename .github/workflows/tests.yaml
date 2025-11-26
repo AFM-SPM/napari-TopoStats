@@ -17,17 +17,15 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: 3.11
-      - name: Upgrade pip and install test dependencies
+      - name: Upgrade pip/setuptools/virtualenv and install test dependencies
         run: |
-          pip install --upgrade virtualenv
-          pip install --upgrade pip setuptools
-          pip show pip setuptools
+          pip install --upgrade pip setuptools virtualenv
           virtualenv --upgrade-embed-wheels
           # virtualenv --reset-app-data
           pip install -e .[tests]
       - name: Test with pytest
         run: |
-          pytest --cov=napari-afmreader -x
+          pytest --cov=src/napari_topostats -x
       - name: Determine coverage
         run: |
           coverage xml
