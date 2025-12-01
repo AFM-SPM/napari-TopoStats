@@ -19,7 +19,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Setup PyVista headless display with Qt support
-        uses: pyvista/setup-headless-display-action@v3
+        uses: pyvista/setup-headless-display-action@v4
         with:
           qt: true
       - name: Setup Python ${{ matrix.python-version }}
