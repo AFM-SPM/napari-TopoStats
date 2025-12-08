@@ -182,9 +182,7 @@ def remove_nonlinear(
         gaussian_size=1.0121397464510862,
         gaussian_mode="nearest",
     )
-    removed_nonlinear = filtered_image.remove_nonlinear_polynomial(
-        image=image, mask=mask
-    )
+    removed_nonlinear = filtered_image.remove_nonlinear_polynomial(image=image, mask=mask)
     return removed_nonlinear
 
 
@@ -205,9 +203,7 @@ def average_background(
         gaussian_mode="nearest",
     )
 
-    removed_nonlinear = filtered_image.average_background(
-        image=image, mask=mask
-    )
+    removed_nonlinear = filtered_image.average_background(image=image, mask=mask)
     return removed_nonlinear
 
 

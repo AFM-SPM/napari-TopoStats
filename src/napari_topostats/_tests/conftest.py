@@ -15,9 +15,7 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 def napari_viewer_fixture(qtbot: QtBot):
     """Create a Napari viewer with QtBot cleanup."""
     viewer = napari.Viewer(show=False)
-    qtbot.addWidget(
-        viewer.window._qt_window
-    )  # pylint: disable=protected-access
+    qtbot.addWidget(viewer.window._qt_window)  # pylint: disable=protected-access
     yield viewer
     viewer.close()
 

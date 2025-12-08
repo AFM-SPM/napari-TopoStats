@@ -10,9 +10,7 @@ from ._helpers import load_test_image, run_functions_in_grid
 
 def test_button_grid_exists(topostats_widget):
     """Ensure the function grid loads correctly."""
-    assert (
-        topostats_widget.function_grid.functions is not None
-    ), "Function grid did not initialize"
+    assert topostats_widget.function_grid.functions is not None, "Function grid did not initialize"
 
 
 @pytest.mark.parametrize(

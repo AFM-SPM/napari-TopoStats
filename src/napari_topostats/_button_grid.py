@@ -143,16 +143,12 @@ class ButtonGrid(QListWidget):
             widget = self.get_widget_from_function(item.text())
             for param in widget:
                 if param.name != "call_button":
-                    self.viewer.window.add_dock_widget(
-                        widget, name=item.text()
-                    )
+                    self.viewer.window.add_dock_widget(widget, name=item.text())
                     self.docked_functions[item.text()] = widget
                     break
         elif not self.docked_functions[item.text()].native.isVisible():
             widget = self.get_widget_from_function(item.text())
-            self.docked_functions[
-                item.text()
-            ].native.destroy()  # Remove the widget if it is not visible
+            self.docked_functions[item.text()].native.destroy()  # Remove the widget if it is not visible
             self.viewer.window.add_dock_widget(widget, name=item.text())
             self.docked_functions[item.text()] = widget
         else:
@@ -168,9 +164,7 @@ class ButtonGrid(QListWidget):
                 widget.viewer.value = self.viewer
             widget()
 
-    def get_widget_from_function(
-        self, function_name: str
-    ) -> FunctionGui | None:
+    def get_widget_from_function(self, function_name: str) -> FunctionGui | None:
         function_from_list = self.functions.get(function_name)
         if isinstance(function_from_list, WidgetFunction):
             # If the function is a WidgetFunction, get its GUI representation.
