@@ -1,6 +1,5 @@
 """Tests for the widget functionalities of the plugin."""
 
-# pylint: disable=redefined-outer-name
 from pathlib import Path
 
 import pytest
@@ -11,9 +10,7 @@ from ._helpers import load_test_image, run_functions_in_grid
 
 def test_button_grid_exists(topostats_widget):
     """Ensure the function grid loads correctly."""
-    assert (
-        topostats_widget.function_grid.functions is not None
-    ), "Function grid did not initialize"
+    assert topostats_widget.function_grid.functions is not None, "Function grid did not initialize"
 
 
 @pytest.mark.parametrize(
@@ -31,7 +28,6 @@ def test_load_image(napari_viewer, image_path):
     assert layer is not None, "Failed to load test image"
 
 
-# pylint: disable=too-many-positional-arguments
 @pytest.mark.parametrize(
     ("image_path", "run_function_on", "expected_layers"),
     [
@@ -53,7 +49,7 @@ def test_load_image(napari_viewer, image_path):
         )
     ],
 )
-def test_functions_in_grid(
+def test_functions_in_grid(  # pylint: disable=too-many-positional-arguments
     qtbot: QtBot,
     napari_viewer,
     topostats_widget,

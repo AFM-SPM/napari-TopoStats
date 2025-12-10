@@ -1,0 +1,44 @@
+name: Run the pytest test suite
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Run pytest (${{ matrix.platform }} ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11"]
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Setup PyVista headless display with Qt support
+        uses: pyvista/setup-headless-display-action@v4
+        with:
+          qt: true
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Upgrade pip/setuptools/virtualenv and install test dependencies
+        run: |
+          pip install --upgrade pip setuptools virtualenv
+          virtualenv --upgrade-embed-wheels
+          # virtualenv --reset-app-data
+          pip install -e .[tests]
+      - name: Test with pytest
+        run: |
+          pytest --cov=src/napari_topostats -x
+      - name: Determine coverage
+        run: |
+          coverage xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
