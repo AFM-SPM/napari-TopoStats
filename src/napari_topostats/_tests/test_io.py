@@ -19,9 +19,7 @@ def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
     open_load_config_widget(qtbot, topostats_widget)
 
     # Check that the load config widget exists in dock
-    assert (
-        "Load Config" in napari_viewer.window._dock_widgets
-    ), "Load Config widget not found in dock widgets."
+    assert "Load Config" in napari_viewer.window._dock_widgets, "Load Config widget not found in dock widgets."
 
 
 @pytest.mark.parametrize(
@@ -72,13 +70,9 @@ def test_load_config(
         ),
     ):
         if use_default:
-            assert io.load_config_impl(
-                napari_viewer, None, use_default=use_default
-            ), "Default config load failed"
+            assert io.load_config_impl(napari_viewer, None, use_default=use_default), "Default config load failed"
             full_current_config = io.config_wrapper.unflatten()
-            assert (
-                full_current_config is not None
-            ), "Failed to retrieve current config after loading default."
+            assert full_current_config is not None, "Failed to retrieve current config after loading default."
 
         else:
             # Simulate selecting a config file (assuming a test config file path)
@@ -88,9 +82,7 @@ def test_load_config(
 
                 with open(test_config_path, encoding="utf-8") as f:
                     expected_config = io.yaml.safe_load(f)
-                overlap_keys = set(full_current_config.keys()).intersection(
-                    set(expected_config.keys())
-                )
+                overlap_keys = set(full_current_config.keys()).intersection(set(expected_config.keys()))
                 if "run" in overlap_keys:
                     overlap_keys.remove("run")
                 for key in overlap_keys:
@@ -98,6 +90,4 @@ def test_load_config(
                         full_current_config[key] == expected_config[key]
                     ), f"Config key '{key}' does not match expected value."
             else:
-                assert (
-                    expected_result == "FAILURE"
-                ), "Config load was expected to succeed but failed."
+                assert expected_result == "FAILURE", "Config load was expected to succeed but failed."

@@ -31,11 +31,14 @@ References:
 Replace code below according to your needs.
 """
 
+# ns-rse 2025-12-08 - We seem to need to allow ungrouped imports so that LoadingWidget() can be used
+# pylint: disable=ungrouped-imports
+
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from napari import current_viewer
+from napari import current_viewer  # pylint: disable=no-name-in-module
 from qtpy.QtWidgets import (
     QApplication,
     QSizePolicy,
@@ -45,10 +48,7 @@ from qtpy.QtWidgets import (
 
 from ._alerts import LoadingWidget, attach_status_label
 
-if (
-    os.environ.get("QT_QPA_PLATFORM") != "offscreen"
-    and QApplication.instance() is not None
-):
+if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() is not None:
     loading_spinner = LoadingWidget(current_viewer())
     loading_spinner.start()
     QApplication.processEvents()
@@ -76,10 +76,7 @@ from napari_topostats.utils import (
     remove_tilt,
 )
 
-if (
-    os.environ.get("QT_QPA_PLATFORM") != "offscreen"
-    and QApplication.instance() is not None
-):
+if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() is not None:
     loading_spinner.stop()
 
 from ._alerts import show_error_dialog
@@ -93,12 +90,12 @@ if TYPE_CHECKING:
 
 from qtpy.QtWidgets import QHBoxLayout, QPushButton
 
-if parse_version(topostats_version) < parse_version(MIN_TOPOSTATS_VERSION):
+if parse_version(parse_version(topostats_version).base_version) < parse_version(MIN_TOPOSTATS_VERSION):
     show_error_dialog(
         f"TopoStats version {topostats_version} is outdated and does not work with this plugin."
         f"Please install at least TopoStats version {MIN_TOPOSTATS_VERSION}.\n"
         f"This can be done with `pip install topostats=={MIN_TOPOSTATS_VERSION}`",
-        raise_exception=True,
+        raise_exception=False,
     )
 
 AVAILABLE_FUNCTIONS = [
@@ -155,7 +152,7 @@ def open_options():
 
 
 # Added comments
-class TopoStatsRootWidget(QWidget):
+class TopoStatsRootWidget(QWidget):  # pylint: disable=too-few-public-methods
     """
     A root widget where all topostats functions can be accessed.
     This widget serves as a container for the button grid and provides
@@ -169,14 +166,10 @@ class TopoStatsRootWidget(QWidget):
         # Make layout so children are arranged vertically
         layout = QVBoxLayout(self)
         # Add the function grid to the layout with the available functions
-        self.function_grid = ButtonGrid(
-            self, functions=self.get_functions(), viewer=self._viewer
-        )
+        self.function_grid = ButtonGrid(self, functions=self.get_functions(), viewer=self._viewer)
         # Set the size policy to allow the widget to expand
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.function_grid.setSizePolicy(
-            QSizePolicy.Expanding, QSizePolicy.Expanding
-        )
+        self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         # Set the layout margins and add the function grid
         layout.setContentsMargins(5, 5, 5, 5)
         layout.addWidget(self.function_grid)
@@ -186,34 +179,24 @@ class TopoStatsRootWidget(QWidget):
 
         # Create a container for the status label that doesn't expand
         status_container = QWidget()
-        status_container.setSizePolicy(
-            QSizePolicy.Preferred, QSizePolicy.Fixed
-        )
+        status_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         status_layout = QHBoxLayout(status_container)
         status_layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(status_container)
         bottom_row.addStretch()  # Push button to the right
 
         reset_button = QPushButton("Reset Default Config")
-        reset_button.setToolTip(
-            "Reset the default configuration to the original TopoStats default."
-        )
+        reset_button.setToolTip("Reset the default configuration to the original TopoStats default.")
 
         def on_reset_clicked():
             config_dir = Path(user_config_dir("TopoStats", "Napari"))
             default_config_path = config_dir / "config.yaml"
             if default_config_path.exists():
                 write_new_default_config(default_config_path)
-                load_config_impl(
-                    self._viewer, config_path=None, use_default=True
-                )
-                bottom_widget.set_status_message(
-                    "✅ Default configuration reset successfully."
-                )
+                load_config_impl(self._viewer, config_path=None, use_default=True)
+                bottom_widget.set_status_message("✅ Default configuration reset successfully.")
             else:
-                bottom_widget.set_status_message(
-                    "No default configuration file found to reset."
-                )
+                bottom_widget.set_status_message("No default configuration file found to reset.")
 
         reset_button.clicked.connect(on_reset_clicked)
         bottom_row.addWidget(reset_button)
@@ -259,7 +242,7 @@ class TopoStatsRootWidget(QWidget):
         return functions
 
 
-def remove_scars_from_image(
+def remove_scars_from_image(  # pylint: disable=too-many-positional-arguments
     image: "napari.types.ImageData",
     removal_iterations: int = 2,
     threshold_low: float = 0.250,
@@ -490,21 +473,19 @@ def gaussian_filter_image(
 # if we want even more control over our widget, we can use
 # magicgui `Container`
 class ImageThreshold(Container):
+    """Image Threshold widget."""
+
     def __init__(self, viewer: "napari.viewer.Viewer"):
         super().__init__()
         self._viewer = viewer
         # use create_widget to generate widgets from type annotations
-        self._image_layer_combo = create_widget(
-            label="Image", annotation="napari.layers.Image"
-        )
-        self._threshold_slider = create_widget(
-            label="Threshold", annotation=float, widget_type="FloatSlider"
-        )
+        self._image_layer_combo = create_widget(label="Image", annotation="napari.layers.Image")
+        self._threshold_slider = create_widget(label="Threshold", annotation=float, widget_type="FloatSlider")
         self._threshold_slider.min = 0
         self._threshold_slider.max = 1
         # use magicgui widgets directly
         self._invert_checkbox = CheckBox(text="Keep pixels below threshold")
-        Image(self._viewer, self._image_layer_combo.value)
+        Image(self._viewer, self._image_layer_combo.value)  # pylint: disable=too-many-function-args
 
         # connect your own callbacks
         self._threshold_slider.changed.connect(self._threshold_im)
@@ -527,11 +508,7 @@ class ImageThreshold(Container):
         image = img_as_float(image_layer.data)
         name = image_layer.name + "_thresholded"
         threshold = self._threshold_slider.value
-        thresholded = (
-            image < threshold
-            if self._invert_checkbox.value
-            else image > threshold
-        )
+        thresholded = image < threshold if self._invert_checkbox.value else image > threshold
         if name in self._viewer.layers:
             self._viewer.layers[name].data = thresholded
         else:

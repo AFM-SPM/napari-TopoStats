@@ -7,6 +7,4 @@ docked_widgets = []
 topostats_widget = None
 current_error_dialog = None
 
-MIN_TOPOSTATS_VERSION = (
-    "2.3.2"  # The oldest compatible version of topostats for this plugin
-)
+MIN_TOPOSTATS_VERSION = "2.3.2"  # The oldest compatible version of topostats for this plugin
