@@ -67,15 +67,14 @@ def grainstats(image: Labels):
     df = stats.calculate_stats()[0]
     # Get scaling factors from metadata
 
-    pixel_to_nm_scaling = image.metadata.get("px2nm", 1.0)
-    metre_scaling_factor = image.metadata.get("metre_scaling_factor", 1e-9)
-    length_scaling_factor = pixel_to_nm_scaling * metre_scaling_factor
-
     # Convert centre coordinates back to pixels if they exist
     if "centre_x" in df.columns and "centre_y" in df.columns:
+        pixel_to_nm_scaling = image.metadata.get("px2nm", 1.0)
+        metre_scaling_factor = image.metadata.get("metre_scaling_factor", 1e-9)
+        length_scaling_factor = pixel_to_nm_scaling * metre_scaling_factor
         df["centre_x_px"] = df["centre_x"] / length_scaling_factor
         df["centre_y_px"] = df["centre_y"] / length_scaling_factor
 
-        return (df, "centre_y_px", "centre_x_px")
+        return df
 
-    return (df, "centre_x", "centre_y")
+    return df

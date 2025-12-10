@@ -117,7 +117,6 @@ AVAILABLE_FUNCTIONS = [
 ]
 
 
-# pylint: disable=too-few-public-methods
 class TopoStatsRootWidget(QWidget):
     """
     A root widget where all topostats functions can be accessed.

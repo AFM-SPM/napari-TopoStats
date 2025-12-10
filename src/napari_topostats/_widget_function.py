@@ -1,3 +1,8 @@
+# pylint: disable=no-else-return
+"""
+Module for dynamic widget generation from topostats functions including creating a window of options
+for those functions, running them and rendering the result.
+"""
 import functools
 import inspect
 from collections.abc import Callable
@@ -8,7 +13,7 @@ import numpy as np
 import pandas as pd
 from magicgui import magicgui
 from magicgui.widgets import FunctionGui
-from napari import current_viewer
+from napari import current_viewer  # pylint: disable=no-name-in-module
 from napari.layers import Image, Labels, Layer
 from napari.layers.labels._labels_constants import Mode
 from napari.viewer import Viewer
@@ -122,6 +127,7 @@ def add_values_to_dict_from_config(
     return args
 
 
+# pylint: disable=too-many-branches
 def _eval(obj: Any, string: str) -> Any:
     """
     Evaluate a path string on an object to access its attributes or subscripts. For example, given a list `lst`, the
@@ -173,7 +179,7 @@ def _eval(obj: Any, string: str) -> Any:
         return _eval(obj, remaining)
 
     # Handle attribute access or method calls, e.g., .attr or .method()
-    elif string[0] == ".":
+    if string[0] == ".":
         index = next_punctuation(string, 1)
         if index == -1:
             # No further punctuation, just get the attribute
@@ -214,10 +220,8 @@ def _eval(obj: Any, string: str) -> Any:
             remaining = string[index:]
             # Recursively evaluate the remaining string
             return _eval(obj, remaining)
-
-    else:
-        # If the string does not start with '[' or '.', return the object
-        return obj
+    # If the string does not start with '[' or '.', return the object
+    return obj
 
 
 def next_punctuation(s: str, start: int = 0, checking_for: str = ".([") -> int:
@@ -278,10 +282,9 @@ def get_selected_image(viewer, of_type: list = None) -> Image | None:
         data = layer.data
         if isinstance(data, (np.ndarray, da.Array)):  # conforms to ImageData
             return layer
-        else:
-            show_error_dialog(
-                "Layer data is not valid ImageData.", raise_exception=True
-            )
+        show_error_dialog(
+            "Layer data is not valid ImageData.", raise_exception=True
+        )
     elif isinstance(layer, Labels):
         return layer
     return None
@@ -328,203 +331,6 @@ def remove_all_but_last(word: str, text: str) -> str:
     )  # Remove extra spaces and return
 
 
-def render_return_value(
-    return_value: Any,
-    function_key: str,
-    viewer: Viewer,
-    original: Layer,
-    ndims: int = 2,
-    metadata: dict = None,
-):
-    """
-    Render the return value of a function in the napari viewer.
-    This function handles the rendering of the return value based on its type.
-    If the return value is a numpy array, it will be added as an image layer.
-    If it is a binary image, it will be added as a labels layer.
-
-    Parameters
-    ----------
-    return_value : Any
-        The return value of the function which will be rendered.
-    function_key : str
-        The key of the function that was executed, used for naming the layer.
-    viewer : Viewer
-        The napari viewer instance where the layer will be added. If not provided, the current viewer will be used.
-    original : Layer
-        The original image layer, used for metadata and naming. If not provided, it will be set to None.
-    ndims : int, optional
-        The number of dimensions of the data to be rendered. If not provided, it will be set to 2.
-    """
-    # Check if the return value is a numpy array
-    # TODO: handle other types of return values if needed
-
-    if isinstance(return_value, np.ndarray):
-        # If the return value is a binary image, add it as a labels layer
-        # TODO: Some functions may return a binary image which should be added as an image layer so need to handle that
-        if is_binary_image(return_value):
-            labels, num_labels = label(return_value.astype(bool))
-            label_ids = list(range(1, num_labels + 1))
-            properties = {"label_id": label_ids}
-            viewer.add_labels(
-                labels.astype(np.uint16),
-                name=f"{original.name} {function_key.title()} Mask",
-                properties=properties,
-                metadata=(
-                    {"px2nm": original.metadata.get("px2nm", 1.0)}
-                    if original
-                    else {}
-                )
-                | metadata,
-            )
-        # If the return value is a greyscale image array, add it as an image layer
-        else:
-            name = f"{original.name} {function_key.title()} Image"
-            name = remove_all_but_last("Image", name)
-            viewer.add_image(
-                return_value,
-                name=name,
-                contrast_limits=(-1, 5),
-                metadata=(
-                    {"px2nm": original.metadata.get("px2nm", 1.0)}
-                    if original
-                    else {}
-                )
-                | metadata,
-            )
-            viewer.dims.ndisplay = ndims
-    elif (
-        isinstance(return_value, tuple)
-        and len(return_value) == 3
-        and isinstance(return_value[0], pd.DataFrame)
-    ):
-        df = return_value[0]
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        nm_checkbox = QCheckBox("Convert to nm")
-        nm_checkbox.setChecked(False)
-        # Create table widget
-        table = QTableWidget()
-        table.setRowCount(len(df))
-        table.setColumnCount(len(df.columns))
-        table.setHorizontalHeaderLabels(df.columns.tolist())
-        original.mode = Mode.PICK
-
-        def convert_to_nm(df_m: pd.DataFrame) -> pd.DataFrame:
-            """Convert the pd.DataFrame from m to nm."""
-            df_nm = df_m.copy()
-            m_to_nm = 1e9
-            for col in df_nm.select_dtypes(include=[np.number]).columns:
-                if df_nm[col].max() == 0:
-                    continue
-                if df_nm[col].max() < 1e-23:  # Volume in m^3
-                    df_nm[col] = df_nm[col] * (m_to_nm**3)
-                elif df_nm[col].max() < 1e-14:  # Area in m^2
-                    df_nm[col] = df_nm[col] * (m_to_nm**2)
-                elif df_nm[col].max() < 1e-5:  # Length in m
-                    df_nm[col] = df_nm[col] * m_to_nm
-            return df_nm
-
-        def on_checkbox_changed(checked):
-            # Convert table from m to nm
-            if checked:
-                df_nm = convert_to_nm(df)
-
-                # Update table
-                for i in range(len(df_nm)):
-                    for j in range(df_nm.shape[1]):
-                        item = QTableWidgetItem(str(df_nm.iat[i, j]))
-                        table.setItem(i, j, item)
-            else:
-                df_m = df.copy()
-                # Update table
-                for i in range(len(df_m)):
-                    for j in range(df_m.shape[1]):
-                        item = QTableWidgetItem(str(df_m.iat[i, j]))
-                        table.setItem(i, j, item)
-
-        def on_row_clicked(row, column):
-            """Triggered when a table row is clicked."""
-            # Get the grain number (or label id) from the dataframe
-            grain_id = df.iloc[row][
-                "grain_number"
-            ]  # or 'label', whatever your column is called
-
-            # Center the view on it
-            # Find coordinates of that label in the image
-            mask = original.data == int(grain_id) + 1
-            if mask.any() and isinstance(original, Labels):
-                coords = np.argwhere(mask)
-                if coords.size > 0:
-                    centroid = coords.mean(axis=0)
-                    # Ensure we're only using (y, x) order for 2D
-                    y, x = centroid[-2], centroid[-1]
-                    # Set the camera center in world coordinates
-                    viewer.camera.center = (y, x)
-                original.show_selected_label = True
-                original.selected_label = int(grain_id) + 1
-                original.mode = Mode.PICK
-                viewer.layers.selection.active = original
-
-        def on_label_selected(event):
-            selected = original.selected_label
-            if selected == 0:  # 0 means background in napari
-                original.show_selected_label = False
-                return
-
-            # Find matching row
-            match = df.index[df["grain_number"] + 1 == selected]
-            if len(match):
-                row = int(match[0])
-                table.selectRow(row)
-                table.scrollToItem(
-                    table.item(row, 0), QTableWidget.PositionAtCenter
-                )
-                original.show_selected_label = True
-
-        nm_checkbox.toggled.connect(on_checkbox_changed)
-        layout.addWidget(nm_checkbox)
-        original.events.selected_label.connect(on_label_selected)
-
-        # Populate table
-        for i in range(len(df)):
-            for j in range(df.shape[1]):
-                item = QTableWidgetItem(str(df.iat[i, j]))
-                table.setItem(i, j, item)
-
-        layout.addWidget(table)
-
-        save_button = QPushButton("Save to CSV")
-        layout.addWidget(save_button)
-
-        def save_to_csv():
-            # Open a file dialog to choose where to save
-            file_path, _ = QFileDialog.getSaveFileName(
-                table,
-                "Save Table as CSV",
-                f"{original.name.lower().replace(' ', '_')}_stats.csv",
-                "CSV Files (*.csv)",
-            )
-            if file_path:
-                df_to_save = (
-                    convert_to_nm(df) if nm_checkbox.isChecked() else df
-                )
-                df_to_save.to_csv(file_path, index=False)
-                print(f"Saved CSV to: {file_path}")
-
-        save_button.clicked.connect(save_to_csv)
-        table.cellClicked.connect(on_row_clicked)
-
-        # Add to viewer
-        viewer.window.add_dock_widget(
-            container, area="right", name="Grain Statistics"
-        )
-    else:
-        show_error_dialog(
-            f"Function {function_key} returned an unsupported type: {type(return_value)}.",
-            topostats_error=True,
-        )
-
-
 def evaluate_path_to_data(
     path_to_data, return_value, instance=None, type_class=None
 ):
@@ -554,7 +360,7 @@ def evaluate_path_to_data(
             else return_value
         )
 
-    elif path_to_data.startswith("obj"):
+    if path_to_data.startswith("obj"):
         if type_class:
             return (
                 _eval(instance, path_to_data[3:])
@@ -567,11 +373,10 @@ def evaluate_path_to_data(
             )
             return None
 
-    else:
-        show_error_dialog(
-            f"Invalid path_to_data: {path_to_data}", topostats_error=True
-        )
-        return None
+    show_error_dialog(
+        f"Invalid path_to_data: {path_to_data}", topostats_error=True
+    )
+    return None
 
 
 # Class representation of each function in the button grid.
@@ -614,6 +419,7 @@ class WidgetFunction:
         user hovers over the button for the function in the button grid.
     """
 
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     def __init__(
         self,
         name: str,
@@ -639,8 +445,10 @@ class WidgetFunction:
         self.function_to_run = function_to_run
         self.tooltip = tooltip
         self.overide_viewer = None
+        self.function_gui = None
 
     def add_overide_viewer(self, viewer: Viewer):
+        """Adds an overide viewer, this is sometimes required for abstract use of the plugin such as tests"""
         self.overide_viewer = viewer
 
     def get_function_gui(self) -> FunctionGui:
@@ -653,10 +461,14 @@ class WidgetFunction:
         FunctionGui
             The magicgui widget that can be used in the napari viewer as a representation of the function.
         """
-        self.function_gui = self.get_widget()
+        if self.function_gui is None:
+            self.function_gui = self.get_widget()
         return self.function_gui
 
-    def get_widget(self) -> FunctionGui:
+    # pylint: disable=too-many-branches, too-many-statements
+    def get_widget(
+        self,
+    ) -> FunctionGui:
         """Create a magicgui widget for the function.
         This widget will have the function's parameters as inputs and will
         call the function when the user interacts with it.
@@ -671,6 +483,7 @@ class WidgetFunction:
             io.config_wrapper is None or io.full_config_container is None
         ):
             io.load_config_impl(current_viewer(), use_default=True)
+        # pylint: disable=too-many-nested-blocks
         try:
             # If path_to_data is not set, default to "return" or "obj" if type_class is provided
             if self.path_to_data is None:
@@ -761,6 +574,7 @@ class WidgetFunction:
                                 if p.name != param_name
                             ]
 
+            # pylint: disable=too-many-branches, too-many-statements
             def func(**kwargs):
                 viewer = (
                     self.overide_viewer
@@ -855,6 +669,7 @@ class WidgetFunction:
                     # ruff: noqa: BLE001
                     try:
                         instance = self.type_class(**class_args)
+                    # pylint: disable=broad-exception-caught
                     except Exception as e:
                         show_error_dialog(
                             f"Topostats is failing with {self.type_class.__name__}: {e}.",
@@ -868,6 +683,7 @@ class WidgetFunction:
                         # ruff: noqa: BLE001
                         try:
                             return_value = method(**method_args)
+                        # pylint: disable=broad-exception-caught
                         except Exception as e:
                             show_error_dialog(
                                 f"Topostats is failing with: {e}.",
@@ -885,6 +701,7 @@ class WidgetFunction:
                     # ruff: noqa: BLE001
                     try:
                         return_value = self.function_to_run(**method_args)
+                    # pylint: disable=broad-exception-caught
                     except Exception as e:
                         show_error_dialog(
                             f"Topostats is failing with: {e}.",
@@ -925,12 +742,10 @@ class WidgetFunction:
 
                 # Render return value
                 if return_value is not None:
-                    render_return_value(
+                    self.render_return_value(
                         return_value,
-                        self.function_key,
                         viewer,
                         kwargs.get("image"),
-                        ndims=self.ndims,
                         metadata=metadata,
                     )
                 else:
@@ -962,11 +777,11 @@ class WidgetFunction:
                     new_p = p.replace(default="image")
                 else:
                     new_p = p
-                if (
-                    new_p.name != "pixel_to_nm_scaling"
-                    and new_p.name != "image"
-                    and new_p.name != "filename"
-                ):
+                if new_p.name not in [
+                    "pixel_to_nm_scaling",
+                    "image",
+                    "filename",
+                ]:
                     new_parameters.append(new_p)
             # Create a magicgui function with the wrapped function and the new parameters
             wrapped_func = CallableWithSignature(
@@ -978,3 +793,195 @@ class WidgetFunction:
         except Exception as e:
             show_error_dialog(f"❌ Exception in get_widget: {e}")
             raise
+
+    # pylint: disable=too-many-statements
+    def render_return_value(
+        self,
+        return_value: Any,
+        viewer: Viewer,
+        original: Layer,
+        metadata: dict,
+    ):
+        """
+        Render the return value of a function in the napari viewer.
+        This function handles the rendering of the return value based on its type.
+        If the return value is a numpy array, it will be added as an image layer.
+        If it is a binary image, it will be added as a labels layer.
+
+        Parameters
+        ----------
+        return_value : Any
+            The return value of the function which will be rendered.
+        function_key : str
+            The key of the function that was executed, used for naming the layer.
+        viewer : Viewer
+            The napari viewer instance where the layer will be added. If not provided, the current viewer will be used.
+        original : Layer
+            The original image layer, used for metadata and naming. If not provided, it will be set to None.
+        ndims : int, optional
+            The number of dimensions of the data to be rendered. If not provided, it will be set to 2.
+        """
+        # Check if the return value is a numpy array
+
+        if isinstance(return_value, np.ndarray):
+            # If the return value is a binary image, add it as a labels layer
+            if is_binary_image(return_value):
+                labels, num_labels = label(return_value.astype(bool))
+                label_ids = list(range(1, num_labels + 1))
+                properties = {"label_id": label_ids}
+                viewer.add_labels(
+                    labels.astype(np.uint16),
+                    name=f"{original.name} {self.function_key.title()} Mask",
+                    properties=properties,
+                    metadata=(
+                        {"px2nm": original.metadata.get("px2nm", 1.0)}
+                        if original
+                        else {}
+                    )
+                    | metadata,
+                )
+            # If the return value is a greyscale image array, add it as an image layer
+            else:
+                name = f"{original.name} {self.function_key.title()} Image"
+                name = remove_all_but_last("Image", name)
+                viewer.add_image(
+                    return_value,
+                    name=name,
+                    contrast_limits=(-1, 5),
+                    metadata=(
+                        {"px2nm": original.metadata.get("px2nm", 1.0)}
+                        if original
+                        else {}
+                    )
+                    | metadata,
+                )
+                viewer.dims.ndisplay = self.ndims
+        elif isinstance(return_value, pd.DataFrame):
+            df = return_value
+            container = QWidget()
+            layout = QVBoxLayout(container)
+            nm_checkbox = QCheckBox("Convert to nm")
+            nm_checkbox.setChecked(False)
+            # Create table widget
+            table = QTableWidget()
+            table.setRowCount(len(df))
+            table.setColumnCount(len(df.columns))
+            table.setHorizontalHeaderLabels(df.columns.tolist())
+            original.mode = Mode.PICK
+
+            def convert_to_nm(df_m: pd.DataFrame) -> pd.DataFrame:
+                """Convert the pd.DataFrame from m to nm."""
+                df_nm = df_m.copy()
+                m_to_nm = 1e9
+                for col in df_nm.select_dtypes(include=[np.number]).columns:
+                    if df_nm[col].max() == 0:
+                        continue
+                    if df_nm[col].max() < 1e-23:  # Volume in m^3
+                        df_nm[col] = df_nm[col] * (m_to_nm**3)
+                    elif df_nm[col].max() < 1e-14:  # Area in m^2
+                        df_nm[col] = df_nm[col] * (m_to_nm**2)
+                    elif df_nm[col].max() < 1e-5:  # Length in m
+                        df_nm[col] = df_nm[col] * m_to_nm
+                return df_nm
+
+            def on_checkbox_changed(checked):
+                # Convert table from m to nm
+                if checked:
+                    df_nm = convert_to_nm(df)
+
+                    # Update table
+                    for i in range(len(df_nm)):
+                        for j in range(df_nm.shape[1]):
+                            item = QTableWidgetItem(str(df_nm.iat[i, j]))
+                            table.setItem(i, j, item)
+                else:
+                    df_m = df.copy()
+                    # Update table
+                    for i in range(len(df_m)):
+                        for j in range(df_m.shape[1]):
+                            item = QTableWidgetItem(str(df_m.iat[i, j]))
+                            table.setItem(i, j, item)
+
+            # pylint: disable=unused-argument
+            def on_row_clicked(row, column):
+                """Triggered when a table row is clicked."""
+                # Get the grain number (or label id) from the dataframe
+                grain_id = df.iloc[row][
+                    "grain_number"
+                ]  # or 'label', whatever your column is called
+
+                # Center the view on it
+                # Find coordinates of that label in the image
+                mask = original.data == int(grain_id) + 1
+                if mask.any() and isinstance(original, Labels):
+                    coords = np.argwhere(mask)
+                    if coords.size > 0:
+                        centroid = coords.mean(axis=0)
+                        # Ensure we're only using (y, x) order for 2D
+                        y, x = centroid[-2], centroid[-1]
+                        # Set the camera center in world coordinates
+                        viewer.camera.center = (y, x)
+                    original.show_selected_label = True
+                    original.selected_label = int(grain_id) + 1
+                    original.mode = Mode.PICK
+                    viewer.layers.selection.active = original
+
+            # pylint: disable=unused-argument
+            def on_label_selected(event):
+                selected = original.selected_label
+                if selected == 0:  # 0 means background in napari
+                    original.show_selected_label = False
+                    return
+
+                # Find matching row
+                match = df.index[df["grain_number"] + 1 == selected]
+                if len(match):
+                    row = int(match[0])
+                    table.selectRow(row)
+                    table.scrollToItem(
+                        table.item(row, 0), QTableWidget.PositionAtCenter
+                    )
+                    original.show_selected_label = True
+
+            nm_checkbox.toggled.connect(on_checkbox_changed)
+            layout.addWidget(nm_checkbox)
+            original.events.selected_label.connect(on_label_selected)
+
+            # Populate table
+            for i in range(len(df)):
+                for j in range(df.shape[1]):
+                    item = QTableWidgetItem(str(df.iat[i, j]))
+                    table.setItem(i, j, item)
+
+            layout.addWidget(table)
+
+            save_button = QPushButton("Save to CSV")
+            layout.addWidget(save_button)
+
+            def save_to_csv():
+                # Open a file dialog to choose where to save
+                file_path, _ = QFileDialog.getSaveFileName(
+                    table,
+                    "Save Table as CSV",
+                    f"{original.name.lower().replace(' ', '_')}_stats.csv",
+                    "CSV Files (*.csv)",
+                )
+                if file_path:
+                    df_to_save = (
+                        convert_to_nm(df) if nm_checkbox.isChecked() else df
+                    )
+                    df_to_save.to_csv(file_path, index=False)
+                    print(f"Saved CSV to: {file_path}")
+
+            save_button.clicked.connect(save_to_csv)
+            table.cellClicked.connect(on_row_clicked)
+
+            # Add to viewer
+            viewer.window.add_dock_widget(
+                container, area="right", name=self.function_key.title()
+            )
+        else:
+            show_error_dialog(
+                f"Function {self.function_key} returned an unsupported type: {type(return_value)}.",
+                topostats_error=True,
+            )

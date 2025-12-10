@@ -93,6 +93,10 @@ disable=C0103,
         useless-suppression,
         deprecated-pragma,
         use-symbolic-message-instead,
+        too-few-public-methods,
+        too-many-locals,
+        too-many-instance-attributes,
+
 
 
 # Enable the message, report, category or checker with the given id(s). You can

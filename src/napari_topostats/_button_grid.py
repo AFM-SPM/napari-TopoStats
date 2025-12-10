@@ -1,3 +1,9 @@
+"""
+This module defines the custom widget button grid which is responsible for rendering the correct image for
+each function which is accessible from the root widget, as well as formatting and arranging those functions
+and correctly linking the backend with those functions being clicked
+"""
+
 from contextlib import suppress
 from pathlib import Path
 
@@ -171,6 +177,20 @@ class ButtonGrid(QListWidget):
     def get_widget_from_function(
         self, function_name: str
     ) -> FunctionGui | None:
+        """
+        Get the widget representation of the passed function by selecting between generating it or returning the
+        passed function if it is already a widget
+
+        Parameters
+        ----------
+        function_name : str
+            The name of the function to retrieve.
+
+        Returns
+        -------
+        FunctionGui or None
+            The widget for the function, or None if the function is not valid.
+        """
         function_from_list = self.functions.get(function_name)
         if isinstance(function_from_list, WidgetFunction):
             # If the function is a WidgetFunction, get its GUI representation.

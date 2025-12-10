@@ -18,7 +18,7 @@ from . import _state as state
 NAPARI_TOPOSTATS_REPORT = "https://github.com/AFM-SPM/napari-TopoStats/issues/new?template=bug_report.yaml"
 
 
-class ErrorDialog(QDialog):  # pylint: disable=too-few-public-methods
+class ErrorDialog(QDialog):
     """
     A simple dialog window to display error messages.
     """
@@ -133,7 +133,7 @@ def show_error_dialog(
         raise ValueError(message)
 
 
-class LoadingDialog(QDialog):  # pylint: disable=too-few-public-methods
+class LoadingDialog(QDialog):
     """
     A dialog window to indicate a loading or processing state.
     """
