@@ -426,8 +426,7 @@ class WidgetFunction:
         FunctionGui
             The magicgui widget that can be used in the napari viewer as a representation of the function.
         """
-        if self.function_gui is None:
-            self.function_gui = self.get_widget()
+        self.function_gui = self.get_widget()
         return self.function_gui
 
     # pylint: disable=too-many-branches, too-many-statements
