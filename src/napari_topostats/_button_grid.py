@@ -19,7 +19,7 @@ from napari_topostats._widget_function import (
 )
 
 from ._alerts import show_error_dialog
-from ._state import INVISIBLE, VISIBLE, widget_valid_and_visible
+from ._state import is_valid_widget, is_visible_widget
 
 RUN_IMMEDIATELY_EXEMPTIONS = {}
 ICON_ROOT = Path(__file__).parent / "icons"
@@ -125,9 +125,8 @@ class ButtonGrid(QListWidget):
         """
         self.functions = functions or {}
         for label, function in functions.items():
-            print(f"Adding function button: {label}")
             if isinstance(function, FunctionGui):
-                if widget_valid_and_visible(function) in {VISIBLE, INVISIBLE}:
+                if is_valid_widget(function):
                     self.addFunctionButton(label, function.tooltip)
                 else:
                     self.addFunctionButton(label)
@@ -160,7 +159,10 @@ class ButtonGrid(QListWidget):
                     self.viewer.window.add_dock_widget(widget, name=item.text())
                     self.docked_functions[item.text()] = widget
                     break
-        elif widget_valid_and_visible(self.docked_functions[item.text()]) != VISIBLE:
+        elif not is_valid_widget(self.docked_functions[item.text()]) or not is_visible_widget(
+            self.docked_functions[item.text()]
+        ):
+
             # Widget exists in dict but is deleted or not visible - recreate it
             widget = self.get_widget_from_function(item.text())
 

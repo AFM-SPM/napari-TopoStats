@@ -3,16 +3,19 @@ Utilities for testing napari-TopoStats widget behaviour, including loading
 test images, simulating button clicks, and opening configuration dialogs.
 """
 
+from pathlib import Path
 from unittest.mock import patch
 
+from napari import Viewer
+from napari.layers import Image
 from napari_afmreader._reader import reader_function
 from pytestqt.qtbot import QtBot
 from qtpy.QtCore import Qt
 
-from napari_topostats._widget import AVAILABLE_FUNCTIONS
+from napari_topostats._widget import AVAILABLE_FUNCTIONS, TopoStatsRootWidget
 
 
-def load_test_image(napari_viewer, image_path):
+def load_test_image(napari_viewer: Viewer, image_path: str | Path) -> Image | None:
     """
     Load a test AFM image into the napari viewer.
 
@@ -38,10 +41,10 @@ def load_test_image(napari_viewer, image_path):
 
 def run_functions_in_grid(
     qtbot: QtBot,
-    topostats_widget,
-    napari_viewer,
-    run_function_on,
-    expected_layers,
+    topostats_widget: TopoStatsRootWidget,
+    napari_viewer: Viewer,
+    run_function_on: list[int],
+    expected_layers: list[str],
 ):
     """
     Simulate clicking functions in the function grid and verify layers appear.
@@ -75,7 +78,7 @@ def run_functions_in_grid(
         assert expected_name in napari_viewer.layers, f"Layer '{expected_name}' not found"
 
 
-def open_load_config_widget(qtbot: QtBot, topostats_widget):
+def open_load_config_widget(qtbot: QtBot, topostats_widget: TopoStatsRootWidget):
     """
     Simulate clicking the Load Config button in the function grid.
 

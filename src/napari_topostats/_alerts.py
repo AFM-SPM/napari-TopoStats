@@ -14,7 +14,7 @@ from qtpy.QtWidgets import (
 )
 
 from . import _state as state
-from ._state import DELEATED, widget_valid_and_visible
+from ._state import is_valid_widget
 
 NAPARI_TOPOSTATS_REPORT = "https://github.com/AFM-SPM/napari-TopoStats/issues/new?template=bug_report.yaml"
 
@@ -168,7 +168,6 @@ def attach_status_label(widget: FunctionGui | QWidget):
     """
     Add status label to passed in widget, which can be updated when then function associated with that widget runs.
     """
-    print("We are here in attach_status_label")
 
     label = QLabel("")
     label.setStyleSheet(
@@ -195,7 +194,7 @@ def attach_status_label(widget: FunctionGui | QWidget):
     label_timer.setSingleShot(True)
 
     def remove_label():
-        if widget_valid_and_visible(widget) != DELEATED:
+        if is_valid_widget(widget):
             label.setText("")
             label.adjustSize()
             # Force the parent widget to recalculate its size

@@ -74,7 +74,6 @@ def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
 
     for key, value in args.items():
         if isinstance(value, (Image)):
-            print(f"Converting ImageData to ndarray for key: {key}")
             args[key] = np.asarray(value.data)
     return args
 
@@ -553,12 +552,10 @@ class WidgetFunction:
                             including_config_params_from_class,
                         )
 
-                print("Method args:", method_args)
                 # Enforce defaults
                 method_args = enforce_defaults(method_args, including_config_params_from_function)
                 if self.type_class:
                     class_args = enforce_defaults(class_args, including_config_params_from_class)
-                    print("Class args:", class_args)
 
                 # Execute function or method
                 if self.type_class:

@@ -4,37 +4,59 @@ This module contains global state variables used for the representation of the g
 It also contains utility functions for ensuring the validity of widgets used in the plugin.
 """
 
+from magicgui.widgets import FunctionGui
+from qtpy.QtWidgets import QWidget
+
 docked_widgets = []
 topostats_widget = None
 current_error_dialog = None
-DELEATED = "DELEATED"
-VISIBLE = "VISIBLE"
-INVISIBLE = "INVISIBLE"
-INVALID = "INVALID"
 MIN_TOPOSTATS_VERSION = "2.3.2"  # The oldest compatible version of topostats for this plugin
 
 
-def widget_valid_and_visible(widget):
+def is_valid_widget(widget: FunctionGui | QWidget) -> bool:
     """
-    Check if widget's native Qt object exists and is visible.
+    Check if widget's native Qt object exists.
 
     Parameters
     ----------
-    widget : FunctionGui
+    widget : FunctionGui | QWidget
         The widget to check
 
     Returns
     -------
     bool
-        True if widget is valid and visible, False otherwise
+        True if widget is valid, False otherwise
     """
     try:
-        if not hasattr(widget, "native"):
-            return INVALID
-        # Try to access a property to check if C++ object still exists
-        if widget.native.isVisible():
-            return VISIBLE
-        return INVISIBLE
+        if isinstance(widget, FunctionGui):
+            if not hasattr(widget, "native"):
+                return False
+            # Try to access a property to check if C++ object still exists
+            widget.native.isVisible()
+        else:
+            widget.isVisible()
+        return True
     except RuntimeError:
         # C++ object has been deleted
-        return DELEATED
+        return False
+
+
+def is_visible_widget(widget: FunctionGui | QWidget) -> bool:
+    """
+    Safely check if the widget is visible.
+
+    Parameters
+    ----------
+    widget : FunctionGui | QWidget
+        The widget to check
+
+    Returns
+    -------
+    bool
+        True if widget is visible, False otherwise
+    """
+    try:
+        return widget.native.isVisible()
+    except RuntimeError:
+        # C++ object has been deleted
+        return False
