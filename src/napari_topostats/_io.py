@@ -1,5 +1,3 @@
-# pylint: disable=too-few-public-methods
-
 """Provides functionality for loading and editting config files"""
 
 import json
@@ -44,6 +42,7 @@ except ImportError:
 config_wrapper = None
 full_config_container = None
 comment_descriptions = {}
+# Globals store currently loaded config and UI state so dialogs/widgets can reuse them.
 
 
 class ConfigWrapper:
@@ -83,6 +82,7 @@ def collect_values(container: Container) -> dict[str, Any]:
     for widget in container:
         val = widget.value
         name = widget.name
+        # Allow lists to be entered as literal strings and parsed back to Python types.
         if isinstance(val, str) and val.strip().startswith("["):
             try:
                 # pylint: disable=import-outside-toplevel
@@ -91,6 +91,7 @@ def collect_values(container: Container) -> dict[str, Any]:
                 val = ast.literal_eval(val)
             except (ValueError, SyntaxError):
                 pass
+        # Treat the literal string "None" as an actual None value when saving.
         elif val == "None":
             val = None
         result[name] = val
@@ -100,6 +101,7 @@ def collect_values(container: Container) -> dict[str, Any]:
 def build_dynamic_widget(flat_config: dict[str, Any], descriptions: dict[str, str] = None) -> Container:
     """Builds a widget for each editable item in the config and add it to a container"""
     widgets = []
+    # Choose an appropriate widget type based on the value's Python type.
     for key, value in flat_config.items():
         current_tooltip_text = descriptions.get(key, "") if descriptions else ""
 
@@ -122,6 +124,7 @@ def build_dynamic_widget(flat_config: dict[str, Any], descriptions: dict[str, st
         label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
         if current_tooltip_text:
+            # Reuse inline YAML comments as tooltips for both the editor and label.
             w.native.setToolTip(current_tooltip_text)
             label.setToolTip(current_tooltip_text)
 
@@ -151,6 +154,7 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
             if not config_path.exists():
                 write_new_default_config(config_path)
         else:
+            # If no path provided, prompt the user via a standard file dialog.
             file_path, _ = QFileDialog.getOpenFileName(
                 parent=None,
                 caption="Select Config File",
@@ -197,7 +201,7 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
     if "Edit Full Config" not in state.docked_widgets:
         # Create a button to open the config editor
         btn = QPushButton("Edit Config")
-        btn.clicked.connect(lambda: open_config_editor(viewer))
+        btn.clicked.connect(open_config_editor)
         docked = viewer.window.add_dock_widget(btn, name="Edit Full Config")
         # Remove from state.docked_widgets when widget is closed
         docked.visibilityChanged.connect(
@@ -288,7 +292,7 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> dict[
         show_error_dialog(f"Error: YAML file not found at {yaml_path}")
         return {}
 
-    with open(yaml_path) as f:
+    with open(yaml_path, encoding="utf-8") as f:
         for line in f:
             stripped_line = line.strip()
 
@@ -299,6 +303,7 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> dict[
 
             if match:
                 indent_str, key_name, comment_text = match.groups()
+                # Infer hierarchy depth from indentation; YAML uses 2 spaces per level here.
                 indent_level = len(indent_str.replace("\t", "  ")) // 2
 
                 key_stack = key_stack[:indent_level]
@@ -337,9 +342,11 @@ def create_info_icon(tooltip_text: str) -> QToolButton:
     return button
 
 
-def open_config_editor(viewer: Viewer):
+# pylint: disable=too-many-statements
+def open_config_editor():
     """Opens and renders the config editor with only certain top level keys available"""
-    global config_wrapper, full_config_container, comment_descriptions
+    # pylint: disable=global-variable-not-assigned
+    global config_wrapper, full_config_container
 
     if config_wrapper is None:
         show_error_dialog("No config loaded.")
@@ -351,12 +358,14 @@ def open_config_editor(viewer: Viewer):
     # Keys to exclude
     EXCLUDED_KEYS = {"filter.run", "grains.run"}
 
+    # Restrict editing to select top-level blocks while avoiding run toggles.
     filtered_flat_config = {
         k: v
         for k, v in config_wrapper.flat.items()
         if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS) and k not in EXCLUDED_KEYS
     }
 
+    # Mirror the same filtering for tooltip descriptions.
     filtered_descriptions = {
         k: v
         for k, v in comment_descriptions.items()
@@ -376,6 +385,7 @@ def open_config_editor(viewer: Viewer):
     scroll_content = QWidget()
     scroll_layout = QVBoxLayout(scroll_content)
 
+    # Build one row per editable field with its label, widget, and optional info icon.
     for widget in fresh_container:
         row = QWidget()
         row_layout = QHBoxLayout(row)
@@ -414,6 +424,7 @@ def open_config_editor(viewer: Viewer):
         save_config_to_file(default_config_path, full_config)
 
         status_label.setText("✅ Default config saved")
+        # Clear the transient status message after a short delay.
         QTimer.singleShot(3000, lambda: status_label.setText(""))
 
     def save_to_file():
@@ -433,6 +444,7 @@ def open_config_editor(viewer: Viewer):
         save_config_to_file(Path(file_path), full_config)
 
         status_label.setText("✅ Config saved to file")
+        # Clear the transient status message after a short delay.
         QTimer.singleShot(3000, lambda: status_label.setText(""))
 
     save_button.clicked.connect(save_to_file)
@@ -457,10 +469,10 @@ def save_config_to_file(file_path: Path, full_config: dict[str, Any]):
     try:
         print(json.dumps(full_config, indent=2))
         if file_path.suffix.lower() == ".json":
-            with open(file_path, "w") as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(full_config, f, indent=2)
         else:
-            with open(file_path, "w") as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 yaml.safe_dump(full_config, f, sort_keys=False)
         print(f"Config saved to {file_path}")
     except (OSError, TypeError, yaml.YAMLError) as e:

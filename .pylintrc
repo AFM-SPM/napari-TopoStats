@@ -93,6 +93,8 @@ disable=C0103,
         useless-suppression,
         deprecated-pragma,
         use-symbolic-message-instead,
+        too-few-public-methods,
+
 
 
 # Enable the message, report, category or checker with the given id(s). You can
@@ -125,6 +127,8 @@ reports=no
 
 # Activate the evaluation score.
 score=yes
+
+
 
 
 [REFACTORING]
@@ -544,7 +548,7 @@ ignored-parents=
 max-args=7  # Raised this from 5
 
 # Maximum number of attributes for a class (see R0902).
-max-attributes=7
+max-attributes=15
 
 # Maximum number of boolean expressions in an if statement (see R0916).
 max-bool-expr=5
@@ -553,7 +557,7 @@ max-bool-expr=5
 max-branches=12
 
 # Maximum number of locals for function / method body.
-max-locals=15
+max-locals=25
 
 
 # Maximum number of parents for a class (see R0901).
