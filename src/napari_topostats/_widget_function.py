@@ -495,7 +495,7 @@ class WidgetFunction:
                         if self.type_class is not None:
                             parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
 
-            # pylint: disable=too-many-branches, too-many-statements
+            # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught
             def func(**kwargs):
                 viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
                 loading_widget = LoadingWidget(viewer)
@@ -553,17 +553,18 @@ class WidgetFunction:
                             including_config_params_from_class,
                         )
 
+                print("Method args:", method_args)
                 # Enforce defaults
                 method_args = enforce_defaults(method_args, including_config_params_from_function)
                 if self.type_class:
                     class_args = enforce_defaults(class_args, including_config_params_from_class)
+                    print("Class args:", class_args)
 
                 # Execute function or method
                 if self.type_class:
                     # ruff: noqa: BLE001
                     try:
                         instance = self.type_class(**class_args)
-                    # pylint: disable=broad-exception-caught
                     except Exception as e:
                         show_error_dialog(
                             f"Topostats is failing with {self.type_class.__name__}: {e}.",
@@ -575,7 +576,6 @@ class WidgetFunction:
                         # ruff: noqa: BLE001
                         try:
                             return_value = method(**method_args)
-                        # pylint: disable=broad-exception-caught
                         except Exception as e:
                             show_error_dialog(
                                 f"Topostats is failing with: {e}.",
@@ -591,7 +591,6 @@ class WidgetFunction:
                     # ruff: noqa: BLE001
                     try:
                         return_value = self.function_to_run(**method_args)
-                    # pylint: disable=broad-exception-caught
                     except Exception as e:
                         show_error_dialog(
                             f"Topostats is failing with: {e}.",

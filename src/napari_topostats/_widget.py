@@ -121,14 +121,18 @@ class TopoStatsRootWidget(QWidget):
     a layout for the various controls.
     """
 
-    def __init__(self, viewer: Viewer):
-        super().__init__()
+    def __init__(self, viewer: Viewer, parent=None):
         # Initialize the widget with a viewer
+        if parent:
+            super().__init__(parent)
+        else:
+            super().__init__()
         self._viewer = viewer
         # Make layout so children are arranged vertically
         layout = QVBoxLayout(self)
         # Add the function grid to the layout with the available functions
-        self.function_grid = ButtonGrid(self, functions=self.get_functions(), viewer=self._viewer)
+        self._functions = self.get_functions()
+        self.function_grid = ButtonGrid(self, functions=self._functions, viewer=self._viewer)
         # Set the size policy to allow the widget to expand
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)

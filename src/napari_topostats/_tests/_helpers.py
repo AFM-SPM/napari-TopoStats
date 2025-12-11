@@ -58,10 +58,6 @@ def run_functions_in_grid(
         Indices of layers to select before running each function.
     expected_layers : list[str]
         Names of layers expected to exist after running the functions.
-
-    Returns
-    -------
-    None
     """
     function_names = [f.name for f in AVAILABLE_FUNCTIONS]
     function_names.remove("load_config")
@@ -89,10 +85,6 @@ def open_load_config_widget(qtbot: QtBot, topostats_widget):
         The pytest-qt bot for generating clicks.
     topostats_widget : TopoStatsRootWidget
         The napari-TopoStats widget containing the function grid.
-
-    Returns
-    -------
-    None
     """
 
     # pylint: disable=unused-argument

@@ -19,6 +19,7 @@ def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
     open_load_config_widget(qtbot, topostats_widget)
 
     # Check that the load config widget exists in dock
+
     assert "Load Config" in napari_viewer.window._dock_widgets, "Load Config widget not found in dock widgets."
 
 
