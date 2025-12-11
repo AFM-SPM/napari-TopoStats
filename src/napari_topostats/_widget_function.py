@@ -686,6 +686,7 @@ class WidgetFunction:
     ):
         """
         Render the return value of a function in the napari viewer.
+
         This function handles the rendering of the return value based on its type.
         If the return value is a numpy array, it will be added as an image layer.
         If it is a binary image, it will be added as a labels layer.
