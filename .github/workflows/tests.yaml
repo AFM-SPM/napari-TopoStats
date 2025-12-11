@@ -1,9 +1,21 @@
 name: Run the pytest test suite
 
 on:
-  push:
-    branches:
-      - main
+  pull_request:
+    types:
+      - opened
+      - ready_for_review
+      - reopened
+      - synchronize
+    paths:
+      - "**.csv"
+      - "**.npy"
+      - "**.out"
+      - "**.pkl"
+      - "**.png"
+      - "**.py"
+      - "**.toml"
+      - "**.yaml"
 
 jobs:
   build:
