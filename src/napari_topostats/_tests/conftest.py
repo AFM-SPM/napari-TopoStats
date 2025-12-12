@@ -17,11 +17,7 @@ def napari_viewer_fixture(qtbot: QtBot):
     viewer = napari.Viewer(show=False)  # pylint: disable=not-callable
     qtbot.addWidget(viewer.window._qt_window)  # pylint: disable=protected-access
 
-    yield viewer
-
-    # Cleanup to ensure no stale references
-    viewer.close()
-    qtbot.wait(50)  # Allow cleanup to complete
+    return viewer
 
 
 @pytest.fixture

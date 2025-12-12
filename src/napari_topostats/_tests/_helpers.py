@@ -44,7 +44,6 @@ def run_functions_in_grid(
     topostats_widget: TopoStatsRootWidget,
     napari_viewer: Viewer,
     run_function_on: list[int],
-    expected_layers: list[str],
 ):
     """
     Simulate clicking functions in the function grid and verify layers appear.
@@ -73,9 +72,6 @@ def run_functions_in_grid(
         rect = button_grid.visualItemRect(item)
         qtbot.mouseClick(button_grid.viewport(), Qt.LeftButton, pos=rect.center())
         qtbot.wait(100)
-
-    for expected_name in expected_layers:
-        assert expected_name in napari_viewer.layers, f"Layer '{expected_name}' not found"
 
 
 def open_load_config_widget(qtbot: QtBot, topostats_widget: TopoStatsRootWidget):

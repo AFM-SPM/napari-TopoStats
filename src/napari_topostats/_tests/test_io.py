@@ -24,23 +24,40 @@ def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
 
 
 @pytest.mark.parametrize(
-    ("test_config_path", "use_default", "expected_result"),
+    ("test_config_path", "use_default", "input_path_on_selection", "expected_result"),
     [
         pytest.param(
             Path("src/napari_topostats/_tests/_test_data/test_config.yaml"),
             False,
+            False,
             "SUCCESS",
-            id="Test valid path as if inputted by user in gui",
+            id="Test valid path as if inputted by user in gui widget",
         ),
+        # pytest.param(
+        #     Path("src/napari_topostats/_tests/_test_data/test_config.yaml"),
+        #     False,
+        #     True,
+        #     "SUCCESS",
+        #     id="Test valid path as if inputted by user in gui on click",
+        # ),
         pytest.param(
             Path("This/is/definitely/not/a_real/path"),
             False,
+            False,
             "FAILURE",
-            id="Test invalid path as if inputted by user in gui",
+            id="Test invalid path as if inputted by user in gui widget",
         ),
+        # pytest.param(
+        #     Path("This/is/definitely/not/a_real/path"),
+        #     False,
+        #     True,
+        #     "FAILURE",
+        #     id="Test invalid path as if inputted by user in gui on click",
+        # ),
         pytest.param(
             None,
             True,
+            False,
             "SUCCESS",
             id="Test valid path as if function run automatically",
         ),
@@ -51,6 +68,7 @@ def test_load_config(
     napari_viewer,
     test_config_path: Path,
     use_default: bool,
+    input_path_on_selection: bool,
     expected_result: str,
 ):
     """Test that loading a config file updates the function parameters correctly."""
@@ -63,7 +81,7 @@ def test_load_config(
     with (
         patch(
             "napari_topostats._io.QFileDialog.getOpenFileName",
-            side_effect=(test_config_path, None),
+            return_value=(str(test_config_path), "YAML Files (*.yaml *.yml)"),
         ),
         patch(
             "napari_topostats._io.show_error_dialog",
@@ -77,7 +95,10 @@ def test_load_config(
 
         else:
             # Simulate selecting a config file (assuming a test config file path)
-            result = io.load_config_impl(napari_viewer, test_config_path)
+            if input_path_on_selection:
+                result = io.load_config_impl(napari_viewer)
+            else:
+                result = io.load_config_impl(napari_viewer, test_config_path)
             if result:
                 full_current_config = io.config_wrapper.unflatten()
 
