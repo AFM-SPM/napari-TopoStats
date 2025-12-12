@@ -19,6 +19,7 @@ from napari_topostats._widget_function import (
 )
 
 from ._alerts import show_error_dialog
+from ._state import is_valid_widget, is_visible_widget
 
 RUN_IMMEDIATELY_EXEMPTIONS = {}
 ICON_ROOT = Path(__file__).parent / "icons"
@@ -124,10 +125,16 @@ class ButtonGrid(QListWidget):
         """
         self.functions = functions or {}
         for label, function in functions.items():
-            if function.tooltip:
-                self.addFunctionButton(label, function.tooltip)
+            if isinstance(function, FunctionGui):
+                if is_valid_widget(function):
+                    self.addFunctionButton(label, function.tooltip)
+                else:
+                    self.addFunctionButton(label)
             else:
-                self.addFunctionButton(label)
+                if function.tooltip:
+                    self.addFunctionButton(label, function.tooltip)
+                else:
+                    self.addFunctionButton(label)
         with suppress(TypeError):
             self.itemClicked.disconnect()
         self.itemClicked.connect(self.add_function_as_widget)
@@ -152,13 +159,27 @@ class ButtonGrid(QListWidget):
                     self.viewer.window.add_dock_widget(widget, name=item.text())
                     self.docked_functions[item.text()] = widget
                     break
-        elif not self.docked_functions[item.text()].native.isVisible():
+        elif not is_valid_widget(self.docked_functions[item.text()]) or not is_visible_widget(
+            self.docked_functions[item.text()]
+        ):
+
+            # Widget exists in dict but is deleted or not visible - recreate it
             widget = self.get_widget_from_function(item.text())
-            self.docked_functions[item.text()].native.destroy()  # Remove the widget if it is not visible
+
+            # Try to destroy the old widget if it still exists
+            try:
+                if hasattr(self.docked_functions[item.text()], "native"):
+                    self.docked_functions[item.text()].native.destroy()
+            except RuntimeError:
+                # Already deleted, that's fine
+                pass
+
+            # Add the new widget
             self.viewer.window.add_dock_widget(widget, name=item.text())
             self.docked_functions[item.text()] = widget
         else:
             widget = self.docked_functions[item.text()]
+
         if item.text() not in RUN_IMMEDIATELY_EXEMPTIONS:
             # If the function is not in the RUN_IMMEDIATELY_EXEMPTIONS list, run it with the appropriate parameters,
             # using the selected image layer as the image parameter

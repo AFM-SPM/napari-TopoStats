@@ -74,7 +74,6 @@ def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
 
     for key, value in args.items():
         if isinstance(value, (Image)):
-            print(f"Converting ImageData to ndarray for key: {key}")
             args[key] = np.asarray(value.data)
     return args
 
@@ -495,7 +494,7 @@ class WidgetFunction:
                         if self.type_class is not None:
                             parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
 
-            # pylint: disable=too-many-branches, too-many-statements
+            # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught
             def func(**kwargs):
                 viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
                 loading_widget = LoadingWidget(viewer)
@@ -563,7 +562,6 @@ class WidgetFunction:
                     # ruff: noqa: BLE001
                     try:
                         instance = self.type_class(**class_args)
-                    # pylint: disable=broad-exception-caught
                     except Exception as e:
                         show_error_dialog(
                             f"Topostats is failing with {self.type_class.__name__}: {e}.",
@@ -575,7 +573,6 @@ class WidgetFunction:
                         # ruff: noqa: BLE001
                         try:
                             return_value = method(**method_args)
-                        # pylint: disable=broad-exception-caught
                         except Exception as e:
                             show_error_dialog(
                                 f"Topostats is failing with: {e}.",
@@ -591,7 +588,6 @@ class WidgetFunction:
                     # ruff: noqa: BLE001
                     try:
                         return_value = self.function_to_run(**method_args)
-                    # pylint: disable=broad-exception-caught
                     except Exception as e:
                         show_error_dialog(
                             f"Topostats is failing with: {e}.",
@@ -813,6 +809,7 @@ class WidgetFunction:
                     original.show_selected_label = True
 
             nm_checkbox.toggled.connect(on_checkbox_changed)
+            nm_checkbox.setObjectName("nm_checkbox")
             layout.addWidget(nm_checkbox)
             original.events.selected_label.connect(on_label_selected)
 

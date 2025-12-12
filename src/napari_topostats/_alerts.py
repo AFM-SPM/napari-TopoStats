@@ -14,6 +14,7 @@ from qtpy.QtWidgets import (
 )
 
 from . import _state as state
+from ._state import is_valid_widget
 
 NAPARI_TOPOSTATS_REPORT = "https://github.com/AFM-SPM/napari-TopoStats/issues/new?template=bug_report.yaml"
 
@@ -193,25 +194,26 @@ def attach_status_label(widget: FunctionGui | QWidget):
     label_timer.setSingleShot(True)
 
     def remove_label():
-        label.setText("")
-        label.adjustSize()
-        # Force the parent widget to recalculate its size
-        to_adjust = widget.native if hasattr(widget, "native") else widget
-        to_adjust.adjustSize()
-        to_adjust.updateGeometry()
-        if to_adjust.parent():
-            to_adjust.parent().adjustSize()
-            to_adjust.parent().updateGeometry()
-            if to_adjust.parent().parent():
-                to_adjust.parent().parent().adjustSize()
-                to_adjust.parent().parent().updateGeometry()
-        label.setStyleSheet(
+        if is_valid_widget(widget):
+            label.setText("")
+            label.adjustSize()
+            # Force the parent widget to recalculate its size
+            to_adjust = widget.native if hasattr(widget, "native") else widget
+            to_adjust.adjustSize()
+            to_adjust.updateGeometry()
+            if to_adjust.parent():
+                to_adjust.parent().adjustSize()
+                to_adjust.parent().updateGeometry()
+                if to_adjust.parent().parent():
+                    to_adjust.parent().parent().adjustSize()
+                    to_adjust.parent().parent().updateGeometry()
+            label.setStyleSheet(
+                """
+                QLabel {
+                    font-size: 4px
+                }
             """
-            QLabel {
-                font-size: 4px
-            }
-        """
-        )
+            )
 
     label_timer.timeout.connect(remove_label)
     widget.label_timer = label_timer

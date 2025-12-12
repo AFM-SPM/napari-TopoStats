@@ -19,6 +19,7 @@ def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
     open_load_config_widget(qtbot, topostats_widget)
 
     # Check that the load config widget exists in dock
+
     assert "Load Config" in napari_viewer.window._dock_widgets, "Load Config widget not found in dock widgets."
 
 
@@ -29,19 +30,19 @@ def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
             Path("src/napari_topostats/_tests/_test_data/test_config.yaml"),
             False,
             "SUCCESS",
-            id="Test valid path as if inputted by user in gui",
+            id="valid path from user",
         ),
         pytest.param(
             Path("This/is/definitely/not/a_real/path"),
             False,
             "FAILURE",
-            id="Test invalid path as if inputted by user in gui",
+            id="invalid path from user",
         ),
         pytest.param(
             None,
             True,
             "SUCCESS",
-            id="Test valid path as if function run automatically",
+            id="valid path from default",
         ),
     ],
 )
@@ -62,7 +63,7 @@ def test_load_config(
     with (
         patch(
             "napari_topostats._io.QFileDialog.getOpenFileName",
-            side_effect=(test_config_path, None),
+            return_value=(str(test_config_path), "YAML Files (*.yaml *.yml)"),
         ),
         patch(
             "napari_topostats._io.show_error_dialog",

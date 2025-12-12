@@ -11,7 +11,7 @@ from magicgui import magicgui
 from magicgui.widgets import Container, create_widget
 from napari.viewer import Viewer
 from platformdirs import user_config_dir
-from qtpy.QtCore import QTimer, Qt
+from qtpy.QtCore import Qt
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
     QDialog,
@@ -410,8 +410,6 @@ def open_config_editor():
     button_box.addButton(set_as_default_button, QDialogButtonBox.ActionRole)
 
     # Temporary status label for feedback when setting default
-    status_label = QLabel("")
-    status_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
     def set_as_default():
         updated_values = collect_values(fresh_container)
@@ -423,9 +421,7 @@ def open_config_editor():
         default_config_path = config_dir / "config.yaml"
         save_config_to_file(default_config_path, full_config)
 
-        status_label.setText("✅ Default config saved")
-        # Clear the transient status message after a short delay.
-        QTimer.singleShot(3000, lambda: status_label.setText(""))
+        dialog.set_status_message("✅ Default config saved")
 
     def save_to_file():
         updated_values = collect_values(fresh_container)
@@ -438,14 +434,11 @@ def open_config_editor():
             filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)",
         )
         if not file_path:
-            status_label.setText("Config save cancelled.")
-            QTimer.singleShot(3000, lambda: status_label.setText(""))
+            dialog.set_status_message("Config save cancelled.")
             return
         save_config_to_file(Path(file_path), full_config)
 
-        status_label.setText("✅ Config saved to file")
-        # Clear the transient status message after a short delay.
-        QTimer.singleShot(3000, lambda: status_label.setText(""))
+        dialog.set_status_message("✅ Config saved to file")
 
     save_button.clicked.connect(save_to_file)
     set_as_default_button.clicked.connect(set_as_default)
@@ -453,7 +446,7 @@ def open_config_editor():
     button_box.rejected.connect(dialog.reject)
 
     main_layout.addWidget(scroll_area)
-    main_layout.addWidget(status_label)
+    attach_status_label(dialog)
     main_layout.addWidget(button_box)
 
     if dialog.exec_():
@@ -467,7 +460,6 @@ def open_config_editor():
 def save_config_to_file(file_path: Path, full_config: dict[str, Any]):
     """Saves the config to a file, displaying an error message if it fails."""
     try:
-        print(json.dumps(full_config, indent=2))
         if file_path.suffix.lower() == ".json":
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(full_config, f, indent=2)
