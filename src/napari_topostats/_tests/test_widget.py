@@ -5,6 +5,8 @@ from pathlib import Path
 import pytest
 from napari import Viewer
 from pytestqt.qtbot import QtBot
+from qtpy.QtCore import Qt
+from qtpy.QtWidgets import QCheckBox
 
 from napari_topostats._widget import TopoStatsRootWidget
 
@@ -32,7 +34,7 @@ def test_load_image(napari_viewer: Viewer, image_path: str):
 
 
 @pytest.mark.parametrize(
-    ("image_path", "run_function_on", "expected_layers"),
+    ("image_path", "run_function_on", "functions_to_run", "expected_layers"),
     [
         pytest.param(
             str(Path("src/napari_topostats/_tests/_test_data/test_spm.spm")),
@@ -42,6 +44,7 @@ def test_load_image(napari_viewer: Viewer, image_path: str):
                 "test image Filter Image",
                 "test image Filter Image Grains Mask",
             ],
+            ["run_filters", "run_grains", "make_3d", "run_grainstats"],
             [
                 "test image",
                 "test image Filter Image",
@@ -58,6 +61,7 @@ def test_functions_in_grid(  # pylint: disable=too-many-positional-arguments
     topostats_widget: TopoStatsRootWidget,
     image_path: str,
     run_function_on: list[str],
+    functions_to_run: list[str],
     expected_layers: list[str],
 ):
     """End-to-end test: load image, run functions, and verify layers."""
@@ -67,7 +71,9 @@ def test_functions_in_grid(  # pylint: disable=too-many-positional-arguments
         topostats_widget,
         napari_viewer,
         run_function_on,
+        functions_to_run,
     )
+
     for expected_name in expected_layers:
         assert expected_name in napari_viewer.layers, f"Layer '{expected_name}' not found"
 
@@ -80,11 +86,10 @@ def test_functions_in_grid(  # pylint: disable=too-many-positional-arguments
             [
                 "test image",
                 "test image Filter Image",
-                "test image Filter Image",
                 "test image Filter Image Grains Mask",
             ],
             id="Checking grainstats function after running prior functions",
-        )
+        ),
     ],
 )
 def test_grainstats_function(
@@ -101,7 +106,11 @@ def test_grainstats_function(
         topostats_widget,
         napari_viewer,
         run_function_on,
+        ["run_filters", "run_grains", "run_grainstats"],
     )
 
     # pylint: disable=protected-access
     assert "Grainstats" in napari_viewer.window._dock_widgets, "Grainstats widget not found in dock widgets."
+    grainstats_widget = napari_viewer.window._dock_widgets["Grainstats"]
+    checkbox = grainstats_widget.findChild(QCheckBox, "nm_checkbox")
+    qtbot.mouseClick(checkbox, Qt.LeftButton)

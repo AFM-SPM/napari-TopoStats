@@ -44,6 +44,7 @@ def run_functions_in_grid(
     topostats_widget: TopoStatsRootWidget,
     napari_viewer: Viewer,
     run_function_on: list[int],
+    functions_to_run: list[str],
 ):
     """
     Simulate clicking functions in the function grid and verify layers appear.
@@ -58,14 +59,15 @@ def run_functions_in_grid(
         The active napari viewer instance.
     run_function_on : list[int]
         Indices of layers to select before running each function.
-    expected_layers : list[str]
-        Names of layers expected to exist after running the functions.
+    functions_to_run : list[str]
+        Names of functions to run in the function grid.
     """
-    function_names = [f.name for f in AVAILABLE_FUNCTIONS]
-    function_names.remove("load_config")
+    if functions_to_run == ["all"]:
+        functions_to_run = [f.name for f in AVAILABLE_FUNCTIONS]
+        functions_to_run.remove("load_config")
     button_grid = topostats_widget.function_grid
 
-    for i, func_name in enumerate(function_names):
+    for i, func_name in enumerate(functions_to_run):
         pretty_name = func_name.replace("_", " ").title()
         napari_viewer.layers.selection = [napari_viewer.layers[run_function_on[i]]]
         item = button_grid.findItems(pretty_name, Qt.MatchExactly)[0]

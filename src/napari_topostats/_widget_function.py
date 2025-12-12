@@ -809,6 +809,7 @@ class WidgetFunction:
                     original.show_selected_label = True
 
             nm_checkbox.toggled.connect(on_checkbox_changed)
+            nm_checkbox.setObjectName("nm_checkbox")
             layout.addWidget(nm_checkbox)
             original.events.selected_label.connect(on_label_selected)
 
