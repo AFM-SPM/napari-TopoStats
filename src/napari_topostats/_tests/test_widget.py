@@ -23,7 +23,7 @@ def test_button_grid_exists(topostats_widget: TopoStatsRootWidget):
     [
         pytest.param(
             str(Path("src/napari_topostats/_tests/_test_data/test_spm.spm")),
-            id="Testing loading with valid image path",
+            id="loading with valid image path",
         )
     ],
 )
@@ -51,7 +51,7 @@ def test_load_image(napari_viewer: Viewer, image_path: str):
                 "test image Filter Image Grains Mask",
                 "test image Filter 3D Image",
             ],
-            id="Testing all the functions in standard order",
+            id="all the functions in standard order",
         )
     ],
 )
@@ -88,7 +88,7 @@ def test_functions_in_grid(  # pylint: disable=too-many-positional-arguments
                 "test image Filter Image",
                 "test image Filter Image Grains Mask",
             ],
-            id="Checking grainstats function after running prior functions",
+            id="grainstats function (after running prior functions)",
         ),
     ],
 )

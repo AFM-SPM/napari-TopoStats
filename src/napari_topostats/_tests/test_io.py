@@ -30,19 +30,19 @@ def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
             Path("src/napari_topostats/_tests/_test_data/test_config.yaml"),
             False,
             "SUCCESS",
-            id="Test valid path as if inputted by user in gui widget",
+            id="valid path from user",
         ),
         pytest.param(
             Path("This/is/definitely/not/a_real/path"),
             False,
             "FAILURE",
-            id="Test invalid path as if inputted by user in gui widget",
+            id="invalid path from user",
         ),
         pytest.param(
             None,
             True,
             "SUCCESS",
-            id="Test valid path as if function run automatically",
+            id="valid path from default",
         ),
     ],
 )
