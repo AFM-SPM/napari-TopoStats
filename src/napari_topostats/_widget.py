@@ -17,11 +17,13 @@ Replace code below according to your needs.
 
 import argparse
 import os
+import threading
 from pathlib import Path
 
 from napari import current_viewer  # pylint: disable=no-name-in-module
 from qtpy.QtWidgets import (
     QApplication,
+    QFileDialog,
     QHBoxLayout,
     QPushButton,
     QSizePolicy,
@@ -58,6 +60,8 @@ if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() 
 from ._alerts import show_error_dialog
 from ._button_grid import ButtonGrid
 from ._io import (
+    config_wrapper,
+    full_config_container,
     get_current_config_path,
     load_config,
     load_config_impl,
@@ -77,42 +81,45 @@ if parse_version(parse_version(topostats_version).base_version) < parse_version(
 
 # pylint: disable=unused-argument
 def batch_process_impl(viewer: Viewer, data_path: str | Path = None, output_path: str | Path = None):
-    """Batch process multiple AFM images in a selected folder using the current configuration.
+    """
+    Batch process multiple AFM images in a selected folder using the current configuration.
 
     Parameters
     ----------
     viewer : napari.Viewer
         The active napari viewer instance.
     """
-    # if config_wrapper is None or full_config_container is None:
-    #     load_config_impl(current_viewer(), use_default=True)
-    # if data_path is None:
-    #     data_path = QFileDialog.getExistingDirectory(
-    #         parent=None,
-    #         caption="Select Input Data Directory",
-    #     )
-    #     if not data_path:
-    #         return False
-    #     data_path = Path(data_path)
-    #     widget = batch_process
-    #     widget.viewer.value = viewer
-    #     widget.data_path.value = data_path
-    # if output_path is None:
-    #     output_path = QFileDialog.getExistingDirectory(
-    #         parent=None,
-    #         caption="Select Output Data Directory",
-    #     )
-    #     if not output_path:
-    #         return False
-    #     output_path = Path(output_path)
-    #     widget = batch_process
-    #     widget.viewer.value = viewer
-    #     widget.output_path.value = output_path
+    if config_wrapper is None or full_config_container is None:
+        load_config_impl(current_viewer(), use_default=True)
+        if data_path is None:
+            data_path = QFileDialog.getExistingDirectory(
+                parent=None,
+                caption="Select Input Data Directory",
+            )
+            if not data_path:
+                return
+            data_path = Path(data_path)
+            widget = batch_process
+            widget.viewer.value = viewer
+            widget.data_path.value = data_path
+        if output_path is None:
+            output_path = QFileDialog.getExistingDirectory(
+                parent=None,
+                caption="Select Output Data Directory",
+            )
+            if not output_path:
+                return
+            output_path = Path(output_path)
+            widget = batch_process
+            widget.viewer.value = viewer
+            widget.output_path.value = output_path
 
     args = argparse.Namespace()
     args.config_file = str(get_current_config_path())
     args.module = "topostats"
-    process(args)
+    args.summary_config = None
+    thread = threading.Thread(target=process, args=(args,), name="ProcessThread-topostats")
+    thread.start()
 
 
 @magicgui(

@@ -489,9 +489,8 @@ def save_current_config_as_temp(overides: dict[str, Any] | None = None):
     overides : dict[str, Any] | None
         A dictionary of config keys and values to override in the saved config.
     """
-    updated_values = collect_values(full_config_container)
-    config_wrapper.flat.update(updated_values)
-    full_current_config = config_wrapper.unflatten()
+    full_current_config = get_current_config()
+
     if overides:
         for key, value in overides.items():
             config_wrapper.flat[key] = value
@@ -499,3 +498,11 @@ def save_current_config_as_temp(overides: dict[str, Any] | None = None):
     config_path = config_dir / "_temp_config.yaml"
     config_dir.mkdir(parents=True, exist_ok=True)
     save_config_to_file(config_path, full_current_config)
+
+
+def get_current_config():
+    """Returns the current config with any updates from the edit config window applied"""
+    updated_values = collect_values(full_config_container)
+    config_wrapper.flat.update(updated_values)
+    full_current_config = config_wrapper.unflatten()
+    return full_current_config
