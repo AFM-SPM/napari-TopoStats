@@ -204,9 +204,6 @@ def attach_status_label(widget: FunctionGui | QWidget):
             if to_adjust.parent():
                 to_adjust.parent().adjustSize()
                 to_adjust.parent().updateGeometry()
-                if to_adjust.parent().parent():
-                    to_adjust.parent().parent().adjustSize()
-                    to_adjust.parent().parent().updateGeometry()
             label.setStyleSheet(
                 """
                 QLabel {

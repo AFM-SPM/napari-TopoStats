@@ -15,6 +15,7 @@ Replace code below according to your needs.
 # ns-rse 2025-12-08 - We seem to need to allow ungrouped imports so that LoadingWidget() can be used
 # pylint: disable=ungrouped-imports
 
+import argparse
 import os
 from pathlib import Path
 
@@ -44,6 +45,7 @@ from platformdirs import user_config_dir
 from topostats import __version__ as topostats_version
 from topostats.filters import Filters
 from topostats.grains import Grains
+from topostats.run_modules import process
 
 from napari_topostats.utils import (
     afm2stack,
@@ -55,7 +57,12 @@ if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() 
 
 from ._alerts import show_error_dialog
 from ._button_grid import ButtonGrid
-from ._io import load_config, load_config_impl, write_new_default_config
+from ._io import (
+    get_current_config_path,
+    load_config,
+    load_config_impl,
+    write_new_default_config,
+)
 from ._state import MIN_TOPOSTATS_VERSION
 from ._widget_function import WidgetFunction
 
@@ -66,6 +73,68 @@ if parse_version(parse_version(topostats_version).base_version) < parse_version(
         f"This can be done with `pip install topostats=={MIN_TOPOSTATS_VERSION}`",
         raise_exception=False,
     )
+
+
+# pylint: disable=unused-argument
+def batch_process_impl(viewer: Viewer, data_path: str | Path = None, output_path: str | Path = None):
+    """Batch process multiple AFM images in a selected folder using the current configuration.
+
+    Parameters
+    ----------
+    viewer : napari.Viewer
+        The active napari viewer instance.
+    """
+    # if config_wrapper is None or full_config_container is None:
+    #     load_config_impl(current_viewer(), use_default=True)
+    # if data_path is None:
+    #     data_path = QFileDialog.getExistingDirectory(
+    #         parent=None,
+    #         caption="Select Input Data Directory",
+    #     )
+    #     if not data_path:
+    #         return False
+    #     data_path = Path(data_path)
+    #     widget = batch_process
+    #     widget.viewer.value = viewer
+    #     widget.data_path.value = data_path
+    # if output_path is None:
+    #     output_path = QFileDialog.getExistingDirectory(
+    #         parent=None,
+    #         caption="Select Output Data Directory",
+    #     )
+    #     if not output_path:
+    #         return False
+    #     output_path = Path(output_path)
+    #     widget = batch_process
+    #     widget.viewer.value = viewer
+    #     widget.output_path.value = output_path
+
+    args = argparse.Namespace()
+    args.config_file = str(get_current_config_path())
+    args.module = "topostats"
+    process(args)
+
+
+@magicgui(
+    data_path={"label": "Input data path"},
+    output_path={
+        "label": "Output data path",
+    },
+    call_button="Run Batch Process",
+)
+def batch_process(viewer: Viewer, data_path: str | Path = None, output_path: str | Path = None):
+    """Batch process multiple AFM images in a selected folder using the current configuration.
+
+    Parameters
+    ----------
+    viewer : napari.Viewer
+        The active napari viewer instance.
+    data_path : str or Path, optional
+        The path to the directory containing AFM image files.
+        If None, a dialog will prompt the user to select a directory.
+    """
+    return batch_process_impl(viewer, data_path=data_path, output_path=output_path)
+
 
 AVAILABLE_FUNCTIONS = [
     WidgetFunction(
@@ -110,6 +179,11 @@ AVAILABLE_FUNCTIONS = [
         of_type=[Labels],
         function_to_run=grainstats,
         tooltip="Creates a table showing the grainstats of the selected grain labels layer.",
+    ),
+    WidgetFunction(
+        name="batch_process",
+        function_to_run=batch_process,
+        tooltip="Batch process multiple AFM images in a selected folder using the current configuration.",
     ),
 ]
 

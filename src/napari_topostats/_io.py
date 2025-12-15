@@ -42,6 +42,7 @@ except ImportError:
 config_wrapper = None
 full_config_container = None
 comment_descriptions = {}
+current_config_path = None
 # Globals store currently loaded config and UI state so dialogs/widgets can reuse them.
 
 
@@ -143,10 +144,15 @@ def write_new_default_config(config_path: Path):
     write_config_with_comments(args)
 
 
+def get_current_config_path() -> str | None:
+    """Returns the current config path"""
+    return current_config_path
+
+
 def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_default: bool = False):
     """Loads config file using default if no path is provided and asking for data from user as required"""
     # pylint: disable=global-statement
-    global comment_descriptions, config_wrapper, full_config_container  # Updated global name
+    global comment_descriptions, config_wrapper, full_config_container, current_config_path  # Updated global name
     if config_path is None:
         if use_default:
             config_dir = Path(user_config_dir("TopoStats", "Napari"))
@@ -167,6 +173,8 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
             widget = load_config
             widget.viewer.value = viewer
             widget.config_path.value = config_path
+    current_config_path = str(config_path)
+    print(f"Current config path set to {current_config_path}")
 
     try:
         with open(config_path, encoding="utf-8") as f:
@@ -469,3 +477,25 @@ def save_config_to_file(file_path: Path, full_config: dict[str, Any]):
         print(f"Config saved to {file_path}")
     except (OSError, TypeError, yaml.YAMLError) as e:
         show_error_dialog(f"Failed to save config: {e}")
+
+
+def save_current_config_as_temp(overides: dict[str, Any] | None = None):
+    """
+    Saves the current config as a temporary file with optional overides.
+    This is used for maintaining an up to date config file and path for TopoStats backend functions.
+
+    Parameters
+    ----------
+    overides : dict[str, Any] | None
+        A dictionary of config keys and values to override in the saved config.
+    """
+    updated_values = collect_values(full_config_container)
+    config_wrapper.flat.update(updated_values)
+    full_current_config = config_wrapper.unflatten()
+    if overides:
+        for key, value in overides.items():
+            config_wrapper.flat[key] = value
+    config_dir = Path(user_config_dir("TopoStats", "Napari"))
+    config_path = config_dir / "_temp_config.yaml"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    save_config_to_file(config_path, full_current_config)
