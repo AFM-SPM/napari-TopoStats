@@ -17,9 +17,9 @@ Replace code below according to your needs.
 
 import argparse
 import os
-import threading
 from pathlib import Path
 
+from PyQt5.QtCore import QThread, pyqtSignal
 from napari import current_viewer  # pylint: disable=no-name-in-module
 from qtpy.QtWidgets import (
     QApplication,
@@ -60,8 +60,8 @@ if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() 
 from ._alerts import show_error_dialog
 from ._button_grid import ButtonGrid
 from ._io import (
-    config_wrapper,
-    full_config_container,
+    config_loaded,
+    get_current_config,
     get_current_config_path,
     load_config,
     load_config_impl,
@@ -79,68 +79,95 @@ if parse_version(parse_version(topostats_version).base_version) < parse_version(
     )
 
 
-# pylint: disable=unused-argument
-def batch_process_impl(viewer: Viewer, data_path: str | Path = None, output_path: str | Path = None):
+# pylint: disable=protected-access
+@magicgui(
+    data_path={"label": "Input path"},
+    output_path={"label": "Output path"},
+    call_button="Batch Process",
+)
+def batch_process(
+    data_path: Path = None,
+    output_path: Path = None,
+):
     """
     Batch process multiple AFM images in a selected folder using the current configuration.
-
     Parameters
     ----------
-    viewer : napari.Viewer
-        The active napari viewer instance.
+    data_path : Path | None
+        The input data directory containing AFM images to process. If None, a dialog will prompt for selection.
+    output_path : Path | None
+        The output directory where results will be saved. If None, a dialog will prompt for selection.
     """
-    if config_wrapper is None or full_config_container is None:
+    widget = batch_process
+    if not hasattr(widget, "set_status_message"):
+        attach_status_label(widget)
+
+    if not config_loaded():
         load_config_impl(current_viewer(), use_default=True)
+
+    if get_current_config()["base_dir"] == "./":
         if data_path is None:
             data_path = QFileDialog.getExistingDirectory(
                 parent=None,
                 caption="Select Input Data Directory",
             )
-            if not data_path:
-                return
             data_path = Path(data_path)
-            widget = batch_process
-            widget.viewer.value = viewer
             widget.data_path.value = data_path
+
         if output_path is None:
             output_path = QFileDialog.getExistingDirectory(
                 parent=None,
                 caption="Select Output Data Directory",
             )
-            if not output_path:
-                return
             output_path = Path(output_path)
-            widget = batch_process
-            widget.viewer.value = viewer
             widget.output_path.value = output_path
+    # ruff: noqa: SIM102
+    if hasattr(widget, "_batch_worker"):
+        if widget._batch_worker.isRunning():
+            widget.set_status_message("⚠️ Batch processing is already running.")
+            return
+    print(f"Config path: {str(get_current_config_path())}")
+    args = argparse.Namespace(
+        config_file=str(get_current_config_path()),
+        module="topostats",
+        summary_config=None,
+    )
+    if data_path is not None:
+        args.base_dir = str(data_path)
+    else:
+        widget.data_path.value = get_current_config()["base_dir"]
+    if output_path is not None:
+        args.output_dir = str(output_path)
+    else:
+        widget.output_path.value = get_current_config()["output_dir"]
 
-    args = argparse.Namespace()
-    args.config_file = str(get_current_config_path())
-    args.module = "topostats"
-    args.summary_config = None
-    thread = threading.Thread(target=process, args=(args,), name="ProcessThread-topostats")
-    thread.start()
+    widget.set_status_message("⏳ Starting batch processing in the background. View command line for progress.")
 
+    class ProcessWorker(QThread):
+        """
+        Worker thread for batch processing.
+        """
 
-@magicgui(
-    data_path={"label": "Input data path"},
-    output_path={
-        "label": "Output data path",
-    },
-    call_button="Run Batch Process",
-)
-def batch_process(viewer: Viewer, data_path: str | Path = None, output_path: str | Path = None):
-    """Batch process multiple AFM images in a selected folder using the current configuration.
+        finished = pyqtSignal()
 
-    Parameters
-    ----------
-    viewer : napari.Viewer
-        The active napari viewer instance.
-    data_path : str or Path, optional
-        The path to the directory containing AFM image files.
-        If None, a dialog will prompt the user to select a directory.
-    """
-    return batch_process_impl(viewer, data_path=data_path, output_path=output_path)
+        def __init__(self, args):
+            """
+            Generate a worker to process the batch in a separate thread.
+            """
+            super().__init__()
+            self.args = args
+
+        def run(self):
+            """
+            Run the batch processing.
+            """
+            process(self.args)
+            self.finished.emit()
+
+    worker = ProcessWorker(args)
+    worker.finished.connect(lambda: widget.set_status_message("✅ Batch processing complete."))
+    widget._batch_worker = worker  # prevent garbage collection
+    worker.start()
 
 
 AVAILABLE_FUNCTIONS = [

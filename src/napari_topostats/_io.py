@@ -1,5 +1,6 @@
 """Provides functionality for loading and editting config files"""
 
+import contextlib
 import json
 import re
 from argparse import Namespace
@@ -84,19 +85,30 @@ def collect_values(container: Container) -> dict[str, Any]:
         val = widget.value
         name = widget.name
         # Allow lists to be entered as literal strings and parsed back to Python types.
-        if isinstance(val, str) and val.strip().startswith("["):
-            try:
+        # Also handle "None" strings converting to None.
+        # And allow scientific notation for floats.
+        if isinstance(val, str):
+            stripped = val.strip()
+
+            if stripped == "None":
+                val = None
+            elif stripped.startswith("["):
                 # pylint: disable=import-outside-toplevel
                 import ast
 
-                val = ast.literal_eval(val)
-            except (ValueError, SyntaxError):
-                pass
-        # Treat the literal string "None" as an actual None value when saving.
-        elif val == "None":
-            val = None
+                with contextlib.suppress(ValueError, SyntaxError):
+                    val = ast.literal_eval(stripped)
+            else:
+                # Try float parsing (supports scientific notation)
+                with contextlib.suppress(ValueError):
+                    val = float(stripped)
         result[name] = val
     return result
+
+
+def should_use_line_edit_for_float(value: float) -> bool:
+    """Determine if a float value should be edited with a LineEdit instead of a FloatSpinBox."""
+    return abs(value) != 0 and (abs(value) < 1e-4 or abs(value) > 1e6)
 
 
 def build_dynamic_widget(flat_config: dict[str, Any], descriptions: dict[str, str] = None) -> Container:
@@ -111,7 +123,19 @@ def build_dynamic_widget(flat_config: dict[str, Any], descriptions: dict[str, st
         elif isinstance(value, int):
             w = create_widget(name=key, widget_type="SpinBox", value=value)
         elif isinstance(value, float):
-            w = create_widget(name=key, widget_type="FloatSpinBox", value=value)
+            if should_use_line_edit_for_float(value):
+                w = create_widget(
+                    name=key,
+                    widget_type="LineEdit",
+                    value=repr(value),
+                )
+            else:
+                w = create_widget(
+                    name=key,
+                    widget_type="FloatSpinBox",
+                    value=value,
+                )
+                w.native.setDecimals(4)
         elif isinstance(value, str):
             w = create_widget(name=key, widget_type="LineEdit", value=value)
         elif isinstance(value, list):
@@ -463,6 +487,7 @@ def open_config_editor():
         print("Config updated.")
         # Optionally refresh the full container for other use
         full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
+        save_current_config_as_temp()
 
 
 def save_config_to_file(file_path: Path, full_config: dict[str, Any]):
@@ -489,6 +514,8 @@ def save_current_config_as_temp(overides: dict[str, Any] | None = None):
     overides : dict[str, Any] | None
         A dictionary of config keys and values to override in the saved config.
     """
+    # pylint: disable=global-statement
+    global current_config_path
     full_current_config = get_current_config()
 
     if overides:
@@ -498,11 +525,19 @@ def save_current_config_as_temp(overides: dict[str, Any] | None = None):
     config_path = config_dir / "_temp_config.yaml"
     config_dir.mkdir(parents=True, exist_ok=True)
     save_config_to_file(config_path, full_current_config)
+    current_config_path = str(config_path)
 
 
-def get_current_config():
+def get_current_config(container: Container | None = None) -> dict[str, Any]:
     """Returns the current config with any updates from the edit config window applied"""
-    updated_values = collect_values(full_config_container)
+    if container is None:
+        container = full_config_container
+    updated_values = collect_values(container)
     config_wrapper.flat.update(updated_values)
     full_current_config = config_wrapper.unflatten()
     return full_current_config
+
+
+def config_loaded() -> bool:
+    """Returns True if a config has been loaded, False otherwise."""
+    return config_wrapper is not None and full_config_container is not None
