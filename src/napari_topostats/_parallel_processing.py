@@ -8,7 +8,7 @@ class ProcessWorker(QThread):
     Worker thread for processing an intensive function in parallel.
     """
 
-    finished = pyqtSignal()
+    result_ready = pyqtSignal(object)
 
     def __init__(self, func, *args, **kwargs):
         """
@@ -18,6 +18,7 @@ class ProcessWorker(QThread):
         self.args = args
         self.kwargs = kwargs
         self.func = func
+        self.result = None
 
     def set_parameters(self, *args, **kwargs):
         """
@@ -30,5 +31,6 @@ class ProcessWorker(QThread):
         """
         Run the batch processing.
         """
-        self.func(*self.args, **self.kwargs)
-        self.finished.emit()
+        self.result = self.func(*self.args, **self.kwargs)
+
+        self.result_ready.emit(self.result)
