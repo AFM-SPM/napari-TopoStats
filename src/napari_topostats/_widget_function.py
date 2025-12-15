@@ -29,8 +29,9 @@ from qtpy.QtWidgets import (
 from scipy.ndimage import label
 
 from . import _io as io
-from ._alerts import LoadingWidget, show_error_dialog
+from ._alerts import show_error_dialog
 from ._io import ConfigWrapper, collect_values
+from ._parallel_processing import ProcessWorker
 
 
 def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
@@ -494,85 +495,95 @@ class WidgetFunction:
                         if self.type_class is not None:
                             parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
 
-            # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught
+            # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught, attribute-defined-outside-init
             def func(**kwargs):
-                viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
-                loading_widget = LoadingWidget(viewer)
-                loading_widget.start(
-                    self.name.replace("_", " ").replace("run", "running").replace("make", "making").title()
-                )
-                method_args = {}
-                class_args = {}
 
-                # Determine all relevant parameters
-                all_params = including_config_params_from_function + (
-                    including_config_params_from_class if self.type_class else []
-                )
+                def _func(**kwargs):
+                    method_args = {}
+                    class_args = {}
 
-                # Handle image selection if required
-                if "image" in [p.name for p in all_params]:
-                    selected_image = get_selected_image(
-                        kwargs.get("viewer", current_viewer()),
-                        of_type=self.of_type,
+                    # Determine all relevant parameters
+                    all_params = including_config_params_from_function + (
+                        including_config_params_from_class if self.type_class else []
                     )
-                    if selected_image is None:
-                        loading_widget.stop()
-                        return
-                    kwargs["image"] = selected_image
 
-                # Handle pixel_to_nm_scaling if required
-                if "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs:
-                    kwargs["pixel_to_nm_scaling"] = kwargs["image"].metadata.get("px2nm", 1.0)
-                    print(f"Using pixel_to_nm_scaling from image metadata: {kwargs['pixel_to_nm_scaling']}")
+                    # Handle image selection if required
+                    if "image" in [p.name for p in all_params]:
+                        selected_image = get_selected_image(
+                            kwargs.get("viewer", current_viewer()),
+                            of_type=self.of_type,
+                        )
+                        if selected_image is None:
+                            return
+                        kwargs["image"] = selected_image
 
-                if "filename" in [p.name for p in all_params] and "filename" not in kwargs:
-                    kwargs["filename"] = "image"
-                # Distribute arguments between method_args and class_args
-                for key, value in kwargs.items():
-                    if key in [p.name for p in including_config_params_from_function]:
-                        method_args[key] = value
-                    elif self.type_class and key in [p.name for p in including_config_params_from_class]:
-                        class_args[key] = value
+                    # Handle pixel_to_nm_scaling if required
+                    if "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs:
+                        kwargs["pixel_to_nm_scaling"] = kwargs["image"].metadata.get("px2nm", 1.0)
+                        print(f"Using pixel_to_nm_scaling from image metadata: {kwargs['pixel_to_nm_scaling']}")
 
-                # Add config values if needed
-                if self.uses_config:
-                    method_args = add_values_to_dict_from_config(
-                        config,
-                        io.config_wrapper,
-                        self.function_key,
-                        method_args,
-                        including_config_params_from_function,
-                    )
-                    if self.type_class:
-                        class_args = add_values_to_dict_from_config(
+                    if "filename" in [p.name for p in all_params] and "filename" not in kwargs:
+                        kwargs["filename"] = "image"
+                    # Distribute arguments between method_args and class_args
+                    for key, value in kwargs.items():
+                        if key in [p.name for p in including_config_params_from_function]:
+                            method_args[key] = value
+                        elif self.type_class and key in [p.name for p in including_config_params_from_class]:
+                            class_args[key] = value
+
+                    # Add config values if needed
+                    if self.uses_config:
+                        method_args = add_values_to_dict_from_config(
                             config,
                             io.config_wrapper,
                             self.function_key,
-                            class_args,
-                            including_config_params_from_class,
+                            method_args,
+                            including_config_params_from_function,
                         )
+                        if self.type_class:
+                            class_args = add_values_to_dict_from_config(
+                                config,
+                                io.config_wrapper,
+                                self.function_key,
+                                class_args,
+                                including_config_params_from_class,
+                            )
 
-                # Enforce defaults
-                method_args = enforce_defaults(method_args, including_config_params_from_function)
-                if self.type_class:
-                    class_args = enforce_defaults(class_args, including_config_params_from_class)
+                    # Enforce defaults
+                    method_args = enforce_defaults(method_args, including_config_params_from_function)
+                    if self.type_class:
+                        class_args = enforce_defaults(class_args, including_config_params_from_class)
 
-                # Execute function or method
-                if self.type_class:
-                    # ruff: noqa: BLE001
-                    try:
-                        instance = self.type_class(**class_args)
-                    except Exception as e:
-                        show_error_dialog(
-                            f"Topostats is failing with {self.type_class.__name__}: {e}.",
-                            topostats_error=True,
-                        )
-                        return
-                    method = getattr(instance, self.function_to_run.__name__, None)
-                    if method:
+                    # Execute function or method
+                    if self.type_class:
                         # ruff: noqa: BLE001
                         try:
-                            return_value = method(**method_args)
+                            instance = self.type_class(**class_args)
+                        except Exception as e:
+                            show_error_dialog(
+                                f"Topostats is failing with {self.type_class.__name__}: {e}.",
+                                topostats_error=True,
+                            )
+                            return
+                        method = getattr(instance, self.function_to_run.__name__, None)
+                        if method:
+                            # ruff: noqa: BLE001
+                            try:
+                                return_value = method(**method_args)
+                            except Exception as e:
+                                show_error_dialog(
+                                    f"Topostats is failing with: {e}.",
+                                    raise_exception=True,
+                                    topostats_error=True,
+                                )
+                                return
+                        else:
+                            show_error_dialog(f"Method {self.function_to_run.__name__} not found on instance.")
+                            return
+                    else:
+                        # ruff: noqa: BLE001
+                        try:
+                            return_value = self.function_to_run(**method_args)
                         except Exception as e:
                             show_error_dialog(
                                 f"Topostats is failing with: {e}.",
@@ -580,63 +591,56 @@ class WidgetFunction:
                                 topostats_error=True,
                             )
                             return
-                    else:
-                        show_error_dialog(f"Method {self.function_to_run.__name__} not found on instance.")
-                        loading_widget.stop()
-                        return
-                else:
-                    # ruff: noqa: BLE001
-                    try:
-                        return_value = self.function_to_run(**method_args)
-                    except Exception as e:
-                        show_error_dialog(
-                            f"Topostats is failing with: {e}.",
-                            raise_exception=True,
-                            topostats_error=True,
+
+                    # Evaluate path_to_data
+                    metadata = {}
+                    if self.metadata_paths is not None:
+                        for key in self.metadata_paths:
+                            if self.metadata_paths[key] == "config":
+                                metadata[key] = full_current_config
+                            else:
+                                metadata[key] = evaluate_path_to_data(
+                                    self.metadata_paths[key],
+                                    return_value,
+                                    instance,
+                                    self.type_class,
+                                )
+
+                    if self.type_class:
+                        result = evaluate_path_to_data(
+                            self.path_to_data,
+                            return_value,
+                            instance,
+                            self.type_class,
                         )
+                    else:
+                        result = evaluate_path_to_data(self.path_to_data, return_value)
+                    if result is None:
                         return
+                    return_value = result
 
-                # Evaluate path_to_data
-                metadata = {}
-                if self.metadata_paths is not None:
-                    for key in self.metadata_paths:
-                        if self.metadata_paths[key] == "config":
-                            metadata[key] = full_current_config
-                        else:
-                            metadata[key] = evaluate_path_to_data(
-                                self.metadata_paths[key],
-                                return_value,
-                                instance,
-                                self.type_class,
-                            )
+                    # Render return value
+                    if return_value is not None:
+                        self.render_return_value(
+                            return_value,
+                            viewer,
+                            kwargs.get("image"),
+                            metadata=metadata,
+                        )
+                    else:
+                        show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
 
-                if self.type_class:
-                    result = evaluate_path_to_data(
-                        self.path_to_data,
-                        return_value,
-                        instance,
-                        self.type_class,
-                    )
-                else:
-                    result = evaluate_path_to_data(self.path_to_data, return_value)
-                if result is None:
-                    loading_widget.stop()
-                    return
-                return_value = result
-
-                # Render return value
-                if return_value is not None:
-                    self.render_return_value(
-                        return_value,
-                        viewer,
-                        kwargs.get("image"),
-                        metadata=metadata,
-                    )
-                else:
-                    show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
-                loading_widget.stop()
+                viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
+                # loading_widget = LoadingWidget(viewer)
+                # loading_widget.start(
+                #     self.name.replace("_", " ").replace("run", "running").replace("make", "making").title()
+                # )
+                self.worker = ProcessWorker(_func, **kwargs)
+                self.worker.start()
+                # self.worker.finished.connect(loading_widget.stop)
 
             # Collect the parameters for the function and ensure defaults are set (these defaults are shown in the GUI)
+
             new_parameters = []
             for p in (
                 (parameters_from_function + parameters_from_class)

@@ -19,7 +19,6 @@ import argparse
 import os
 from pathlib import Path
 
-from PyQt5.QtCore import QThread, pyqtSignal
 from napari import current_viewer  # pylint: disable=no-name-in-module
 from qtpy.QtWidgets import (
     QApplication,
@@ -67,6 +66,7 @@ from ._io import (
     load_config_impl,
     write_new_default_config,
 )
+from ._parallel_processing import ProcessWorker
 from ._state import MIN_TOPOSTATS_VERSION
 from ._widget_function import WidgetFunction
 
@@ -142,29 +142,7 @@ def batch_process(
         widget.output_path.value = get_current_config()["output_dir"]
 
     widget.set_status_message("⏳ Starting batch processing in the background. View command line for progress.")
-
-    class ProcessWorker(QThread):
-        """
-        Worker thread for batch processing.
-        """
-
-        finished = pyqtSignal()
-
-        def __init__(self, args):
-            """
-            Generate a worker to process the batch in a separate thread.
-            """
-            super().__init__()
-            self.args = args
-
-        def run(self):
-            """
-            Run the batch processing.
-            """
-            process(self.args)
-            self.finished.emit()
-
-    worker = ProcessWorker(args)
+    worker = ProcessWorker(process, args)
     worker.finished.connect(lambda: widget.set_status_message("✅ Batch processing complete."))
     widget._batch_worker = worker  # prevent garbage collection
     worker.start()
