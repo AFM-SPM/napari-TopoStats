@@ -144,6 +144,7 @@ def batch_process(
     widget.set_status_message("⏳ Starting batch processing in the background. View command line for progress.")
     worker = ProcessWorker(process, args)
     worker.finished.connect(lambda: widget.set_status_message("✅ Batch processing complete."))
+    worker.finished.connect(worker.deleteLater)
     widget._batch_worker = worker  # prevent garbage collection
     worker.start()
 

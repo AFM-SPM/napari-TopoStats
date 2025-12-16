@@ -43,7 +43,7 @@ def run_functions_in_grid(
     qtbot: QtBot,
     topostats_widget: TopoStatsRootWidget,
     napari_viewer: Viewer,
-    run_function_on: list[int],
+    run_function_on: list[str],
     functions_to_run: list[str],
 ):
     """
@@ -57,8 +57,8 @@ def run_functions_in_grid(
         The main napari-TopoStats widget containing the function grid.
     napari_viewer : napari.Viewer
         The active napari viewer instance.
-    run_function_on : list[int]
-        Indices of layers to select before running each function.
+    run_function_on : list[str]
+        Names of layers to select before running each function.
     functions_to_run : list[str]
         Names of functions to run in the function grid.
     """
@@ -68,12 +68,13 @@ def run_functions_in_grid(
     button_grid = topostats_widget.function_grid
 
     for i, func_name in enumerate(functions_to_run):
+        print(f"{func_name} running on {run_function_on[i]}")
         pretty_name = func_name.replace("_", " ").title()
         napari_viewer.layers.selection = [napari_viewer.layers[run_function_on[i]]]
         item = button_grid.findItems(pretty_name, Qt.MatchExactly)[0]
         rect = button_grid.visualItemRect(item)
         qtbot.mouseClick(button_grid.viewport(), Qt.LeftButton, pos=rect.center())
-        qtbot.wait(100)
+        qtbot.wait(3000)
 
 
 def open_load_config_widget(qtbot: QtBot, topostats_widget: TopoStatsRootWidget):
