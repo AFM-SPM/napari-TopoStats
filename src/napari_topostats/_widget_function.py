@@ -29,7 +29,7 @@ from qtpy.QtWidgets import (
 from scipy.ndimage import label
 
 from . import _io as io
-from ._alerts import show_error_dialog
+from ._alerts import LoadingWidget, show_error_dialog
 from ._io import ConfigWrapper, collect_values
 from ._parallel_processing import ProcessWorker
 
@@ -497,9 +497,14 @@ class WidgetFunction:
 
             # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught, attribute-defined-outside-init
             def func(**kwargs):
+                viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
+                loading_widget = LoadingWidget(viewer)
+                loading_widget.start(
+                    self.name.replace("_", " ").replace("run", "running").replace("make", "making").title()
+                )
+
                 method_args = {}
                 class_args = {}
-
                 # Determine all relevant parameters
                 all_params = including_config_params_from_function + (
                     including_config_params_from_class if self.type_class else []
@@ -512,6 +517,7 @@ class WidgetFunction:
                         of_type=self.of_type,
                     )
                     if selected_image is None:
+                        loading_widget.stop()
                         return
                     kwargs["image"] = selected_image
 
@@ -628,6 +634,7 @@ class WidgetFunction:
                         )
                     else:
                         show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
+                    loading_widget.stop()
 
                 self.worker = ProcessWorker(_func)
                 self.worker.start()

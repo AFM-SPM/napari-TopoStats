@@ -491,17 +491,115 @@ def open_config_editor():
 
 
 def save_config_to_file(file_path: Path, full_config: dict[str, Any]):
-    """Saves the config to a file, displaying an error message if it fails."""
+    """Saves the config to a file with comments preserved, displaying an error message if it fails."""
     try:
         if file_path.suffix.lower() == ".json":
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(full_config, f, indent=2)
         else:
-            with open(file_path, "w", encoding="utf-8") as f:
-                yaml.safe_dump(full_config, f, sort_keys=False)
+            # For YAML files, use write_config_with_comments if we have comment descriptions
+            if comment_descriptions:
+                # Build the comments dict in the format expected by write_config_with_comments
+                # It expects nested dict structure matching the config
+                comments_nested = _unflatten_comments(comment_descriptions)
+
+                # Use write_config_with_comments to preserve inline comments
+                _write_yaml_with_inline_comments(file_path, full_config, comments_nested)
+            else:
+                # Fallback to standard YAML dump if no comments available
+                with open(file_path, "w", encoding="utf-8") as f:
+                    yaml.safe_dump(full_config, f, sort_keys=False)
         print(f"Config saved to {file_path}")
     except (OSError, TypeError, yaml.YAMLError) as e:
         show_error_dialog(f"Failed to save config: {e}")
+
+
+def _unflatten_comments(flat_comments: dict[str, str]) -> dict:
+    """
+    Convert flat dotted-key comments back to nested dictionary structure.
+
+    Example:
+        {"filter.threshold": "comment"} -> {"filter": {"threshold": "comment"}}
+    """
+    result = {}
+    for key, comment in flat_comments.items():
+        keys = key.split(".")
+        d = result
+        for part in keys[:-1]:
+            d = d.setdefault(part, {})
+        d[keys[-1]] = comment
+    return result
+
+
+def _write_yaml_with_inline_comments(file_path: Path, config: dict, comments: dict):
+    """
+    Write YAML config file with inline comments preserved.
+
+    Parameters
+    ----------
+    file_path : Path
+        Path to write the YAML file
+    config : dict
+        Configuration dictionary to write
+    comments : dict
+        Nested dictionary of comments matching config structure
+    """
+    lines = []
+
+    def format_value(value):
+        """Format a value as YAML inline style"""
+        if isinstance(value, list):
+            # Format lists in flow style [item1, item2]
+            formatted_items = []
+            for item in value:
+                if item is None:
+                    formatted_items.append("null")
+                elif isinstance(item, str):
+                    formatted_items.append(f"'{item}'")
+                else:
+                    formatted_items.append(str(item))
+            return f"[{', '.join(formatted_items)}]"
+        if value is None:
+            return "null"
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if isinstance(value, str):
+            # Check if string needs quoting
+            if any(
+                c in value
+                for c in [":", "#", "[", "]", "{", "}", ",", "&", "*", "?", "|", "-", "<", ">", "=", "!", "%", "@", "`"]
+            ):
+                return f"'{value}'"
+            return value
+        return str(value)
+
+    def write_dict(d, comment_dict, indent=0):
+        """Recursively write dictionary with comments"""
+        indent_str = "  " * indent
+
+        for key, val in d.items():
+            key_comment = comment_dict.get(key, None) if isinstance(comment_dict, dict) else None
+
+            if isinstance(val, dict):
+                # Nested dictionary - only use comment if it's a string, not a dict
+                if key_comment and isinstance(key_comment, str):
+                    lines.append(f"{indent_str}{key}: # {key_comment}")
+                else:
+                    lines.append(f"{indent_str}{key}:")
+                # Pass the comment dict for children if it exists and is a dict
+                write_dict(val, key_comment if isinstance(key_comment, dict) else {}, indent + 1)
+            else:
+                # Simple value (including lists) - only use string comments
+                formatted_val = format_value(val)
+                if key_comment and isinstance(key_comment, str):
+                    lines.append(f"{indent_str}{key}: {formatted_val} # {key_comment}")
+                else:
+                    lines.append(f"{indent_str}{key}: {formatted_val}")
+
+    write_dict(config, comments)
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def save_current_config_as_temp(overides: dict[str, Any] | None = None):
