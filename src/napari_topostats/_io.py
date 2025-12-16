@@ -44,6 +44,7 @@ config_wrapper = None
 full_config_container = None
 comment_descriptions = {}
 current_config_path = None
+updated_values = {}
 # Globals store currently loaded config and UI state so dialogs/widgets can reuse them.
 
 
@@ -111,6 +112,28 @@ def should_use_line_edit_for_float(value: float) -> bool:
     return abs(value) != 0 and (abs(value) < 1e-4 or abs(value) > 1e6)
 
 
+# pylint: disable=global-variable-not-assigned
+def on_config_value_changed(key: str, val: Any):
+    """Update the config wrapper when a value changes"""
+    global updated_values
+    if isinstance(val, str):
+        stripped = val.strip()
+
+        if stripped == "None":
+            val = None
+        elif stripped.startswith("["):
+            # pylint: disable=import-outside-toplevel
+            import ast
+
+            with contextlib.suppress(ValueError, SyntaxError):
+                val = ast.literal_eval(stripped)
+        else:
+            # Try float parsing (supports scientific notation)
+            with contextlib.suppress(ValueError):
+                val = float(stripped)
+    updated_values[key] = val
+
+
 def build_dynamic_widget(flat_config: dict[str, Any], descriptions: dict[str, str] = None) -> Container:
     """Builds a widget for each editable item in the config and add it to a container"""
     widgets = []
@@ -152,7 +175,7 @@ def build_dynamic_widget(flat_config: dict[str, Any], descriptions: dict[str, st
             # Reuse inline YAML comments as tooltips for both the editor and label.
             w.native.setToolTip(current_tooltip_text)
             label.setToolTip(current_tooltip_text)
-
+        w.changed.connect(lambda val, k=key: on_config_value_changed(k, val))
         w.label = label
         widgets.append(w)
     return Container(widgets=widgets)
@@ -219,7 +242,6 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
     ) as e:
         show_error_dialog(f"Failed to load config: {e}")
         return False
-
     comment_descriptions = extract_inline_comments(config_path)
     if config is None:
         show_error_dialog("Please select a file containing valid config data.")
@@ -444,21 +466,14 @@ def open_config_editor():
     # Temporary status label for feedback when setting default
 
     def set_as_default():
-        updated_values = collect_values(fresh_container)
-        config_wrapper.flat.update(updated_values)
-        full_config = config_wrapper.unflatten()
-
         config_dir = Path(user_config_dir("TopoStats", "Napari"))
         config_dir.mkdir(parents=True, exist_ok=True)
         default_config_path = config_dir / "config.yaml"
-        save_config_to_file(default_config_path, full_config)
+        save_config_to_file(default_config_path, get_current_config())
 
         dialog.set_status_message("✅ Default config saved")
 
     def save_to_file():
-        updated_values = collect_values(fresh_container)
-        config_wrapper.flat.update(updated_values)
-        full_config = config_wrapper.unflatten()
 
         file_path, _ = QFileDialog.getSaveFileName(
             parent=dialog,
@@ -468,7 +483,7 @@ def open_config_editor():
         if not file_path:
             dialog.set_status_message("Config save cancelled.")
             return
-        save_config_to_file(Path(file_path), full_config)
+        save_config_to_file(Path(file_path), get_current_config())
 
         dialog.set_status_message("✅ Config saved to file")
 
@@ -482,7 +497,6 @@ def open_config_editor():
     main_layout.addWidget(button_box)
 
     if dialog.exec_():
-        updated_values = collect_values(fresh_container)
         config_wrapper.flat.update(updated_values)
         print("Config updated.")
         # Optionally refresh the full container for other use
@@ -626,12 +640,8 @@ def save_current_config_as_temp(overides: dict[str, Any] | None = None):
     current_config_path = str(config_path)
 
 
-def get_current_config(container: Container | None = None) -> dict[str, Any]:
+def get_current_config() -> dict[str, Any]:
     """Returns the current config with any updates from the edit config window applied"""
-    if container is None:
-        container = full_config_container
-    updated_values = collect_values(container)
-    config_wrapper.flat.update(updated_values)
     full_current_config = config_wrapper.unflatten()
     return full_current_config
 
@@ -639,3 +649,9 @@ def get_current_config(container: Container | None = None) -> dict[str, Any]:
 def config_loaded() -> bool:
     """Returns True if a config has been loaded, False otherwise."""
     return config_wrapper is not None and full_config_container is not None
+
+
+# def set_current_config(config: dict):
+#     global current_config
+#     print(json.dumps(config, indent=2))
+#     current_config = config
