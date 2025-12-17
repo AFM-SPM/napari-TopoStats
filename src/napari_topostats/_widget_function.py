@@ -30,7 +30,7 @@ from scipy.ndimage import label
 
 from . import _io as io
 from ._alerts import LoadingWidget, show_error_dialog
-from ._io import ConfigWrapper, collect_values
+from ._io import ConfigWrapper
 from ._parallel_processing import ProcessWorker
 
 
@@ -471,8 +471,6 @@ class WidgetFunction:
             including_config_params_from_class = parameters_from_class.copy() if self.type_class is not None else []
             # Then remove parameters that are already in the config (so they are set from config file rather than GUI)
             if self.uses_config:
-                updated_values = collect_values(io.full_config_container)
-                io.config_wrapper.flat.update(updated_values)
                 full_current_config = io.config_wrapper.unflatten()
                 config = full_current_config.get(self.function_key, {})
                 for param_name in [p.name for p in all_parameters]:
@@ -658,12 +656,8 @@ class WidgetFunction:
             ):
                 if p.name == "image":
                     # Sets the default image to the currently selected image in the viewer
-                    # Doneat the time of opening the widget
-                    selected_image = get_selected_image(current_viewer())
-                    if selected_image is not None:
-                        new_p = p.replace(default=selected_image, annotation=Image)
-                    else:
-                        new_p = p.replace(annotation=Image)
+                    # Done at the time of opening the widget
+                    new_p = p.replace(annotation=Image)
                 elif p.name == "pixel_to_nm_scaling":
                     new_p = p.replace(default=1.0)
                 elif p.name == "filename":

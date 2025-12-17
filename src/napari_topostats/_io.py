@@ -9,19 +9,21 @@ from typing import Any
 
 import yaml
 from magicgui import magicgui
-from magicgui.widgets import Container, create_widget
+from magicgui.widgets import create_widget
 from napari.viewer import Viewer
 from platformdirs import user_config_dir
 from qtpy.QtCore import Qt
-from qtpy.QtGui import QIcon
+from qtpy.QtGui import QGuiApplication, QIcon
 from qtpy.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -40,12 +42,25 @@ except ImportError:
     )
 
 
+MISC_TITLE = "Batch Settings"
+# Globals store currently loaded config and UI state so dialogs/widgets can reuse them.
 config_wrapper = None
 full_config_container = None
 comment_descriptions = {}
 current_config_path = None
 updated_values = {}
-# Globals store currently loaded config and UI state so dialogs/widgets can reuse them.
+
+
+def _unflatten(flat: dict) -> dict:
+    """Function used for reverting to the dict form where keys can correspond to dict values like json format"""
+    result = {}
+    for k, v in flat.items():
+        keys = k.split(".")
+        d = result
+        for part in keys[:-1]:
+            d = d.setdefault(part, {})
+        d[keys[-1]] = v
+    return result
 
 
 class ConfigWrapper:
@@ -69,42 +84,65 @@ class ConfigWrapper:
 
     def unflatten(self) -> dict:
         """Function used for reverting to the dict form where keys can correspond to dict values like json format"""
-        result = {}
-        for k, v in self.flat.items():
-            keys = k.split(".")
-            d = result
-            for part in keys[:-1]:
-                d = d.setdefault(part, {})
-            d[keys[-1]] = v
-        return result
+        return _unflatten(self.flat)
 
 
-def collect_values(container: Container) -> dict[str, Any]:
-    """Collect config values from edit config window"""
-    result = {}
-    for widget in container:
-        val = widget.value
-        name = widget.name
-        # Allow lists to be entered as literal strings and parsed back to Python types.
-        # Also handle "None" strings converting to None.
-        # And allow scientific notation for floats.
-        if isinstance(val, str):
-            stripped = val.strip()
+class CollapsibleBox(QWidget):
+    """
+    A widget to contain over widgets in a collapsible area
+    """
 
-            if stripped == "None":
-                val = None
-            elif stripped.startswith("["):
-                # pylint: disable=import-outside-toplevel
-                import ast
+    def __init__(self, title="", parent=None, start_open=False):
+        super().__init__(parent)
 
-                with contextlib.suppress(ValueError, SyntaxError):
-                    val = ast.literal_eval(stripped)
-            else:
-                # Try float parsing (supports scientific notation)
-                with contextlib.suppress(ValueError):
-                    val = float(stripped)
-        result[name] = val
-    return result
+        # Main layout
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
+
+        # Toggle Button (The Header)
+        self.toggle_button = QPushButton(title)
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(start_open)
+        self.toggle_button.setStyleSheet(
+            "QPushButton { text-align: left; font-weight: bold; padding: 5px; border: none; }"
+            "QPushButton:hover { background-color: #555d68; }"
+        )
+        self.toggle_button.toggled.connect(self.on_toggle)
+        self.layout.addWidget(self.toggle_button)
+
+        # Content Area
+        self.content_area = QFrame()
+        self.content_layout = QVBoxLayout(self.content_area)
+        self.content_layout.setContentsMargins(10, 10, 10, 10)
+        self.layout.addWidget(self.content_area)
+
+        # Start at given state
+        self.on_toggle(start_open)
+
+    def on_toggle(self, checked):
+        """
+        Set behaviour for expanding/ collapsing when clicked
+
+        Parameters
+        ----------
+        checked : bool
+            The state toggle has been changed to
+        """
+        self.content_area.setVisible(checked)
+        arrow = "▼" if checked else "▶"
+        self.toggle_button.setText(f"{arrow}  {self.toggle_button.text()[3:]}")
+
+    def add_widget(self, widget):
+        """
+        Adds the widget to the collapsable view
+
+        Parameters
+        ----------
+        widget : QWidget
+            The widget to add
+        """
+        self.content_layout.addWidget(widget)
 
 
 def should_use_line_edit_for_float(value: float) -> bool:
@@ -131,54 +169,104 @@ def on_config_value_changed(key: str, val: Any):
             # Try float parsing (supports scientific notation)
             with contextlib.suppress(ValueError):
                 val = float(stripped)
+    if key.split(".")[0] == MISC_TITLE:
+        key = ".".join(key.split(".")[1:])
     updated_values[key] = val
 
 
-def build_dynamic_widget(flat_config: dict[str, Any], descriptions: dict[str, str] = None) -> Container:
-    """Builds a widget for each editable item in the config and add it to a container"""
-    widgets = []
-    # Choose an appropriate widget type based on the value's Python type.
-    for key, value in flat_config.items():
-        current_tooltip_text = descriptions.get(key, "") if descriptions else ""
+# pylint: disable=too-many-branches, too-many-statements
+def build_dynamic_widget(
+    config: dict[str, Any], descriptions: dict[str, Any] = None, running_reference: str = None
+) -> QWidget:
+    """
+    Recursive function to build widgets.
+    - If 'title' is None, it acts as the Root container (QWidget).
+    - If 'title' is set, it creates a CollapsibleBox.
+    """
+    config_to_display = config.copy()
+    if running_reference is None:
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setAlignment(Qt.AlignTop)
+        misc_config = {}
+        for key, value in config.items():
+            if not isinstance(value, dict):
+                misc_config[key] = value
+                del config_to_display[key]
+        config_to_display[MISC_TITLE] = misc_config
 
-        if isinstance(value, bool):
-            w = create_widget(name=key, widget_type="CheckBox", value=value)
-        elif isinstance(value, int):
-            w = create_widget(name=key, widget_type="SpinBox", value=value)
-        elif isinstance(value, float):
-            if should_use_line_edit_for_float(value):
-                w = create_widget(
-                    name=key,
-                    widget_type="LineEdit",
-                    value=repr(value),
-                )
+    else:
+        title = running_reference.split(".")[-1].replace("_", " ").upper()
+        container = CollapsibleBox(title=f"   {title}")
+
+    for key, value in config_to_display.items():
+
+        desc_text = ""
+        sub_desc = None
+        if descriptions and isinstance(descriptions, dict):
+            desc_text = descriptions.get(key, "")
+            if isinstance(desc_text, dict):
+                sub_desc = desc_text
+                desc_text = ""
+
+        if isinstance(value, dict):
+            new_running_reference = key if running_reference is None else f"{running_reference}.{key}"
+            sub_widget = build_dynamic_widget(value, sub_desc, running_reference=new_running_reference)
+
+            if running_reference is None:
+                layout.addWidget(sub_widget)
             else:
-                w = create_widget(
-                    name=key,
-                    widget_type="FloatSpinBox",
-                    value=value,
-                )
-                w.native.setDecimals(4)
-        elif isinstance(value, str):
-            w = create_widget(name=key, widget_type="LineEdit", value=value)
-        elif isinstance(value, list):
-            w = create_widget(name=key, widget_type="LineEdit", value=str(value))
-        elif value is None:
-            w = create_widget(name=key, widget_type="LineEdit", value="None")
-        else:
+                container.add_widget(sub_widget)
+
             continue
 
-        label = QLabel(w.name)
-        label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        w = None
+        name = key.replace("_", " ")
+        if isinstance(value, bool):
+            w = create_widget(name="", widget_type="CheckBox", value=value)
+        elif isinstance(value, int):
+            w = create_widget(name=name, widget_type="SpinBox", value=value)
+        elif isinstance(value, float):
+            if should_use_line_edit_for_float(value):
+                w = create_widget(name=name, widget_type="LineEdit", value=repr(value))
+            else:
+                w = create_widget(name=name, widget_type="FloatSpinBox", value=value)
+                w.native.setDecimals(4)
+                w.value = value
+        elif isinstance(value, (str, list)) or value is None:
+            w = create_widget(name=name, widget_type="LineEdit", value=str(value))
 
-        if current_tooltip_text:
-            # Reuse inline YAML comments as tooltips for both the editor and label.
-            w.native.setToolTip(current_tooltip_text)
-            label.setToolTip(current_tooltip_text)
-        w.changed.connect(lambda val, k=key: on_config_value_changed(k, val))
-        w.label = label
-        widgets.append(w)
-    return Container(widgets=widgets)
+        if w is None:
+            continue
+        w.changed.connect(lambda val, k=key: on_config_value_changed(f"{running_reference}.{k}", val))
+        if desc_text:
+            w.native.setToolTip(desc_text)
+
+        # Create Row for Widgets
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 5, 0, 5)
+        label_widget = QLabel(key)
+        label_widget.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        label_widget.setToolTip(desc_text)
+        row_layout.addWidget(label_widget)
+        row_layout.addWidget(w.native)
+        if desc_text != "":
+            row_layout.addWidget(create_info_icon(desc_text))
+
+        # Add Row to Container
+        if running_reference is None:
+            layout.addWidget(row_widget)
+        else:
+            container.add_widget(row_widget)
+
+    # Handle ScrollArea (Only run at the root level to prevent multiple layers of scroll view)
+    if running_reference is None:
+        scroll = QScrollArea()
+        scroll.setWidget(container)
+        scroll.setWidgetResizable(True)
+        return scroll
+    return container
 
 
 def write_new_default_config(config_path: Path):
@@ -248,7 +336,7 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
         return False
     config_wrapper = ConfigWrapper(config)
 
-    full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
+    full_config_container = build_dynamic_widget(config, comment_descriptions)
     if full_config_container is None:
         show_error_dialog("Failed to create full config container.")
         return False
@@ -374,7 +462,7 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> dict[
 
                 if comment_text is not None and final_key_for_map:
                     comment_map[final_key_for_map] = comment_text.strip()
-    return comment_map
+    return _unflatten(comment_map)
 
 
 def create_info_icon(tooltip_text: str) -> QToolButton:
@@ -406,55 +494,18 @@ def open_config_editor():
         show_error_dialog("No config loaded.")
         return
 
-    # Keys to include
-    EDITABLE_TOP_LEVEL_KEYS = {"filter", "grains"}
-
-    # Keys to exclude
-    EXCLUDED_KEYS = {"filter.run", "grains.run"}
-
-    # Restrict editing to select top-level blocks while avoiding run toggles.
-    filtered_flat_config = {
-        k: v
-        for k, v in config_wrapper.flat.items()
-        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS) and k not in EXCLUDED_KEYS
-    }
-
-    # Mirror the same filtering for tooltip descriptions.
-    filtered_descriptions = {
-        k: v
-        for k, v in comment_descriptions.items()
-        if any(k.startswith(f"{prefix}.") for prefix in EDITABLE_TOP_LEVEL_KEYS) and k not in EXCLUDED_KEYS
-    }
-
-    fresh_container = build_dynamic_widget(filtered_flat_config, filtered_descriptions)
+    fresh_container = build_dynamic_widget(get_current_config(), comment_descriptions)
+    fresh_container.setFrameShape(QFrame.NoFrame)
+    fresh_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     dialog = QDialog()
-    dialog.setWindowTitle("Edit Filters and Grains Config")
-    dialog.resize(600, 800)
+    dialog.setWindowTitle("Edit Config")
+    dialog.setMinimumWidth(550)
+    screen_height = QGuiApplication.primaryScreen().availableGeometry().height()
+    dialog.setMaximumHeight(int(screen_height * 0.9))
 
     main_layout = QVBoxLayout(dialog)
-    scroll_area = QScrollArea()
-    scroll_area.setWidgetResizable(True)
-
-    scroll_content = QWidget()
-    scroll_layout = QVBoxLayout(scroll_content)
-
-    # Build one row per editable field with its label, widget, and optional info icon.
-    for widget in fresh_container:
-        row = QWidget()
-        row_layout = QHBoxLayout(row)
-        row_layout.addWidget(widget.label)
-        row_layout.addWidget(widget.native)
-
-        tooltip = widget.native.toolTip()
-        if tooltip:
-            info_btn = create_info_icon(tooltip)
-            row_layout.addWidget(info_btn)
-
-        scroll_layout.addWidget(row)
-
-    scroll_content.setLayout(scroll_layout)
-    scroll_area.setWidget(scroll_content)
+    main_layout.addWidget(fresh_container)
 
     button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
     save_button = QPushButton("Save Config to File")
@@ -492,15 +543,15 @@ def open_config_editor():
     button_box.accepted.connect(dialog.accept)
     button_box.rejected.connect(dialog.reject)
 
-    main_layout.addWidget(scroll_area)
     attach_status_label(dialog)
     main_layout.addWidget(button_box)
 
+    dialog.adjustSize()
     if dialog.exec_():
         config_wrapper.flat.update(updated_values)
         print("Config updated.")
         # Optionally refresh the full container for other use
-        full_config_container = build_dynamic_widget(config_wrapper.flat.copy(), comment_descriptions)
+        full_config_container = build_dynamic_widget(get_current_config(), comment_descriptions)
         save_current_config_as_temp()
 
 
@@ -649,9 +700,3 @@ def get_current_config() -> dict[str, Any]:
 def config_loaded() -> bool:
     """Returns True if a config has been loaded, False otherwise."""
     return config_wrapper is not None and full_config_container is not None
-
-
-# def set_current_config(config: dict):
-#     global current_config
-#     print(json.dumps(config, indent=2))
-#     current_config = config
