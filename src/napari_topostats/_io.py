@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 from magicgui import magicgui
-from magicgui.widgets import create_widget
+from magicgui.widgets import FunctionGui, create_widget
 from napari.viewer import Viewer
 from platformdirs import user_config_dir
 from qtpy.QtCore import Qt
@@ -52,7 +52,19 @@ updated_values = {}
 
 
 def _unflatten(flat: dict) -> dict:
-    """Function used for reverting to the dict form where keys can correspond to dict values like json format"""
+    """
+    Function used for reverting to the dict form where keys can correspond to dict values like json format
+
+    Parameters
+    ----------
+    flat : dict
+        The dictionary to unflatten
+
+    Returns
+    -------
+    dict
+        The unflattened dictionary
+    """
     result = {}
     for k, v in flat.items():
         keys = k.split(".")
@@ -69,10 +81,35 @@ class ConfigWrapper:
     """
 
     def __init__(self, config: dict):
+        """
+        Initializes the ConfigWrapper.
+
+        Parameters
+        ----------
+        config : dict
+            The configuration dictionary.
+        """
         self.original = config
         self.flat = self._flatten(config)
 
-    def _flatten(self, d, parent_key="", sep="."):
+    def _flatten(self, d: dict, parent_key: str = "", sep: str = ".") -> dict:
+        """
+        Flattens a nested dictionary.
+
+        Parameters
+        ----------
+        d : dict
+            The dictionary to flatten.
+        parent_key : str, optional
+            The parent key, by default ""
+        sep : str, optional
+            The separator to use, by default "."
+
+        Returns
+        -------
+        dict
+            The flattened dictionary.
+        """
         items = {}
         for k, v in d.items():
             new_key = f"{parent_key}{sep}{k}" if parent_key else k
@@ -83,7 +120,14 @@ class ConfigWrapper:
         return items
 
     def unflatten(self) -> dict:
-        """Function used for reverting to the dict form where keys can correspond to dict values like json format"""
+        """
+        Function used for reverting to the dict form where keys can correspond to dict values like json format
+
+        Returns
+        -------
+        dict
+            The unflattened dictionary.
+        """
         return _unflatten(self.flat)
 
 
@@ -92,7 +136,19 @@ class CollapsibleBox(QWidget):
     A widget to contain over widgets in a collapsible area
     """
 
-    def __init__(self, title="", parent=None, start_open=False):
+    def __init__(self, title: str = "", parent: QWidget | None = None, start_open: bool = False):
+        """
+        Initializes the CollapsibleBox.
+
+        Parameters
+        ----------
+        title : str, optional
+            The title of the box, by default ""
+        parent : QWidget, optional
+            The parent widget, by default None
+        start_open : bool, optional
+            Whether the box should start open, by default False
+        """
         super().__init__(parent)
 
         # Main layout
@@ -120,7 +176,7 @@ class CollapsibleBox(QWidget):
         # Start at given state
         self.on_toggle(start_open)
 
-    def on_toggle(self, checked):
+    def on_toggle(self, checked: bool):
         """
         Set behaviour for expanding/ collapsing when clicked
 
@@ -133,7 +189,7 @@ class CollapsibleBox(QWidget):
         arrow = "▼" if checked else "▶"
         self.toggle_button.setText(f"{arrow}  {self.toggle_button.text()[3:]}")
 
-    def add_widget(self, widget):
+    def add_widget(self, widget: QWidget):
         """
         Adds the widget to the collapsable view
 
@@ -146,13 +202,35 @@ class CollapsibleBox(QWidget):
 
 
 def should_use_line_edit_for_float(value: float) -> bool:
-    """Determine if a float value should be edited with a LineEdit instead of a FloatSpinBox."""
+    """
+    Determine if a float value should be edited with a LineEdit instead of a FloatSpinBox.
+    This is to prevent data being lost during rounding
+
+    Parameters
+    ----------
+    value : float
+        The float value to check.
+
+    Returns
+    -------
+    bool
+        True if a LineEdit should be used, False otherwise.
+    """
     return abs(value) != 0 and (abs(value) < 1e-4 or abs(value) > 1e6)
 
 
 # pylint: disable=global-variable-not-assigned
 def on_config_value_changed(key: str, val: Any):
-    """Update the config wrapper when a value changes"""
+    """
+    Update the config wrapper when a value changes
+
+    Parameters
+    ----------
+    key : str
+        The key of the value that changed.
+    val : Any
+        The new value.
+    """
     global updated_values
     if isinstance(val, str):
         stripped = val.strip()
@@ -182,6 +260,20 @@ def build_dynamic_widget(
     Recursive function to build widgets.
     - If 'title' is None, it acts as the Root container (QWidget).
     - If 'title' is set, it creates a CollapsibleBox.
+
+    Parameters
+    ----------
+    config : dict[str, Any]
+        The configuration dictionary.
+    descriptions : dict[str, Any], optional
+        The descriptions for the config values, by default None
+    running_reference : str, optional
+        The running reference for the current config level, by default None
+
+    Returns
+    -------
+    QWidget
+        The generated widget.
     """
     config_to_display = config.copy()
     if running_reference is None:
@@ -231,8 +323,6 @@ def build_dynamic_widget(
                 w = create_widget(name=name, widget_type="LineEdit", value=repr(value))
             else:
                 w = create_widget(name=name, widget_type="FloatSpinBox", value=value)
-                w.native.setDecimals(4)
-                w.value = value
         elif isinstance(value, (str, list)) or value is None:
             w = create_widget(name=name, widget_type="LineEdit", value=str(value))
 
@@ -270,7 +360,14 @@ def build_dynamic_widget(
 
 
 def write_new_default_config(config_path: Path):
-    """Writes a default config file to the provided path using the topostats backend"""
+    """
+    Writes a default config file to the provided path using the topostats backend
+
+    Parameters
+    ----------
+    config_path : Path
+        The path to write the config file to.
+    """
     args = Namespace()
     args.config = None
     args.filename = config_path.name
@@ -280,12 +377,35 @@ def write_new_default_config(config_path: Path):
 
 
 def get_current_config_path() -> str | None:
-    """Returns the current config path"""
+    """
+    Returns the current config path
+
+    Returns
+    -------
+    str | None
+        The current config path.
+    """
     return current_config_path
 
 
-def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_default: bool = False):
-    """Loads config file using default if no path is provided and asking for data from user as required"""
+def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_default: bool = False) -> bool:
+    """
+    Loads config file using default if no path is provided and asking for data from user as required
+
+    Parameters
+    ----------
+    viewer : Viewer
+        The napari viewer.
+    config_path : Path | None, optional
+        The path to the config file, by default None
+    use_default : bool, optional
+        Whether to use the default config, by default False
+
+    Returns
+    -------
+    bool
+        True if the config was loaded successfully, False otherwise.
+    """
     # pylint: disable=global-statement
     global comment_descriptions, config_wrapper, full_config_container, current_config_path  # Updated global name
     if config_path is None:
@@ -368,19 +488,38 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
     call_button="Load Config",
     auto_call=True,
 )
-def load_config(viewer: Viewer, config_path: Path | None = None):
+def load_config(viewer: Viewer, config_path: Path | None = None) -> bool:
     """
     Load a configuration file and build a dynamic widget to edit it.
     This is a magicgui function that can be called directly from the napari GUI and is an example of a hardcoded
     function being implemented using the dynamic function widget system.
+
+    Parameters
+    ----------
+    viewer : Viewer
+        The napari viewer.
+    config_path : Path | None, optional
+        The path to the config file, by default None
+
+    Returns
+    -------
+    bool
+        True if the config was loaded successfully, False otherwise.
     """
     return load_config_impl(viewer, config_path)
 
 
-def set_up_load_config_widget(widget):
-    """Attach a success/error label under the FunctionGui call button."""
+def set_up_load_config_widget(widget: FunctionGui):
+    """
+    Attach a success/error label under the FunctionGui call button.
 
-    def on_success(result):
+    Parameters
+    ----------
+    widget : magicgui.widgets.FunctionGui
+        The widget to attach the label to.
+    """
+
+    def on_success(result: bool):
         if result:
             widget.set_status_message("✅ Configuration loaded successfully!")
         else:
@@ -390,15 +529,29 @@ def set_up_load_config_widget(widget):
 
 
 def save_as_default_config(config: dict[str, Any]):
-    """Saves the config as the new default"""
+    """
+    Saves the config as the new default (to the user config directory)
+
+    Parameters
+    ----------
+    config : dict[str, Any]
+        The config to save.
+    """
     config_dir = Path(user_config_dir("TopoStats", "Napari"))
     config_path = config_dir / "config.yaml"
     config_dir.mkdir(parents=True, exist_ok=True)
     save_config_to_file(config_path, config)
 
 
-def add_save_as_default_button(widget):
-    """Add a 'Save as Default' button to the load_config widget."""
+def add_save_as_default_button(widget: QWidget):
+    """
+    Add a 'Save as Default' button to the load_config widget.
+
+    Parameters
+    ----------
+    widget : magicgui.widgets.FunctionGui
+        The widget to add the button to.
+    """
     button_row = QHBoxLayout()
     save_button = QPushButton("Save as Default Config")
     save_button.setToolTip("Save the currently loaded configuration as the default config.")
@@ -425,7 +578,18 @@ add_save_as_default_button(load_config)
 def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> dict[str, str]:
     """
     Extracts inline comments from a YAML file.
-    (This function remains the same as our last debugged version)
+
+    Parameters
+    ----------
+    yaml_path : Path
+        The path to the YAML file.
+    top_level_key : str, optional
+        The top level key to extract comments from, by default None
+
+    Returns
+    -------
+    dict[str, str]
+        A dictionary of comments.
     """
     comment_map = {}
     key_stack = []
@@ -466,7 +630,19 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> dict[
 
 
 def create_info_icon(tooltip_text: str) -> QToolButton:
-    """Creates an info icon that can be hovered over to explain each config attribute"""
+    """
+    Creates an info icon that can be hovered over to explain each config attribute
+
+    Parameters
+    ----------
+    tooltip_text : str
+        The text to display in the tooltip.
+
+    Returns
+    -------
+    QToolButton
+        The info icon button.
+    """
     button = QToolButton()
     icon = QIcon.fromTheme("help-about")
 
@@ -556,7 +732,16 @@ def open_config_editor():
 
 
 def save_config_to_file(file_path: Path, full_config: dict[str, Any]):
-    """Saves the config to a file with comments preserved, displaying an error message if it fails."""
+    """
+    Saves the config to a file with comments preserved, displaying an error message if it fails.
+
+    Parameters
+    ----------
+    file_path : Path
+        The path to save the file to.
+    full_config : dict[str, Any]
+        The config to save.
+    """
     try:
         if file_path.suffix.lower() == ".json":
             with open(file_path, "w", encoding="utf-8") as f:
@@ -583,8 +768,15 @@ def _unflatten_comments(flat_comments: dict[str, str]) -> dict:
     """
     Convert flat dotted-key comments back to nested dictionary structure.
 
-    Example:
-        {"filter.threshold": "comment"} -> {"filter": {"threshold": "comment"}}
+    Parameters
+    ----------
+    flat_comments : dict[str, str]
+        The flat comments dictionary.
+
+    Returns
+    -------
+    dict
+        The unflattened comments dictionary.
     """
     result = {}
     for key, comment in flat_comments.items():
@@ -611,7 +803,7 @@ def _write_yaml_with_inline_comments(file_path: Path, config: dict, comments: di
     """
     lines = []
 
-    def format_value(value):
+    def format_value(value: Any) -> str:
         """Format a value as YAML inline style"""
         if isinstance(value, list):
             # Format lists in flow style [item1, item2]
@@ -638,12 +830,12 @@ def _write_yaml_with_inline_comments(file_path: Path, config: dict, comments: di
             return value
         return str(value)
 
-    def write_dict(d, comment_dict, indent=0):
+    def write_dict(d: dict, comment_dict: dict, indent: int = 0):
         """Recursively write dictionary with comments"""
         indent_str = "  " * indent
 
         for key, val in d.items():
-            key_comment = comment_dict.get(key, None) if isinstance(comment_dict, dict) else None
+            key_comment = comment_dict.get(key) if isinstance(comment_dict, dict) else None
 
             if isinstance(val, dict):
                 # Nested dictionary - only use comment if it's a string, not a dict
@@ -698,5 +890,12 @@ def get_current_config() -> dict[str, Any]:
 
 
 def config_loaded() -> bool:
-    """Returns True if a config has been loaded, False otherwise."""
+    """
+    Returns True if a config has been loaded, False otherwise.
+
+    Returns
+    -------
+    bool
+        True if a config has been loaded, False otherwise.
+    """
     return config_wrapper is not None and full_config_container is not None
