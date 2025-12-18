@@ -43,6 +43,7 @@ except ImportError:
 
 
 MISC_TITLE = "Batch Settings"
+START_OPEN = {"filter", "grains"}
 # Globals store currently loaded config and UI state so dialogs/widgets can reuse them.
 config_wrapper = None
 full_config_container = None
@@ -289,7 +290,8 @@ def build_dynamic_widget(
 
     else:
         title = running_reference.split(".")[-1].replace("_", " ").upper()
-        container = CollapsibleBox(title=f"   {title}")
+
+        container = CollapsibleBox(title=f"   {title}", start_open=running_reference in START_OPEN)
 
     for key, value in config_to_display.items():
 
