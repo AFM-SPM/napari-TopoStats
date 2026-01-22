@@ -66,7 +66,7 @@ from ._io import (
     load_config_impl,
     write_new_default_config,
 )
-from ._parallel_processing import ProcessWorker
+from ._parallel_processing import ProcessWorker, add_interrupt_button
 from ._state import MIN_TOPOSTATS_VERSION
 from ._widget_function import WidgetFunction
 
@@ -143,10 +143,27 @@ def batch_process(
 
     widget.set_status_message("⏳ Starting batch processing in the background. View command line for progress.")
     worker = ProcessWorker(process, args)
+    add_interrupt_button(widget, worker, process_name="Batch Processing")
     worker.finished.connect(lambda: widget.set_status_message("✅ Batch processing complete."))
     worker.finished.connect(worker.deleteLater)
+    worker.error_signal.connect(handle_batch_process_error)
     widget._batch_worker = worker  # prevent garbage collection
     worker.start()
+
+
+def handle_batch_process_error(e: Exception):
+    """
+    Handle errors that occur during batch processing.
+
+    Parameters
+    ----------
+    e : Exception
+        The exception that was raised during batch processing.
+    """
+    widget = batch_process
+    if hasattr(widget, "set_status_message"):
+        widget.set_status_message(f"❌ Error during batch processing: {str(e)}")
+    show_error_dialog(f"Error during batch processing: {str(e)}", raise_exception=True)
 
 
 AVAILABLE_FUNCTIONS = [

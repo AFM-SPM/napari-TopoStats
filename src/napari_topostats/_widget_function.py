@@ -566,7 +566,7 @@ class WidgetFunction:
                         except Exception as e:
                             error_args = {}
                             error_args["message"] = (
-                                f"Topostats is failing with {self.type_class.__name__}: {e.__class__} {e}.",
+                                f"Topostats is failing with {self.type_class.__name__}: {e.__class__} {e}."
                             )
                             error_args["topostats_error"] = True
                             return error_args
