@@ -602,6 +602,7 @@ class WidgetFunction:
                                 error_args["message"] = f"Topostats is failing with:{e.__class__} {e}."
                                 error_args["raise_exception"] = True
                                 error_args["topostats_error"] = True
+                                error_args["exception"] = e
                                 return error_args
                         else:
                             error_args = {}
@@ -616,6 +617,7 @@ class WidgetFunction:
                             error_args["message"] = f"Topostats is failing with:{e.__class__} {e}."
                             error_args["raise_exception"] = True
                             error_args["topostats_error"] = True
+                            error_args["exception"] = e
                             return error_args
                     # Evaluate path_to_data
                     metadata = {}
@@ -648,6 +650,7 @@ class WidgetFunction:
                         error_args["message"] = f"Topostats is failing with: {e.__class__} {e}."
                         error_args["raise_exception"] = True
                         error_args["topostats_error"] = True
+                        error_args["exception"] = e
                         return error_args
                     return (result, metadata)
 
