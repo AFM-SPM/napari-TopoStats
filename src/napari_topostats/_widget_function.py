@@ -561,10 +561,13 @@ class WidgetFunction:
                     if self.type_class:
                         # ruff: noqa: BLE001
                         try:
+                            print(class_args)
                             instance = self.type_class(**class_args)
                         except Exception as e:
                             error_args = {}
-                            error_args["message"] = (f"Topostats is failing with {self.type_class.__name__}: {e}.",)
+                            error_args["message"] = (
+                                f"Topostats is failing with {self.type_class.__name__}: {e.__class__} {e}.",
+                            )
                             error_args["topostats_error"] = True
                             return error_args
                         method = getattr(instance, self.function_to_run.__name__, None)
@@ -574,7 +577,7 @@ class WidgetFunction:
                                 return_value = method(**method_args)
                             except Exception as e:
                                 error_args = {}
-                                error_args["message"] = f"Topostats is failing with: {e}."
+                                error_args["message"] = f"Topostats is failing with:{e.__class__} {e}."
                                 error_args["raise_exception"] = True
                                 error_args["topostats_error"] = True
                                 return error_args
@@ -588,37 +591,45 @@ class WidgetFunction:
                             return_value = self.function_to_run(**method_args)
                         except Exception as e:
                             error_args = {}
-                            error_args["message"] = f"Topostats is failing with: {e}."
+                            error_args["message"] = f"Topostats is failing with:{e.__class__} {e}."
                             error_args["raise_exception"] = True
                             error_args["topostats_error"] = True
                             return error_args
                     # Evaluate path_to_data
                     metadata = {}
-                    if self.metadata_paths is not None:
-                        for key in self.metadata_paths:
-                            if self.metadata_paths[key] == "config":
-                                metadata[key] = full_current_config
-                            else:
-                                metadata[key] = evaluate_path_to_data(
-                                    self.metadata_paths[key],
-                                    return_value,
-                                    instance,
-                                    self.type_class,
-                                )
+                    try:
+                        if self.metadata_paths is not None:
+                            for key in self.metadata_paths:
+                                if self.metadata_paths[key] == "config":
+                                    metadata[key] = full_current_config
+                                else:
+                                    metadata[key] = evaluate_path_to_data(
+                                        self.metadata_paths[key],
+                                        return_value,
+                                        instance,
+                                        self.type_class,
+                                    )
 
-                    if self.type_class:
-                        result = evaluate_path_to_data(
-                            self.path_to_data,
-                            return_value,
-                            instance,
-                            self.type_class,
-                        )
-                    else:
-                        result = evaluate_path_to_data(self.path_to_data, return_value)
+                        if self.type_class:
+                            result = evaluate_path_to_data(
+                                self.path_to_data,
+                                return_value,
+                                instance,
+                                self.type_class,
+                            )
+                        else:
+                            result = evaluate_path_to_data(self.path_to_data, return_value)
+                    except Exception as e:
+                        error_args = {}
+                        error_args["message"] = f"Topostats is failing with: {e.__class__} {e}."
+                        error_args["raise_exception"] = True
+                        error_args["topostats_error"] = True
+                        return error_args
                     return (result, metadata)
 
                 def _handle_result(result):
                     if isinstance(result, dict) and "message" in result:
+                        loading_widget.stop()
                         show_error_dialog(**result)
                         return
                     viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
@@ -728,7 +739,6 @@ class WidgetFunction:
                 viewer.add_image(
                     return_value,
                     name=name,
-                    contrast_limits=(-1, 5),
                     metadata=({"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}) | metadata,
                 )
                 viewer.dims.ndisplay = self.ndims
@@ -744,6 +754,7 @@ class WidgetFunction:
             table.setColumnCount(len(df.columns))
             table.setHorizontalHeaderLabels(df.columns.tolist())
             original.mode = Mode.PICK
+            is_updating = False
 
             def convert_to_nm(df_m: pd.DataFrame) -> pd.DataFrame:
                 """Convert the pd.DataFrame from m to nm."""
@@ -781,8 +792,9 @@ class WidgetFunction:
             # pylint: disable=unused-argument
             def on_row_clicked(row, column):
                 """Triggered when a table row is clicked."""
+                nonlocal is_updating
                 # Get the grain number (or label id) from the dataframe
-                grain_id = df.iloc[row]["grain_number"]  # or 'label', whatever your column is called
+                grain_id = df.iloc[row]["grain_number"]
 
                 # Center the view on it
                 # Find coordinates of that label in the image
@@ -799,11 +811,16 @@ class WidgetFunction:
                     original.selected_label = int(grain_id) + 1
                     original.mode = Mode.PICK
                     viewer.layers.selection.active = original
+                    is_updating = True
 
             # pylint: disable=unused-argument
             def on_label_selected(event):
+                nonlocal is_updating
+                if is_updating:
+                    is_updating = False
+                    return
                 selected = original.selected_label
-                if selected == 0:  # 0 means background in napari
+                if selected == 0:  # 0 means background
                     original.show_selected_label = False
                     return
 
