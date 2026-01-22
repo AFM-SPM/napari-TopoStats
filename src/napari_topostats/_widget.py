@@ -81,8 +81,8 @@ if parse_version(parse_version(topostats_version).base_version) < parse_version(
 
 # pylint: disable=protected-access
 @magicgui(
-    data_path={"label": "Input path"},
-    output_path={"label": "Output path"},
+    data_path={"label": "Input path", "mode": "d"},
+    output_path={"label": "Output path", "mode": "d"},
     call_button="Batch Process",
 )
 def batch_process(
