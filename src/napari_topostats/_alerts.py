@@ -99,6 +99,7 @@ def show_error_dialog(
     message: str = "",
     raise_exception: bool = False,
     topostats_error: bool = False,
+    exception: Exception | None = None,
 ):
     """
     Show an error dialog with the given message. Optionally raise an exception.
@@ -116,7 +117,8 @@ def show_error_dialog(
             f"front-end you are using.\nPlease report your issue at {NAPARI_TOPOSTATS_REPORT}."
         )
 
-    print(f"Error: {message}")
+    if not raise_exception or exception:
+        print(f"Error: {message}")
 
     # Close any existing error dialog before showing a new one
     if state.current_error_dialog is not None:
@@ -131,6 +133,8 @@ def show_error_dialog(
 
     # If raise_exception is True, raise a ValueError
     if raise_exception:
+        if exception is not None:
+            raise exception
         raise ValueError(message)
 
 
