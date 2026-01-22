@@ -27,10 +27,11 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 from scipy.ndimage import label
+from topostats.classes import TopoStats
 
 from . import _io as io
 from ._alerts import LoadingWidget, show_error_dialog
-from ._io import ConfigWrapper
+from ._io import ConfigWrapper, get_current_config
 from ._parallel_processing import ProcessWorker
 
 
@@ -508,8 +509,9 @@ class WidgetFunction:
                     including_config_params_from_class if self.type_class else []
                 )
 
+                uses_topostats_object = "topostats_object" in [p.name for p in all_params]
                 # Handle image selection if required
-                if "image" in [p.name for p in all_params]:
+                if "image" in [p.name for p in all_params] or uses_topostats_object:
                     selected_image = get_selected_image(
                         kwargs.get("viewer", current_viewer()),
                         of_type=self.of_type,
@@ -517,15 +519,35 @@ class WidgetFunction:
                     if selected_image is None:
                         loading_widget.stop()
                         return
+                if "image" in [p.name for p in all_params]:
                     kwargs["image"] = selected_image
-
                 # Handle pixel_to_nm_scaling if required
+                if (
+                    "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs
+                ) or uses_topostats_object:
+                    px2nm = selected_image.metadata.get("px2nm", 1.0)
+                    print(f"Using pixel_to_nm_scaling from image metadata: {px2nm}")
                 if "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs:
-                    kwargs["pixel_to_nm_scaling"] = kwargs["image"].metadata.get("px2nm", 1.0)
-                    print(f"Using pixel_to_nm_scaling from image metadata: {kwargs['pixel_to_nm_scaling']}")
+                    kwargs["pixel_to_nm_scaling"] = px2nm
 
+                if ("filename" in [p.name for p in all_params] and "filename" not in kwargs) or uses_topostats_object:
+                    filename = "image"
                 if "filename" in [p.name for p in all_params] and "filename" not in kwargs:
-                    kwargs["filename"] = "image"
+                    kwargs["filename"] = filename
+
+                if uses_topostats_object:
+                    # Create TopoStats object and add to kwargs
+                    if selected_image.metadata.get("topostats_object") is not None:
+                        topostats_object = selected_image.metadata["topostats_object"]
+                    else:
+                        topostats_object = TopoStats(
+                            image_original=selected_image.data,
+                            image=selected_image.data,
+                            pixel_to_nm_scaling=px2nm,
+                            filename=filename,
+                            config=get_current_config(),
+                        )
+                    kwargs["topostats_object"] = topostats_object
                 # Distribute arguments between method_args and class_args
                 for key, value in kwargs.items():
                     if key in [p.name for p in including_config_params_from_function]:
@@ -609,6 +631,8 @@ class WidgetFunction:
                                         instance,
                                         self.type_class,
                                     )
+                        if self.type_class and hasattr(instance, "topostats_object"):
+                            metadata["topostats_object"] = instance.topostats_object
 
                         if self.type_class:
                             result = evaluate_path_to_data(
@@ -638,7 +662,7 @@ class WidgetFunction:
                         self.render_return_value(
                             return_value,
                             viewer,
-                            kwargs.get("image"),
+                            selected_image,
                             metadata=metadata,
                         )
                     else:
@@ -679,6 +703,7 @@ class WidgetFunction:
                     "pixel_to_nm_scaling",
                     "image",
                     "filename",
+                    "topostats_object",
                 ]:
                     new_parameters.append(new_p)
             # Create a magicgui function with the wrapped function and the new parameters
