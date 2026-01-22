@@ -66,7 +66,7 @@ from ._io import (
     load_config_impl,
     write_new_default_config,
 )
-from ._parallel_processing import ProcessWorker, add_interrupt_button
+from ._parallel_processing import ProcessWorker
 from ._state import MIN_TOPOSTATS_VERSION
 from ._widget_function import WidgetFunction
 
@@ -123,9 +123,13 @@ def batch_process(
             widget.output_path.value = output_path
     # ruff: noqa: SIM102
     if hasattr(widget, "_batch_worker"):
-        if widget._batch_worker.isRunning():
-            widget.set_status_message("⚠️ Batch processing is already running.")
-            return
+        try:
+            if widget._batch_worker.isRunning():
+                widget.set_status_message("⚠️ Batch processing is already running.")
+                return
+        except RuntimeError:
+            # Worker thread has been deleted and is therefore not running
+            pass
     print(f"Config path: {str(get_current_config_path())}")
     args = argparse.Namespace(
         config_file=str(get_current_config_path()),
@@ -143,7 +147,6 @@ def batch_process(
 
     widget.set_status_message("⏳ Starting batch processing in the background. View command line for progress.")
     worker = ProcessWorker(process, args)
-    add_interrupt_button(widget, worker, process_name="Batch Processing")
     worker.finished.connect(lambda: widget.set_status_message("✅ Batch processing complete."))
     worker.finished.connect(worker.deleteLater)
     worker.error_signal.connect(handle_batch_process_error)
