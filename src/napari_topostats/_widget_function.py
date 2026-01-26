@@ -584,7 +584,6 @@ class WidgetFunction:
                     if self.type_class:
                         # ruff: noqa: BLE001
                         try:
-                            print(class_args)
                             instance = self.type_class(**class_args)
                         except Exception as e:
                             error_args = {}
@@ -679,14 +678,6 @@ class WidgetFunction:
                 self.worker = ProcessWorker(_func)
                 self.worker.start()
                 self.worker.result_ready.connect(_handle_result)
-                # Render return value
-
-                # loading_widget = LoadingWidget(viewer)
-                # loading_widget.start(
-                #     self.name.replace("_", " ").replace("run", "running").replace("make", "making").title()
-                # )
-
-                # self.worker.finished.connect(loading_widget.stop)
 
             # Collect the parameters for the function and ensure defaults are set (these defaults are shown in the GUI)
 
