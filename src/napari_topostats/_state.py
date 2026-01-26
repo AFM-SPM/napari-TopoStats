@@ -11,6 +11,33 @@ docked_widgets = []
 topostats_widget = None
 current_error_dialog = None
 MIN_TOPOSTATS_VERSION = "2.3.2"  # The oldest compatible version of topostats for this plugin
+running_function = None  # Currently running function (None if no function is running)
+
+
+def set_running_function(function_name: str | None):
+    """
+    Set the currently running function.
+
+    Parameters
+    ----------
+    function_name : str | None
+        The name of the function that is currently running, or None if no function is running.
+    """
+    # pylint: disable=global-statement
+    global running_function
+    running_function = function_name
+
+
+def get_running_function() -> str | None:
+    """
+    Get the currently running function.
+
+    Returns
+    -------
+    str | None
+        The name of the function that is currently running, or None if no function is running.
+    """
+    return running_function
 
 
 def is_valid_widget(widget: FunctionGui | QWidget) -> bool:

@@ -67,7 +67,7 @@ from ._io import (
     write_new_default_config,
 )
 from ._parallel_processing import ProcessWorker
-from ._state import MIN_TOPOSTATS_VERSION
+from ._state import MIN_TOPOSTATS_VERSION, get_running_function
 from ._widget_function import WidgetFunction
 
 if parse_version(parse_version(topostats_version).base_version) < parse_version(MIN_TOPOSTATS_VERSION):
@@ -313,3 +313,15 @@ class TopoStatsRootWidget(QWidget):
                 elif callable(func):
                     functions[display_name] = magicgui(func)
         return functions
+
+    def get_running_function_widget(self) -> str | None:
+        """
+        Get the name of the currently running function, if any.
+
+        Returns
+        -------
+        str | None
+            The name of the currently running function, or None if no function is running.
+        """
+
+        return get_running_function()

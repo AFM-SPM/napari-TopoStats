@@ -32,6 +32,7 @@ from . import _io as io
 from ._alerts import LoadingWidget, show_error_dialog
 from ._io import ConfigWrapper
 from ._parallel_processing import ProcessWorker
+from ._state import get_running_function, set_running_function
 
 
 def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
@@ -647,7 +648,10 @@ class WidgetFunction:
                     else:
                         show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
                     loading_widget.stop()
+                    if self.name == get_running_function():
+                        set_running_function(None)
 
+                set_running_function(self.name)
                 self.worker = ProcessWorker(_func)
                 self.worker.start()
                 self.worker.result_ready.connect(_handle_result)

@@ -74,7 +74,12 @@ def run_functions_in_grid(
         item = button_grid.findItems(pretty_name, Qt.MatchExactly)[0]
         rect = button_grid.visualItemRect(item)
         qtbot.mouseClick(button_grid.viewport(), Qt.LeftButton, pos=rect.center())
-        qtbot.wait(3000)
+        qtbot.wait(300)
+        running_function = topostats_widget.get_running_function_widget()
+        print(f"Running function: {running_function}")
+        while running_function is not None:
+            qtbot.wait(300)
+            running_function = topostats_widget.get_running_function_widget()
 
 
 def open_load_config_widget(qtbot: QtBot, topostats_widget: TopoStatsRootWidget):
