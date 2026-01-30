@@ -59,6 +59,11 @@ dev = [
   "pylint",
   "ruff",
 ]
+pypi = [
+  "build",
+  "setuptools_scm[toml]",
+  "wheel",
+]
 
 [tool.setuptools_scm]
 write_to = "_version.py"
