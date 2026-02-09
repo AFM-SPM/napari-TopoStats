@@ -6,6 +6,7 @@ for those functions, running them and rendering the result.
 
 import functools
 import inspect
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -448,6 +449,18 @@ class WidgetFunction:
         # Check if a config is needed
         if self.uses_config and (io.config_wrapper is None or io.full_config_container is None):
             io.load_config_impl(current_viewer(), use_default=True)
+        # Replace any dynamic components of the paths with actual values from the config if needed
+        flat_config = get_current_config(flat=True)
+
+        def lookup(match):
+            key = match.group(1)
+            return flat_config.get(key, match.group(0))
+
+        for attr in ["path_to_data", "metadata_paths"]:
+            value = getattr(self, attr)
+            if isinstance(value, str):
+                setattr(self, attr, re.sub(r"<([^>]+)>", lookup, value))
+            print(f"{attr}: {getattr(self, attr)}")
         # pylint: disable=too-many-nested-blocks
         try:
             # If path_to_data is not set, default to "return" or "obj" if type_class is provided

@@ -15,14 +15,12 @@ Replace code below according to your needs.
 # ns-rse 2025-12-08 - We seem to need to allow ungrouped imports so that LoadingWidget() can be used
 # pylint: disable=ungrouped-imports
 
-import argparse
 import os
 from pathlib import Path
 
 from napari import current_viewer  # pylint: disable=no-name-in-module
 from qtpy.QtWidgets import (
     QApplication,
-    QFileDialog,
     QHBoxLayout,
     QPushButton,
     QSizePolicy,
@@ -46,7 +44,6 @@ from platformdirs import user_config_dir
 from topostats import __version__ as topostats_version
 from topostats.filters import Filters
 from topostats.grains import Grains
-from topostats.run_modules import process
 
 from napari_topostats.utils import (
     afm2stack,
@@ -57,16 +54,13 @@ if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() 
     loading_spinner.stop()
 
 from ._alerts import show_error_dialog
+from ._batch_process import batch_process
 from ._button_grid import ButtonGrid
 from ._io import (
-    config_loaded,
-    get_current_config,
-    get_current_config_path,
     load_config,
     load_config_impl,
     write_new_default_config,
 )
-from ._parallel_processing import ProcessWorker
 from ._state import MIN_TOPOSTATS_VERSION, get_running_function
 from ._widget_function import WidgetFunction
 
@@ -78,96 +72,13 @@ if parse_version(parse_version(topostats_version).base_version) < parse_version(
         raise_exception=False,
     )
 
-
-# pylint: disable=protected-access
-@magicgui(
-    data_path={"label": "Input path", "mode": "d"},
-    output_path={"label": "Output path", "mode": "d"},
-    call_button="Batch Process",
-)
-def batch_process(
-    data_path: Path = None,
-    output_path: Path = None,
-):
-    """
-    Batch process multiple AFM images in a selected folder using the current configuration.
-    Parameters
-    ----------
-    data_path : Path | None
-        The input data directory containing AFM images to process. If None, a dialog will prompt for selection.
-    output_path : Path | None
-        The output directory where results will be saved. If None, a dialog will prompt for selection.
-    """
-    widget = batch_process
-    if not hasattr(widget, "set_status_message"):
-        attach_status_label(widget)
-
-    if not config_loaded():
-        load_config_impl(current_viewer(), use_default=True)
-
-    if get_current_config()["base_dir"] == "./":
-        if data_path is None:
-            data_path = QFileDialog.getExistingDirectory(
-                parent=None,
-                caption="Select Input Data Directory",
-            )
-            data_path = Path(data_path)
-            widget.data_path.value = data_path
-
-        if output_path is None:
-            output_path = QFileDialog.getExistingDirectory(
-                parent=None,
-                caption="Select Output Data Directory",
-            )
-            output_path = Path(output_path)
-            widget.output_path.value = output_path
-    # ruff: noqa: SIM102
-    if hasattr(widget, "_batch_worker"):
-        try:
-            if widget._batch_worker.isRunning():
-                widget.set_status_message("⚠️ Batch processing is already running.")
-                return
-        except RuntimeError:
-            # Worker thread has been deleted and is therefore not running
-            pass
-    print(f"Config path: {str(get_current_config_path())}")
-    args = argparse.Namespace(
-        config_file=str(get_current_config_path()),
-        module="topostats",
-        summary_config=None,
-    )
-    if data_path is not None:
-        args.base_dir = str(data_path)
-    else:
-        widget.data_path.value = get_current_config()["base_dir"]
-    if output_path is not None:
-        args.output_dir = str(output_path)
-    else:
-        widget.output_path.value = get_current_config()["output_dir"]
-
-    widget.set_status_message("⏳ Starting batch processing in the background. View command line for progress.")
-    worker = ProcessWorker(process, args)
-    worker.finished.connect(lambda: widget.set_status_message("✅ Batch processing complete."))
-    worker.finished.connect(worker.deleteLater)
-    worker.error_signal.connect(handle_batch_process_error)
-    widget._batch_worker = worker  # prevent garbage collection
-    worker.start()
-
-
-def handle_batch_process_error(e: Exception):
-    """
-    Handle errors that occur during batch processing.
-
-    Parameters
-    ----------
-    e : Exception
-        The exception that was raised during batch processing.
-    """
-    widget = batch_process
-    if hasattr(widget, "set_status_message"):
-        widget.set_status_message(f"❌ Error during batch processing: {str(e)}")
-    show_error_dialog(f"Error during batch processing: {str(e)}", raise_exception=True)
-
+# List of available functions to be displayed in the button grid.
+# Each function is represented as an instance of the WidgetFunction class defined in _widget_function.py,
+# which contains all the necessary information for rendering the function as a button and executing it when clicked.
+# Function to run shows the function that will be executed when the button is clicked and path_to_data shows where the
+# data that will be rendered is located. (path_to_data is designed for when functions will be dynamically converted).
+# Attributes from the config can be dynamically inserted into path_to_data or metadata_paths using the syntax
+# <config_category.attribute> (this will reference config["config_category"]["attribute"]).
 
 AVAILABLE_FUNCTIONS = [
     WidgetFunction(
@@ -190,7 +101,7 @@ AVAILABLE_FUNCTIONS = [
         function_key="grains",
         function_to_run=Grains.find_grains,
         type_class=Grains,
-        path_to_data='obj.mask_images["above"]["merged_classes"][:, :, 1]',
+        path_to_data='obj.mask_images["<grains.direction>"]["merged_classes"][:, :, 1]',
         of_type=[Image],
         metadata_paths={"config": "config", "grains": "obj"},
         uses_config=True,

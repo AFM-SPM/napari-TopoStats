@@ -885,8 +885,10 @@ def save_current_config_as_temp(overides: dict[str, Any] | None = None):
     current_config_path = str(config_path)
 
 
-def get_current_config() -> dict[str, Any]:
+def get_current_config(flat: bool = False) -> dict[str, Any]:
     """Returns the current config with any updates from the edit config window applied"""
+    if flat:
+        return config_wrapper.flat
     full_current_config = config_wrapper.unflatten()
     return full_current_config
 
