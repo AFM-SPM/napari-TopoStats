@@ -162,7 +162,7 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(start_open)
         self.toggle_button.setStyleSheet(
-            "QPushButton { text-align: left; font-weight: bold; padding: 5px; border: none; }"
+            "QPushButton { text-align: left; font-weight: bold; padding: 0.5em; border: none; }"
             "QPushButton:hover { background-color: #555d68; }"
         )
         self.toggle_button.toggled.connect(self.on_toggle)
@@ -677,6 +677,7 @@ def open_config_editor():
     fresh_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     dialog = QDialog()
+    dialog.setStyleSheet("font-size: 9pt;")
     dialog.setWindowTitle("Edit Config")
     dialog.setMinimumWidth(550)
     screen_height = QGuiApplication.primaryScreen().availableGeometry().height()
