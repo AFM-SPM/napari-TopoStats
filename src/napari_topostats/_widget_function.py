@@ -36,6 +36,7 @@ from ._alerts import LoadingWidget, show_error_dialog
 from ._io import ConfigWrapper, get_current_config
 from ._parallel_processing import ProcessWorker
 from ._state import get_running_function, set_running_function
+from .utils import calculate_contrast_limits
 
 
 def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
@@ -778,6 +779,7 @@ class WidgetFunction:
                 viewer.add_image(
                     return_value,
                     name=name,
+                    contrast_limits=calculate_contrast_limits(return_value, percentage=0.5),
                     metadata=({"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}) | metadata,
                 )
                 viewer.dims.ndisplay = self.ndims

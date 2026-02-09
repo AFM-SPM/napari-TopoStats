@@ -131,3 +131,22 @@ def get_grainstats_df(stats) -> pd.DataFrame:
     # Create DataFrame
     df = pd.DataFrame(rows)
     return df
+
+
+def calculate_contrast_limits(image: np.ndarray, percentage: float = 2.0) -> tuple[float, float]:
+    """
+    Calculate contrast limits for an image using the 2nd and 98th percentiles.
+
+    Parameters
+    ----------
+    image : ImageData
+        The input image data.
+
+    Returns
+    -------
+    tuple[float, float]
+        The calculated contrast limits (min, max).
+    """
+    vmin = np.percentile(image, percentage)
+    vmax = np.percentile(image, 100 - percentage)
+    return vmin, vmax
