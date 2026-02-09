@@ -1,6 +1,7 @@
 # ruff: noqa: BLE001
 # pylint: disable=broad-exception-caught
 """Provides a worker thread for parallel processing of intensive functions."""
+
 from qtpy.QtCore import QThread, Signal
 
 
