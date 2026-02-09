@@ -903,3 +903,22 @@ def config_loaded() -> bool:
         True if a config has been loaded, False otherwise.
     """
     return config_wrapper is not None and full_config_container is not None
+
+
+def get_topostats_default_config():
+    """
+    Returns the default config from the TopoStats backend as a dictionary.
+
+    Returns
+    -------
+    dict
+        The default config.
+    """
+    config_dir = Path(user_config_dir("TopoStats", "Napari"))
+    config_path = config_dir / "default_config.yaml"
+    write_config_with_comments(
+        Namespace(config=None, filename="default_config.yaml", output_dir=config_dir, module="topostats")
+    )
+
+    with open(config_path, encoding="utf-8") as f:
+        return yaml.safe_load(f)

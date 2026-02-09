@@ -454,13 +454,15 @@ class WidgetFunction:
 
         def lookup(match):
             key = match.group(1)
-            return flat_config.get(key, match.group(0))
+            if key in flat_config:
+                return str(flat_config[key])
+            default_config = io.get_topostats_default_config()
+            return default_config.get(key, match.group(0))
 
         for attr in ["path_to_data", "metadata_paths"]:
             value = getattr(self, attr)
             if isinstance(value, str):
                 setattr(self, attr, re.sub(r"<([^>]+)>", lookup, value))
-            print(f"{attr}: {getattr(self, attr)}")
         # pylint: disable=too-many-nested-blocks
         try:
             # If path_to_data is not set, default to "return" or "obj" if type_class is provided
