@@ -3,6 +3,7 @@
 Module for dynamic widget generation from topostats functions including creating a window of options
 for those functions, running them and rendering the result.
 """
+
 import functools
 import inspect
 from collections.abc import Callable

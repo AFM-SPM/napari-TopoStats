@@ -44,15 +44,13 @@ class ErrorDialog(QDialog):
         # Error message
         self.label = QLabel(message)
         self.label.setWordWrap(True)
-        self.label.setStyleSheet(
-            """
+        self.label.setStyleSheet("""
             QLabel {
                 font-size: 13px;
                 color: #333333;
                 padding: 10px;
             }
-        """
-        )
+        """)
         layout.addWidget(self.label)
 
         # OK button
@@ -60,8 +58,7 @@ class ErrorDialog(QDialog):
         button_layout.addStretch()
         ok_button = QPushButton("OK")
         ok_button.setMinimumWidth(80)
-        ok_button.setStyleSheet(
-            """
+        ok_button.setStyleSheet("""
             QPushButton {
                 background-color: #0078d4;
                 color: white;
@@ -76,8 +73,7 @@ class ErrorDialog(QDialog):
             QPushButton:pressed {
                 background-color: #005a9e;
             }
-        """
-        )
+        """)
         ok_button.clicked.connect(self.accept)
         button_layout.addWidget(ok_button)
         layout.addLayout(button_layout)
@@ -86,13 +82,11 @@ class ErrorDialog(QDialog):
         self.setModal(True)
 
         # Dialog styling
-        self.setStyleSheet(
-            """
+        self.setStyleSheet("""
             QDialog {
                 background-color: white;
             }
-        """
-        )
+        """)
 
 
 def show_error_dialog(
@@ -174,15 +168,13 @@ def attach_status_label(widget: FunctionGui | QWidget):
     """
 
     label = QLabel("")
-    label.setStyleSheet(
-        """
+    label.setStyleSheet("""
         QLabel {
             border: none;
             padding: 0px;
             margin: 0px;
         }
-    """
-    )
+    """)
     label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
     label.setMinimumWidth(0)
     label.setMaximumWidth(300)  # Prevent excessive width
@@ -213,21 +205,18 @@ def attach_status_label(widget: FunctionGui | QWidget):
                 QLabel {
                     font-size: 4px
                 }
-            """
-            )
+            """)
 
     label_timer.timeout.connect(remove_label)
     widget.label_timer = label_timer
 
     def set_status_message(message: str):
         label.setText(message)
-        label.setStyleSheet(
-            """
+        label.setStyleSheet("""
             QLabel {
                 font-size: 12px
             }
-        """
-        )
+        """)
         label.adjustSize()
         to_adjust = widget.native if hasattr(widget, "native") else widget
         to_adjust.updateGeometry()
@@ -255,30 +244,26 @@ class LoadingWidget(QWidget):
 
         # Create container with rounded background
         loading_container = QWidget()
-        loading_container.setStyleSheet(
-            """
+        loading_container.setStyleSheet("""
             QWidget {
                 background-color: rgba(40, 40, 40, 240);
                 border-radius: 15px;
                 padding: 30px;
             }
-        """
-        )
+        """)
 
         loading_layout = QVBoxLayout()
         loading_layout.setAlignment(Qt.AlignCenter)
 
         self.loading_label = QLabel()
-        self.loading_label.setStyleSheet(
-            """
+        self.loading_label.setStyleSheet("""
             QLabel {
                 color: white;
                 font-size: 18px;
                 font-weight: bold;
                 background-color: transparent;
             }
-        """
-        )
+        """)
         self.loading_label.setAlignment(Qt.AlignCenter)
 
         loading_layout.addWidget(self.loading_label)
