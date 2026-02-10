@@ -915,11 +915,10 @@ def get_topostats_default_config():
     dict
         The default config.
     """
-    config_dir = Path(user_config_dir("TopoStats", "Napari"))
-    config_path = config_dir / "default_config.yaml"
-    write_config_with_comments(
-        Namespace(config=None, filename="default_config.yaml", output_dir=config_dir, module="topostats")
-    )
+    # this function is currently bugged for some reason, it seems write_config_with_comments fails to write the file
+    config_path = Path(user_config_dir("TopoStats", "Napari")) / "default_config.yaml"
+    write_new_default_config(config_path)
 
     with open(config_path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        config = yaml.safe_load(f)
+    return config

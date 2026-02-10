@@ -335,6 +335,21 @@ def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=
     any
         The evaluated result, or None if there's an error
     """
+    if "<DIRECTION>" in path_to_data:
+        raised_error = None
+        for direction in ["above", "below"]:
+            new_path = path_to_data.replace("<DIRECTION>", direction)
+            try:
+                return evaluate_path_to_data(new_path, return_value, instance, type_class)
+            except KeyError as e:
+                raised_error = e
+        if raised_error:
+            show_error_dialog(
+                "Couldn't find data for either direction",
+                raise_exception=True,
+                topostats_error=True,
+                exception=raised_error,
+            )
     if path_to_data.startswith("return"):
         return _eval(return_value, path_to_data[6:]) if len(path_to_data) > 6 else return_value
 
@@ -450,6 +465,7 @@ class WidgetFunction:
         # Check if a config is needed
         if self.uses_config and (io.config_wrapper is None or io.full_config_container is None):
             io.load_config_impl(current_viewer(), use_default=True)
+
         # Replace any dynamic components of the paths with actual values from the config if needed
         flat_config = get_current_config(flat=True)
 
@@ -457,8 +473,7 @@ class WidgetFunction:
             key = match.group(1)
             if key in flat_config:
                 return str(flat_config[key])
-            default_config = io.get_topostats_default_config()
-            return default_config.get(key, match.group(0))
+            return match.group(0)
 
         for attr in ["path_to_data", "metadata_paths"]:
             value = getattr(self, attr)
