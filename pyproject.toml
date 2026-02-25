@@ -41,7 +41,7 @@ dependencies = [
   "napari[all]",
   "qtpy",
   "tox",
-  "topostats>=2.4.0",
+  "topostats>=2.4.0",  # This should match MIN_TOPOSTATS_VERSION in src/napari_topostats/_state.py
   "napari-AFMReader"
 ]
 
