@@ -41,8 +41,8 @@ dependencies = [
   "napari[all]",
   "qtpy",
   "tox",
-  "topostats @ git+https://github.com/AFM-SPM/TopoStats.git@main",
-  "napari-AFMReader @ git+https://github.com/AFM-SPM/napari-AFMReader.git@main"
+  "topostats>=2.4.0",
+  "napari-AFMReader"
 ]
 
 [project.optional-dependencies]
