@@ -48,8 +48,8 @@ def test_load_image(napari_viewer: Viewer, image_path: str):
             [
                 "test image",
                 "test image Filter Image",
-                "test image Filter Image Grains Mask",
                 "test image Filter 3D Image",
+                "test image Filter Image Grains Mask",
             ],
             id="all the functions in standard order",
         )

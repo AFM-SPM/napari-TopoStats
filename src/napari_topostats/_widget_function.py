@@ -31,7 +31,9 @@ from scipy.ndimage import label
 
 from . import _io as io
 from ._alerts import LoadingWidget, show_error_dialog
-from ._io import ConfigWrapper, collect_values
+from ._io import ConfigWrapper
+from ._parallel_processing import ProcessWorker
+from ._state import get_running_function, set_running_function
 
 
 def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
@@ -471,8 +473,6 @@ class WidgetFunction:
             including_config_params_from_class = parameters_from_class.copy() if self.type_class is not None else []
             # Then remove parameters that are already in the config (so they are set from config file rather than GUI)
             if self.uses_config:
-                updated_values = collect_values(io.full_config_container)
-                io.config_wrapper.flat.update(updated_values)
                 full_current_config = io.config_wrapper.unflatten()
                 config = full_current_config.get(self.function_key, {})
                 for param_name in [p.name for p in all_parameters]:
@@ -495,16 +495,16 @@ class WidgetFunction:
                         if self.type_class is not None:
                             parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
 
-            # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught
+            # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught, attribute-defined-outside-init
             def func(**kwargs):
                 viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
                 loading_widget = LoadingWidget(viewer)
                 loading_widget.start(
                     self.name.replace("_", " ").replace("run", "running").replace("make", "making").title()
                 )
+
                 method_args = {}
                 class_args = {}
-
                 # Determine all relevant parameters
                 all_params = including_config_params_from_function + (
                     including_config_params_from_class if self.type_class else []
@@ -559,85 +559,114 @@ class WidgetFunction:
                     class_args = enforce_defaults(class_args, including_config_params_from_class)
 
                 # Execute function or method
-                if self.type_class:
-                    # ruff: noqa: BLE001
-                    try:
-                        instance = self.type_class(**class_args)
-                    except Exception as e:
-                        show_error_dialog(
-                            f"Topostats is failing with {self.type_class.__name__}: {e}.",
-                            topostats_error=True,
-                        )
-                        return
-                    method = getattr(instance, self.function_to_run.__name__, None)
-                    if method:
+                def _func():
+                    if self.type_class:
                         # ruff: noqa: BLE001
                         try:
-                            return_value = method(**method_args)
+                            print(class_args)
+                            instance = self.type_class(**class_args)
                         except Exception as e:
-                            show_error_dialog(
-                                f"Topostats is failing with: {e}.",
-                                raise_exception=True,
-                                topostats_error=True,
+                            error_args = {}
+                            error_args["message"] = (
+                                f"Topostats is failing with {self.type_class.__name__}: {e.__class__} {e}."
                             )
-                            return
-                    else:
-                        show_error_dialog(f"Method {self.function_to_run.__name__} not found on instance.")
-                        loading_widget.stop()
-                        return
-                else:
-                    # ruff: noqa: BLE001
-                    try:
-                        return_value = self.function_to_run(**method_args)
-                    except Exception as e:
-                        show_error_dialog(
-                            f"Topostats is failing with: {e}.",
-                            raise_exception=True,
-                            topostats_error=True,
-                        )
-                        return
-
-                # Evaluate path_to_data
-                metadata = {}
-                if self.metadata_paths is not None:
-                    for key in self.metadata_paths:
-                        if self.metadata_paths[key] == "config":
-                            metadata[key] = full_current_config
+                            error_args["topostats_error"] = True
+                            return error_args
+                        method = getattr(instance, self.function_to_run.__name__, None)
+                        if method:
+                            # ruff: noqa: BLE001
+                            try:
+                                return_value = method(**method_args)
+                            except Exception as e:
+                                error_args = {}
+                                error_args["message"] = f"Topostats is failing with:{e.__class__} {e}."
+                                error_args["raise_exception"] = True
+                                error_args["topostats_error"] = True
+                                error_args["exception"] = e
+                                return error_args
                         else:
-                            metadata[key] = evaluate_path_to_data(
-                                self.metadata_paths[key],
+                            error_args = {}
+                            error_args["message"] = f"Method {self.function_to_run.__name__} not found on instance."
+                            return error_args
+                    else:
+                        # ruff: noqa: BLE001
+                        try:
+                            return_value = self.function_to_run(**method_args)
+                        except Exception as e:
+                            error_args = {}
+                            error_args["message"] = f"Topostats is failing with:{e.__class__} {e}."
+                            error_args["raise_exception"] = True
+                            error_args["topostats_error"] = True
+                            error_args["exception"] = e
+                            return error_args
+                    # Evaluate path_to_data
+                    metadata = {}
+                    try:
+                        if self.metadata_paths is not None:
+                            for key in self.metadata_paths:
+                                if self.metadata_paths[key] == "config":
+                                    metadata[key] = full_current_config
+                                else:
+                                    metadata[key] = evaluate_path_to_data(
+                                        self.metadata_paths[key],
+                                        return_value,
+                                        instance,
+                                        self.type_class,
+                                    )
+
+                        if self.type_class:
+                            result = evaluate_path_to_data(
+                                self.path_to_data,
                                 return_value,
                                 instance,
                                 self.type_class,
                             )
+                        else:
+                            result = evaluate_path_to_data(self.path_to_data, return_value)
+                    except Exception as e:
+                        error_args = {}
+                        error_args["message"] = f"Topostats is failing with: {e.__class__} {e}."
+                        error_args["raise_exception"] = True
+                        error_args["topostats_error"] = True
+                        error_args["exception"] = e
+                        return error_args
+                    return (result, metadata)
 
-                if self.type_class:
-                    result = evaluate_path_to_data(
-                        self.path_to_data,
-                        return_value,
-                        instance,
-                        self.type_class,
-                    )
-                else:
-                    result = evaluate_path_to_data(self.path_to_data, return_value)
-                if result is None:
+                def _handle_result(result):
+                    if isinstance(result, dict) and "message" in result:
+                        loading_widget.stop()
+                        show_error_dialog(**result)
+                        return
+                    viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
+                    return_value, metadata = result
+                    if return_value is not None:
+                        self.render_return_value(
+                            return_value,
+                            viewer,
+                            kwargs.get("image"),
+                            metadata=metadata,
+                        )
+                    else:
+                        show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
                     loading_widget.stop()
-                    return
-                return_value = result
+                    if self.name == get_running_function():
+                        set_running_function(None)
 
+                set_running_function(self.name)
+                self.worker = ProcessWorker(_func)
+                self.worker.start()
+                self.worker.result_ready.connect(_handle_result)
                 # Render return value
-                if return_value is not None:
-                    self.render_return_value(
-                        return_value,
-                        viewer,
-                        kwargs.get("image"),
-                        metadata=metadata,
-                    )
-                else:
-                    show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
-                loading_widget.stop()
+
+                # loading_widget = LoadingWidget(viewer)
+                # loading_widget.start(
+                #     self.name.replace("_", " ").replace("run", "running").replace("make", "making").title()
+                # )
+
+                # self.worker.finished.connect(loading_widget.stop)
 
             # Collect the parameters for the function and ensure defaults are set (these defaults are shown in the GUI)
+
             new_parameters = []
             for p in (
                 (parameters_from_function + parameters_from_class)
@@ -646,12 +675,8 @@ class WidgetFunction:
             ):
                 if p.name == "image":
                     # Sets the default image to the currently selected image in the viewer
-                    # Doneat the time of opening the widget
-                    selected_image = get_selected_image(current_viewer())
-                    if selected_image is not None:
-                        new_p = p.replace(default=selected_image, annotation=Image)
-                    else:
-                        new_p = p.replace(annotation=Image)
+                    # Done at the time of opening the widget
+                    new_p = p.replace(annotation=Image)
                 elif p.name == "pixel_to_nm_scaling":
                     new_p = p.replace(default=1.0)
                 elif p.name == "filename":
@@ -722,7 +747,6 @@ class WidgetFunction:
                 viewer.add_image(
                     return_value,
                     name=name,
-                    contrast_limits=(-1, 5),
                     metadata=({"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}) | metadata,
                 )
                 viewer.dims.ndisplay = self.ndims
@@ -738,6 +762,7 @@ class WidgetFunction:
             table.setColumnCount(len(df.columns))
             table.setHorizontalHeaderLabels(df.columns.tolist())
             original.mode = Mode.PICK
+            is_updating = False
 
             def convert_to_nm(df_m: pd.DataFrame) -> pd.DataFrame:
                 """Convert the pd.DataFrame from m to nm."""
@@ -775,8 +800,9 @@ class WidgetFunction:
             # pylint: disable=unused-argument
             def on_row_clicked(row, column):
                 """Triggered when a table row is clicked."""
+                nonlocal is_updating
                 # Get the grain number (or label id) from the dataframe
-                grain_id = df.iloc[row]["grain_number"]  # or 'label', whatever your column is called
+                grain_id = df.iloc[row]["grain_number"]
 
                 # Center the view on it
                 # Find coordinates of that label in the image
@@ -793,11 +819,16 @@ class WidgetFunction:
                     original.selected_label = int(grain_id) + 1
                     original.mode = Mode.PICK
                     viewer.layers.selection.active = original
+                    is_updating = True
 
             # pylint: disable=unused-argument
             def on_label_selected(event):
+                nonlocal is_updating
+                if is_updating:
+                    is_updating = False
+                    return
                 selected = original.selected_label
-                if selected == 0:  # 0 means background in napari
+                if selected == 0:  # 0 means background
                     original.show_selected_label = False
                     return
 

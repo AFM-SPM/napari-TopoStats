@@ -2,6 +2,7 @@
 
 import os
 
+import matplotlib
 import napari
 import pytest
 from pytestqt.qtbot import QtBot
@@ -9,6 +10,15 @@ from pytestqt.qtbot import QtBot
 from napari_topostats._widget import TopoStatsRootWidget
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def configure_matplotlib():
+    """
+    Force matplotlib to use the non-interactive 'Agg' backend
+    to prevent Tcl/Tk threading errors during tests.
+    """
+    matplotlib.use("Agg")
 
 
 @pytest.fixture(name="napari_viewer")

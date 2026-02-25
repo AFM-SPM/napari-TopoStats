@@ -33,8 +33,8 @@ output/config.yaml
 !cat.spm
 
 # Include icons
-!icons/
-!icons/**
+!src/napari_topostats/icons/
+!src/napari_topostats/icons/**
 !readme_images/
 !readme_images/**
 
