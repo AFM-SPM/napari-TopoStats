@@ -162,7 +162,7 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(start_open)
         self.toggle_button.setStyleSheet(
-            "QPushButton { text-align: left; font-weight: bold; padding: 5px; border: none; }"
+            "QPushButton { text-align: left; font-weight: bold; padding: 0.5em; border: none; }"
             "QPushButton:hover { background-color: #555d68; }"
         )
         self.toggle_button.toggled.connect(self.on_toggle)
@@ -677,6 +677,7 @@ def open_config_editor():
     fresh_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     dialog = QDialog()
+    dialog.setStyleSheet("font-size: 9pt;")
     dialog.setWindowTitle("Edit Config")
     dialog.setMinimumWidth(550)
     screen_height = QGuiApplication.primaryScreen().availableGeometry().height()
@@ -885,8 +886,10 @@ def save_current_config_as_temp(overides: dict[str, Any] | None = None):
     current_config_path = str(config_path)
 
 
-def get_current_config() -> dict[str, Any]:
+def get_current_config(flat: bool = False) -> dict[str, Any]:
     """Returns the current config with any updates from the edit config window applied"""
+    if flat:
+        return config_wrapper.flat
     full_current_config = config_wrapper.unflatten()
     return full_current_config
 
@@ -901,3 +904,21 @@ def config_loaded() -> bool:
         True if a config has been loaded, False otherwise.
     """
     return config_wrapper is not None and full_config_container is not None
+
+
+def get_topostats_default_config():
+    """
+    Returns the default config from the TopoStats backend as a dictionary.
+
+    Returns
+    -------
+    dict
+        The default config.
+    """
+    # this function is currently bugged for some reason, it seems write_config_with_comments fails to write the file
+    config_path = Path(user_config_dir("TopoStats", "Napari")) / "default_config.yaml"
+    write_new_default_config(config_path)
+
+    with open(config_path, encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    return config

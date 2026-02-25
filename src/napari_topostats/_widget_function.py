@@ -6,6 +6,7 @@ for those functions, running them and rendering the result.
 
 import functools
 import inspect
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -28,12 +29,14 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 from scipy.ndimage import label
+from topostats.classes import TopoStats
 
 from . import _io as io
 from ._alerts import LoadingWidget, show_error_dialog
-from ._io import ConfigWrapper
+from ._io import ConfigWrapper, get_current_config
 from ._parallel_processing import ProcessWorker
 from ._state import get_running_function, set_running_function
+from .utils import calculate_contrast_limits
 
 
 def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
@@ -332,6 +335,21 @@ def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=
     any
         The evaluated result, or None if there's an error
     """
+    if "<DIRECTION>" in path_to_data:
+        raised_error = None
+        for direction in ["above", "below"]:
+            new_path = path_to_data.replace("<DIRECTION>", direction)
+            try:
+                return evaluate_path_to_data(new_path, return_value, instance, type_class)
+            except KeyError as e:
+                raised_error = e
+        if raised_error:
+            show_error_dialog(
+                "Couldn't find data for either direction",
+                raise_exception=True,
+                topostats_error=True,
+                exception=raised_error,
+            )
     if path_to_data.startswith("return"):
         return _eval(return_value, path_to_data[6:]) if len(path_to_data) > 6 else return_value
 
@@ -447,6 +465,20 @@ class WidgetFunction:
         # Check if a config is needed
         if self.uses_config and (io.config_wrapper is None or io.full_config_container is None):
             io.load_config_impl(current_viewer(), use_default=True)
+
+        # Replace any dynamic components of the paths with actual values from the config if needed
+        flat_config = get_current_config(flat=True)
+
+        def lookup(match):
+            key = match.group(1)
+            if key in flat_config:
+                return str(flat_config[key])
+            return match.group(0)
+
+        for attr in ["path_to_data", "metadata_paths"]:
+            value = getattr(self, attr)
+            if isinstance(value, str):
+                setattr(self, attr, re.sub(r"<([^>]+)>", lookup, value))
         # pylint: disable=too-many-nested-blocks
         try:
             # If path_to_data is not set, default to "return" or "obj" if type_class is provided
@@ -510,8 +542,9 @@ class WidgetFunction:
                     including_config_params_from_class if self.type_class else []
                 )
 
+                uses_topostats_object = "topostats_object" in [p.name for p in all_params]
                 # Handle image selection if required
-                if "image" in [p.name for p in all_params]:
+                if "image" in [p.name for p in all_params] or uses_topostats_object:
                     selected_image = get_selected_image(
                         kwargs.get("viewer", current_viewer()),
                         of_type=self.of_type,
@@ -519,15 +552,35 @@ class WidgetFunction:
                     if selected_image is None:
                         loading_widget.stop()
                         return
+                if "image" in [p.name for p in all_params]:
                     kwargs["image"] = selected_image
-
                 # Handle pixel_to_nm_scaling if required
+                if (
+                    "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs
+                ) or uses_topostats_object:
+                    px2nm = selected_image.metadata.get("px2nm", 1.0)
+                    print(f"Using pixel_to_nm_scaling from image metadata: {px2nm}")
                 if "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs:
-                    kwargs["pixel_to_nm_scaling"] = kwargs["image"].metadata.get("px2nm", 1.0)
-                    print(f"Using pixel_to_nm_scaling from image metadata: {kwargs['pixel_to_nm_scaling']}")
+                    kwargs["pixel_to_nm_scaling"] = px2nm
 
+                if ("filename" in [p.name for p in all_params] and "filename" not in kwargs) or uses_topostats_object:
+                    filename = "image"
                 if "filename" in [p.name for p in all_params] and "filename" not in kwargs:
-                    kwargs["filename"] = "image"
+                    kwargs["filename"] = filename
+
+                if uses_topostats_object:
+                    # Create TopoStats object and add to kwargs
+                    if selected_image.metadata.get("topostats_object") is not None:
+                        topostats_object = selected_image.metadata["topostats_object"]
+                    else:
+                        topostats_object = TopoStats(
+                            image_original=selected_image.data,
+                            image=selected_image.data,
+                            pixel_to_nm_scaling=px2nm,
+                            filename=filename,
+                            config=get_current_config(),
+                        )
+                    kwargs["topostats_object"] = topostats_object
                 # Distribute arguments between method_args and class_args
                 for key, value in kwargs.items():
                     if key in [p.name for p in including_config_params_from_function]:
@@ -563,7 +616,6 @@ class WidgetFunction:
                     if self.type_class:
                         # ruff: noqa: BLE001
                         try:
-                            print(class_args)
                             instance = self.type_class(**class_args)
                         except Exception as e:
                             error_args = {}
@@ -613,6 +665,8 @@ class WidgetFunction:
                                         instance,
                                         self.type_class,
                                     )
+                        if self.type_class and hasattr(instance, "topostats_object"):
+                            metadata["topostats_object"] = instance.topostats_object
 
                         if self.type_class:
                             result = evaluate_path_to_data(
@@ -643,7 +697,7 @@ class WidgetFunction:
                         self.render_return_value(
                             return_value,
                             viewer,
-                            kwargs.get("image"),
+                            selected_image,
                             metadata=metadata,
                         )
                     else:
@@ -656,14 +710,6 @@ class WidgetFunction:
                 self.worker = ProcessWorker(_func)
                 self.worker.start()
                 self.worker.result_ready.connect(_handle_result)
-                # Render return value
-
-                # loading_widget = LoadingWidget(viewer)
-                # loading_widget.start(
-                #     self.name.replace("_", " ").replace("run", "running").replace("make", "making").title()
-                # )
-
-                # self.worker.finished.connect(loading_widget.stop)
 
             # Collect the parameters for the function and ensure defaults are set (these defaults are shown in the GUI)
 
@@ -687,6 +733,7 @@ class WidgetFunction:
                     "pixel_to_nm_scaling",
                     "image",
                     "filename",
+                    "topostats_object",
                 ]:
                     new_parameters.append(new_p)
             # Create a magicgui function with the wrapped function and the new parameters
@@ -747,6 +794,7 @@ class WidgetFunction:
                 viewer.add_image(
                     return_value,
                     name=name,
+                    contrast_limits=calculate_contrast_limits(return_value, percentage=0.5),
                     metadata=({"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}) | metadata,
                 )
                 viewer.dims.ndisplay = self.ndims
