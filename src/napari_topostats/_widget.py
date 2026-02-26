@@ -35,8 +35,6 @@ if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() 
     loading_spinner.start()
     QApplication.processEvents()
 
-from magicgui import magicgui
-from magicgui.widgets import FunctionGui
 from napari.layers import Image, Labels
 from napari.viewer import Viewer
 from packaging.version import parse as parse_version
@@ -61,6 +59,7 @@ from ._io import (
     load_config_impl,
     write_new_default_config,
 )
+from ._plotting import open_curve_viewer
 from ._state import MIN_TOPOSTATS_VERSION, get_running_function
 from ._widget_function import WidgetFunction
 
@@ -128,6 +127,12 @@ AVAILABLE_FUNCTIONS = [
         name="batch_process",
         function_to_run=batch_process,
         tooltip="Batch process multiple AFM images in a selected folder using the current configuration.",
+    ),
+    WidgetFunction(
+        name="view_curves",
+        function_to_run=open_curve_viewer,
+        tooltip="Open curve window for viewing AFM curves for each point of the image",
+        overide_get_widget=True,
     ),
 ]
 
@@ -213,16 +218,7 @@ class TopoStatsRootWidget(QWidget):
         for function in AVAILABLE_FUNCTIONS:
             function_name = function.name
             display_name = function_name.replace("_", " ").title()
-            if function.path_to_data is not None:
-                # This option is used for functions that will be dynamically converted to a widget
-                functions[display_name] = function
-            else:
-                # This option is used for functions that are hardcoded
-                func = function.function_to_run
-                if isinstance(func, FunctionGui):
-                    functions[display_name] = func
-                elif callable(func):
-                    functions[display_name] = magicgui(func)
+            functions[display_name] = function
         return functions
 
     def get_running_function_widget(self) -> str | None:

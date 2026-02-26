@@ -4,6 +4,7 @@ each function which is accessible from the root widget, as well as formatting an
 and correctly linking the backend with those functions being clicked
 """
 
+import inspect
 from contextlib import suppress
 from pathlib import Path
 
@@ -125,20 +126,15 @@ class ButtonGrid(QListWidget):
         """
         self.functions = functions or {}
         for label, function in functions.items():
-            if isinstance(function, FunctionGui):
-                if is_valid_widget(function):
-                    self.addFunctionButton(label, function.tooltip)
-                else:
-                    self.addFunctionButton(label)
+            if function.tooltip:
+                self.addFunctionButton(label, function.tooltip)
             else:
-                if function.tooltip:
-                    self.addFunctionButton(label, function.tooltip)
-                else:
-                    self.addFunctionButton(label)
+                self.addFunctionButton(label)
         with suppress(TypeError):
             self.itemClicked.disconnect()
         self.itemClicked.connect(self.add_function_as_widget)
 
+    # pylint: disable=too-many-branches
     def add_function_as_widget(self, item):
         """
         Handle the click event on a list item.
@@ -150,7 +146,24 @@ class ButtonGrid(QListWidget):
         item : QListWidgetItem
             The item that was clicked.
         """
-
+        if self.functions[item.text()].overide_get_widget:
+            func = self.functions[item.text()].function_to_run
+            sig = inspect.signature(func)
+            params = list(sig.parameters.values())
+            if len(params) == 1 and params[0].name == "viewer":
+                widget = func(self.viewer)
+            elif len(params) == 0:
+                widget = func()
+            else:
+                show_error_dialog(
+                    f"Function {item.text()} expected input when none was given.",
+                    raise_exception=True,
+                    topostats_error=True,
+                )
+            # pylint: disable=used-before-assignment
+            self.viewer.window.add_dock_widget(widget, name=item.text())
+            self.docked_functions[item.text()] = widget
+            return
         # Check if the widget is already docked and add it if not
         if item.text() not in self.docked_functions:
             widget = self.get_widget_from_function(item.text())
@@ -210,10 +223,6 @@ class ButtonGrid(QListWidget):
         if isinstance(function_from_list, WidgetFunction):
             # If the function is a WidgetFunction, get its GUI representation.
             widget = function_from_list.get_function_gui()
-        elif isinstance(function_from_list, FunctionGui):
-            # If the function is already a FunctionGui, use it directly. This means it was created with magicgui and has
-            # been hard-coded to be a FunctionGui.
-            widget = function_from_list
         else:
             show_error_dialog(
                 f"Function {function_name} is not a valid WidgetFunction or FunctionGui.",

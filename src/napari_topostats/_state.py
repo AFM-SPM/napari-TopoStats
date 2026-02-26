@@ -83,7 +83,9 @@ def is_visible_widget(widget: FunctionGui | QWidget) -> bool:
         True if widget is visible, False otherwise
     """
     try:
-        return widget.native.isVisible()
+        if isinstance(widget, FunctionGui):
+            return widget.native.isVisible()
+        return widget.isVisible()
     except RuntimeError:
         # C++ object has been deleted
         return False

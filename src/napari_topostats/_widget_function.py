@@ -417,6 +417,7 @@ class WidgetFunction:
         of_type: list = None,
         metadata_paths: dict = None,
         tooltip: str | None = None,
+        overide_get_widget: bool = False,
     ):
         self.name = name
         self.path_to_data = path_to_data
@@ -429,6 +430,7 @@ class WidgetFunction:
             self.metadata_paths = metadata_paths
         self.function_to_run = function_to_run
         self.tooltip = tooltip
+        self.overide_get_widget = overide_get_widget
         self.overide_viewer = None
         self.function_gui = None
 
@@ -446,6 +448,11 @@ class WidgetFunction:
         FunctionGui
             The magicgui widget that can be used in the napari viewer as a representation of the function.
         """
+        if self.path_to_data is None:
+            if isinstance(self.function_to_run, FunctionGui):
+                return self.function_to_run
+            elif callable(self.function_to_run):
+                return magicgui(self.function_to_run)
         self.function_gui = self.get_widget()
         return self.function_gui
 
