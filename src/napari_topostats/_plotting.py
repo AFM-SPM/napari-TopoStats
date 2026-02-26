@@ -1,8 +1,9 @@
 """Module to add plotting functionality for viewing force curves"""
 
+# pylint: disable=too-many-instance-attributes
 import numpy as np
 import pyqtgraph as pg
-from qtpy.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from qtpy.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 
 def open_curve_viewer(viewer):
@@ -26,17 +27,40 @@ class CurveViewer(QWidget):
         self.plot_widget = pg.PlotWidget(title="F-D curve")
 
         self.layout().addWidget(self.plot_widget)
+        self.available_channels = []
 
         self.settings_widget = QWidget()
         self.settings_layout = QHBoxLayout(self.settings_widget)
+        self.left_widget = QWidget()
+        self.right_widget = QWidget()
+        self.left_layout = QVBoxLayout(self.left_widget)
+        self.right_layout = QVBoxLayout(self.right_widget)
+        self.x_selector_label = QLabel("Select channel for X")
+        self.y_selector_label = QLabel("Select channel for Y")
         self.x_channel_selector = QComboBox()
         self.y_channel_selector = QComboBox()
-        self.available_channels = []
         self.x_channel_selector.currentTextChanged.connect(lambda text: self.update_channels(x_channel=text))
         self.y_channel_selector.currentTextChanged.connect(lambda text: self.update_channels(y_channel=text))
 
-        self.settings_layout.addWidget(self.x_channel_selector)
-        self.settings_layout.addWidget(self.y_channel_selector)
+        self.left_layout.addWidget(self.x_selector_label)
+        self.right_layout.addWidget(self.y_selector_label)
+        self.left_layout.addWidget(self.x_channel_selector)
+        self.right_layout.addWidget(self.y_channel_selector)
+
+        self.show_approach = True
+        self.show_retract = False
+
+        self.approach_checkbox = QCheckBox("Show approach")
+        self.approach_checkbox.setChecked(True)
+        self.retract_checkbox = QCheckBox("Show retract")
+        self.retract_checkbox.setChecked(False)
+        self.approach_checkbox.toggled.connect(lambda checked: self.update_segments(approach=checked))
+        self.retract_checkbox.toggled.connect(lambda checked: self.update_segments(retract=checked))
+        self.left_layout.addWidget(self.approach_checkbox)
+        self.right_layout.addWidget(self.retract_checkbox)
+
+        self.settings_layout.addWidget(self.left_widget)
+        self.settings_layout.addWidget(self.right_widget)
         self.layout().addWidget(self.settings_widget)
 
         self.x_coord = 0
@@ -57,8 +81,17 @@ class CurveViewer(QWidget):
             self.selected_curve_dict = selected_curve_dict
         if self.selected_curve_dict is None:
             return
-        x_array = self.selected_curve_dict[self.x_channel]["Segment_0"]
-        y_array = self.selected_curve_dict[self.y_channel]["Segment_0"]
+        x_segments = []
+        y_segments = []
+        if self.show_approach:
+            x_segments.append(self.selected_curve_dict[self.x_channel]["Segment_0"])
+            y_segments.append(self.selected_curve_dict[self.y_channel]["Segment_0"])
+        if self.show_retract:
+            x_segments.append(self.selected_curve_dict[self.x_channel]["Segment_1"])
+            y_segments.append(self.selected_curve_dict[self.y_channel]["Segment_1"])
+        x_array = np.concatenate(x_segments) if len(x_segments) > 0 else []
+        y_array = np.concatenate(y_segments) if len(y_segments) > 0 else []
+
         self.plot_line.setData(x_array, y_array)
         self.info_label.setText(f"Plotting curve for pixel (x={self.x_coord}, y={self.y_coord}).")
 
@@ -70,6 +103,14 @@ class CurveViewer(QWidget):
         if y_channel:
             self.y_channel = y_channel
             self.plot_widget.setLabel("left", self.y_channel, units="N")
+        self.update_curve()
+
+    def update_segments(self, approach: bool | None = None, retract: bool | None = None):
+        """Updates the segments of the plot based on user checking boxes"""
+        if approach is not None:
+            self.show_approach = approach
+        if retract is not None:
+            self.show_retract = retract
         self.update_curve()
 
     def extract_curve(self, viewer, event):
