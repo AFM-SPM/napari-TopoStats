@@ -51,8 +51,10 @@ class CurveViewer(QWidget):
         self.show_retract = False
 
         self.approach_checkbox = QCheckBox("Show approach")
-        self.approach_checkbox.setChecked(True)
         self.retract_checkbox = QCheckBox("Show retract")
+        self.approach_checkbox.setStyleSheet("color: yellow;")
+        self.retract_checkbox.setStyleSheet("color: red;")
+        self.approach_checkbox.setChecked(True)
         self.retract_checkbox.setChecked(False)
         self.approach_checkbox.toggled.connect(lambda checked: self.update_segments(approach=checked))
         self.retract_checkbox.toggled.connect(lambda checked: self.update_segments(retract=checked))
@@ -71,7 +73,8 @@ class CurveViewer(QWidget):
 
         self.selected_curve_dict = None
 
-        self.plot_line = self.plot_widget.plot([], [], pen="y", name="Force Curve")
+        self.approach_line = self.plot_widget.plot([], [], pen="y", name="approach")
+        self.retract_line = self.plot_widget.plot([], [], pen="r", name="retract")
 
         self.viewer.mouse_drag_callbacks.append(self.extract_curve)
 
@@ -81,18 +84,15 @@ class CurveViewer(QWidget):
             self.selected_curve_dict = selected_curve_dict
         if self.selected_curve_dict is None:
             return
-        x_segments = []
-        y_segments = []
+        approach_x, approach_y, retract_x, retract_y = [], [], [], []
         if self.show_approach:
-            x_segments.append(self.selected_curve_dict[self.x_channel]["Segment_0"])
-            y_segments.append(self.selected_curve_dict[self.y_channel]["Segment_0"])
+            approach_x = self.selected_curve_dict[self.x_channel]["Segment_0"]
+            approach_y = self.selected_curve_dict[self.y_channel]["Segment_0"]
         if self.show_retract:
-            x_segments.append(self.selected_curve_dict[self.x_channel]["Segment_1"])
-            y_segments.append(self.selected_curve_dict[self.y_channel]["Segment_1"])
-        x_array = np.concatenate(x_segments) if len(x_segments) > 0 else []
-        y_array = np.concatenate(y_segments) if len(y_segments) > 0 else []
-
-        self.plot_line.setData(x_array, y_array)
+            retract_x = self.selected_curve_dict[self.x_channel]["Segment_1"]
+            retract_y = self.selected_curve_dict[self.y_channel]["Segment_1"]
+        self.approach_line.setData(approach_x, approach_y)
+        self.retract_line.setData(retract_x, retract_y)
         self.info_label.setText(f"Plotting curve for pixel (x={self.x_coord}, y={self.y_coord}).")
 
     def update_channels(self, x_channel=None, y_channel=None):
