@@ -146,52 +146,50 @@ class ButtonGrid(QListWidget):
         item : QListWidgetItem
             The item that was clicked.
         """
-        if self.functions[item.text()].overide_get_widget:
-            func = self.functions[item.text()].function_to_run
-            sig = inspect.signature(func)
-            params = list(sig.parameters.values())
-            if len(params) == 1 and params[0].name == "viewer":
-                widget = func(self.viewer)
-            elif len(params) == 0:
-                widget = func()
-            else:
-                show_error_dialog(
-                    f"Function {item.text()} expected input when none was given.",
-                    raise_exception=True,
-                    topostats_error=True,
-                )
-            # pylint: disable=used-before-assignment
-            self.viewer.window.add_dock_widget(widget, name=item.text())
-            self.docked_functions[item.text()] = widget
-            return
+
+        if item.text() in self.docked_functions and (
+            not is_valid_widget(self.docked_functions[item.text()])
+            or not is_visible_widget(self.docked_functions[item.text()])
+        ):
+            # Try to destroy the old widget if it still exists
+            try:
+                if hasattr(self.docked_functions[item.text()], "native"):
+                    self.docked_functions[item.text()].native.destroy()
+            except RuntimeError:
+                # Already deleted
+                pass
+            self.docked_functions.pop(item.text())
+
         # Check if the widget is already docked and add it if not
         if item.text() not in self.docked_functions:
+            if self.functions[item.text()].overide_get_widget:
+                func = self.functions[item.text()].function_to_run
+                sig = inspect.signature(func)
+                params = list(sig.parameters.values())
+                if len(params) == 1 and params[0].name == "viewer":
+                    widget = func(self.viewer)
+                elif len(params) == 0:
+                    widget = func()
+                else:
+                    show_error_dialog(
+                        f"Function {item.text()} expected input when none was given.",
+                        raise_exception=True,
+                        topostats_error=True,
+                    )
+                # pylint: disable=used-before-assignment
+                self.viewer.window.add_dock_widget(widget, name=item.text())
+                self.docked_functions[item.text()] = widget
+                return
             widget = self.get_widget_from_function(item.text())
             for param in widget:
                 if param.name != "call_button":
                     self.viewer.window.add_dock_widget(widget, name=item.text())
                     self.docked_functions[item.text()] = widget
                     break
-        elif not is_valid_widget(self.docked_functions[item.text()]) or not is_visible_widget(
-            self.docked_functions[item.text()]
-        ):
 
-            # Widget exists in dict but is deleted or not visible - recreate it
-            widget = self.get_widget_from_function(item.text())
-
-            # Try to destroy the old widget if it still exists
-            try:
-                if hasattr(self.docked_functions[item.text()], "native"):
-                    self.docked_functions[item.text()].native.destroy()
-            except RuntimeError:
-                # Already deleted, that's fine
-                pass
-
-            # Add the new widget
-            self.viewer.window.add_dock_widget(widget, name=item.text())
-            self.docked_functions[item.text()] = widget
-        else:
-            widget = self.docked_functions[item.text()]
+        widget = self.docked_functions[item.text()]
+        if self.functions[item.text()].overide_get_widget:
+            return
 
         if item.text() not in RUN_IMMEDIATELY_EXEMPTIONS:
             # If the function is not in the RUN_IMMEDIATELY_EXEMPTIONS list, run it with the appropriate parameters,

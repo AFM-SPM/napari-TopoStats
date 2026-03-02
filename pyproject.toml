@@ -171,3 +171,6 @@ filterwarnings = [
     "ignore::UserWarning"
 ]
 xfail_strict = true
+
+[project.entry-points."napari.manifest"]
+napari-TopoStats = "napari_topostats:napari.yaml"
