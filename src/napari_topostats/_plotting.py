@@ -72,6 +72,7 @@ class CurveViewer(QWidget):
         self.y_channel = "vDeflection"
 
         self.selected_curve_dict = None
+        self.channels_units = None
 
         self.approach_line = self.plot_widget.plot([], [], pen="y", name="approach")
         self.retract_line = self.plot_widget.plot([], [], pen="r", name="retract")
@@ -99,10 +100,12 @@ class CurveViewer(QWidget):
         """Updates the channels of the plot and refreshes curve to match"""
         if x_channel:
             self.x_channel = x_channel
-            self.plot_widget.setLabel("bottom", self.x_channel, units="m")
+            unit = self.channels_units.get(self.x_channel, "m")
+            self.plot_widget.setLabel("bottom", self.x_channel, units=unit)
         if y_channel:
             self.y_channel = y_channel
-            self.plot_widget.setLabel("left", self.y_channel, units="N")
+            unit = self.channels_units.get(self.y_channel, "N")
+            self.plot_widget.setLabel("left", self.y_channel, units=unit)
         self.update_curve()
 
     def update_segments(self, approach: bool | None = None, retract: bool | None = None):
@@ -129,6 +132,7 @@ class CurveViewer(QWidget):
         self.x_coord = coords[-1]
 
         all_curve_data = layer.metadata["force_curves"]
+        self.channels_units = layer.metadata["force_curves_units"]
 
         try:
             curve_dict = all_curve_data[self.y_coord][self.x_coord]
