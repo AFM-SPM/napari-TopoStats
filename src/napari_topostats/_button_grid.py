@@ -127,9 +127,9 @@ class ButtonGrid(QListWidget):
         self.functions = functions or {}
         for label, function in functions.items():
             if function.tooltip:
-                self.addFunctionButton(label, function.tooltip)
+                self.add_function_button(label, function.tooltip)
             else:
-                self.addFunctionButton(label)
+                self.add_function_button(label)
         with suppress(TypeError):
             self.itemClicked.disconnect()
         self.itemClicked.connect(self.add_function_as_widget)
@@ -147,6 +147,7 @@ class ButtonGrid(QListWidget):
             The item that was clicked.
         """
 
+        widget = None
         if item.text() in self.docked_functions and (
             not is_valid_widget(self.docked_functions[item.text()])
             or not is_visible_widget(self.docked_functions[item.text()])
@@ -186,8 +187,8 @@ class ButtonGrid(QListWidget):
                     self.viewer.window.add_dock_widget(widget, name=item.text())
                     self.docked_functions[item.text()] = widget
                     break
-
-        widget = self.docked_functions[item.text()]
+        if item.text() in self.docked_functions:
+            widget = self.docked_functions[item.text()]
         if self.functions[item.text()].overide_get_widget:
             return
 
@@ -229,7 +230,7 @@ class ButtonGrid(QListWidget):
             return None
         return widget
 
-    def addFunctionButton(self, label: str, tool_tip: str | None = None):
+    def add_function_button(self, label: str, tool_tip: str | None = None):
         """
         Add a button to the grid with the specified label and tooltip.
 
@@ -254,3 +255,8 @@ class ButtonGrid(QListWidget):
         Remove all items from the QListWidget.
         """
         self.clear()
+
+    def add_function(self, widget_function, label):
+        """Add a function button to the button grid"""
+        self.functions[label] = widget_function
+        self.add_function_button(label, tool_tip=widget_function.tooltip)

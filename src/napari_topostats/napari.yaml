@@ -9,6 +9,18 @@ contributions:
     - id: napari-TopoStats.make_root_widget
       python_name: napari_topostats:TopoStatsRootWidget
       title: TopoStats
+    - id: napari-TopoStats.get_reader
+      python_name: napari_topostats._reader:napari_get_reader
+      title: Open python files to run on images
   widgets:
     - command: napari-TopoStats.make_root_widget
       display_name: TopoStats
+
+  readers:
+    - command: napari-TopoStats.get_reader
+      accepts_directories: false
+      filename_patterns:
+        [
+          "*.py",
+          "*.ipynb"
+        ]

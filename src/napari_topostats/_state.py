@@ -89,3 +89,14 @@ def is_visible_widget(widget: FunctionGui | QWidget) -> bool:
     except RuntimeError:
         # C++ object has been deleted
         return False
+
+
+def set_topostats_widget(widget):
+    """Update the topostats widget"""
+    global topostats_widget  # pylint:disable=global-statement
+    topostats_widget = widget
+
+
+def get_topostats_widget():
+    """Get the topostats widget"""
+    return topostats_widget

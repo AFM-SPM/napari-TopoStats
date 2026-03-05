@@ -60,7 +60,7 @@ from ._io import (
     write_new_default_config,
 )
 from ._plotting import open_curve_viewer
-from ._state import MIN_TOPOSTATS_VERSION, get_running_function
+from ._state import MIN_TOPOSTATS_VERSION, get_running_function, set_topostats_widget
 from ._widget_function import WidgetFunction
 
 if parse_version(parse_version(topostats_version).base_version) < parse_version(MIN_TOPOSTATS_VERSION):
@@ -204,6 +204,7 @@ class TopoStatsRootWidget(QWidget):
 
         # Set the layout for the widget
         self.setLayout(layout)
+        set_topostats_widget(widget=self)
 
     def get_functions(self):
         """
@@ -232,3 +233,10 @@ class TopoStatsRootWidget(QWidget):
         """
 
         return get_running_function()
+
+    def add_function(self, function_to_add: WidgetFunction):
+        """Add a function to the button grid (designed for retrospective use, after loading widget)"""
+        function_name = function_to_add.name
+        display_name = function_name.replace("_", " ").title()
+        self._functions[display_name] = function_to_add
+        self.function_grid.add_function(function_to_add, label=display_name)

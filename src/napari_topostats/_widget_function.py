@@ -473,19 +473,19 @@ class WidgetFunction:
         if self.uses_config and (io.config_wrapper is None or io.full_config_container is None):
             io.load_config_impl(current_viewer(), use_default=True)
 
-        # Replace any dynamic components of the paths with actual values from the config if needed
-        flat_config = get_current_config(flat=True)
+            # Replace any dynamic components of the paths with actual values from the config if needed
+            flat_config = get_current_config(flat=True)
 
-        def lookup(match):
-            key = match.group(1)
-            if key in flat_config:
-                return str(flat_config[key])
-            return match.group(0)
+            def lookup(match):
+                key = match.group(1)
+                if key in flat_config:
+                    return str(flat_config[key])
+                return match.group(0)
 
-        for attr in ["path_to_data", "metadata_paths"]:
-            value = getattr(self, attr)
-            if isinstance(value, str):
-                setattr(self, attr, re.sub(r"<([^>]+)>", lookup, value))
+            for attr in ["path_to_data", "metadata_paths"]:
+                value = getattr(self, attr)
+                if isinstance(value, str):
+                    setattr(self, attr, re.sub(r"<([^>]+)>", lookup, value))
         # pylint: disable=too-many-nested-blocks
         try:
             # If path_to_data is not set, default to "return" or "obj" if type_class is provided
