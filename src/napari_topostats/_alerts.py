@@ -3,12 +3,10 @@
 from magicgui.widgets import FunctionGui
 from qtpy.QtCore import QTimer, Qt
 from qtpy.QtWidgets import (
-    QAbstractItemView,
     QApplication,
     QDialog,
     QHBoxLayout,
     QLabel,
-    QListWidget,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
@@ -231,6 +229,14 @@ class LoadingWidget(QWidget):
     """A semi-transparent overlay for napari viewer."""
 
     def __init__(self, viewer):
+        """
+        Initialize the loading widget and attach it to the napari viewer.
+
+        Parameters
+        ----------
+        viewer : napari.Viewer
+            The napari viewer to attach the loading widget to.
+        """
         # Parent to the main napari window so it covers everything
         super().__init__(viewer.window._qt_window)
         self.viewer = viewer
@@ -299,29 +305,3 @@ class LoadingWidget(QWidget):
         if self.parent():
             self.setGeometry(self.parent().rect())
         super().resizeEvent(event)
-
-
-class SelectionDialog(QDialog):
-    """Selection dialog to allow so list of items to be given then return selected items"""
-
-    def __init__(self, available_items, text="Select items", parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(text)
-        self.resize(300, 400)  # Width, Height
-
-        self.layout = QVBoxLayout()
-
-        self.list_widget = QListWidget()
-        self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.list_widget.addItems(available_items)
-        self.layout.addWidget(self.list_widget)
-
-        self.confirm_btn = QPushButton("Confirm")
-        self.confirm_btn.clicked.connect(self.accept)
-        self.layout.addWidget(self.confirm_btn)
-
-        self.setLayout(self.layout)
-
-    def get_selected_items(self):
-        """Helper method to return the text of the selected items."""
-        return [item.text() for item in self.list_widget.selectedItems()]

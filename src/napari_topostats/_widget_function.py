@@ -752,7 +752,7 @@ class WidgetFunction:
             show_error_dialog(f"❌ Exception in get_widget: {e}")
             raise
 
-    # pylint: disable=too-many-statements
+    # pylint: disable=too-many-statements, too-many-locals
     def render_return_value(
         self,
         return_value: Any,
@@ -783,26 +783,37 @@ class WidgetFunction:
         # Check if the return value is a numpy array
 
         if isinstance(return_value, np.ndarray):
+            # Get the scale from the original layer; default to (1, 1) if not found
+            current_scale = original.scale if original else (1, 1)
+
+            # Common metadata logic
+            base_metadata = {"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}
+            combined_metadata = base_metadata | metadata
+
             # If the return value is a binary image, add it as a labels layer
             if is_binary_image(return_value):
                 labels, num_labels = label(return_value.astype(bool))
                 label_ids = list(range(1, num_labels + 1))
                 properties = {"label_id": label_ids}
+
                 viewer.add_labels(
                     labels.astype(np.uint16),
                     name=f"{original.name} {self.function_key.title()} Mask",
                     properties=properties,
-                    metadata=({"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}) | metadata,
+                    metadata=combined_metadata,
+                    scale=current_scale,
                 )
             # If the return value is a greyscale image array, add it as an image layer
             else:
                 name = f"{original.name} {self.function_key.title()} Image"
                 name = remove_all_but_last("Image", name)
+
                 viewer.add_image(
                     return_value,
                     name=name,
                     contrast_limits=calculate_contrast_limits(return_value, percentage=0.5),
-                    metadata=({"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}) | metadata,
+                    metadata=combined_metadata,
+                    scale=current_scale,
                 )
                 viewer.dims.ndisplay = self.ndims
         elif isinstance(return_value, pd.DataFrame):

@@ -150,3 +150,27 @@ def calculate_contrast_limits(image: np.ndarray, percentage: float = 2.0) -> tup
     vmin = np.percentile(image, percentage)
     vmax = np.percentile(image, 100 - percentage)
     return vmin, vmax
+
+
+def unflatten_dict(flat: dict) -> dict:
+    """
+    Function used for reverting to the dict form where keys can correspond to dict values like json format
+
+    Parameters
+    ----------
+    flat : dict
+        The dictionary to unflatten
+
+    Returns
+    -------
+    dict
+        The unflattened dictionary
+    """
+    result = {}
+    for k, v in flat.items():
+        keys = k.split(".")
+        d = result
+        for part in keys[:-1]:
+            d = d.setdefault(part, {})
+        d[keys[-1]] = v
+    return result

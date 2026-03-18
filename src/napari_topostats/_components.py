@@ -1,0 +1,211 @@
+"""Module for containing custom and reusable gui components"""
+
+from qtpy.QtWidgets import (
+    QAbstractItemView,
+    QDialog,
+    QFrame,
+    QLabel,
+    QListWidget,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
+
+class CollapsibleBox(QWidget):
+    """
+    A widget to contain over widgets in a collapsible area
+    """
+
+    def __init__(
+        self, title: str = "", parent: QWidget | None = None, start_open: bool = False, cut_off_title: int = 0
+    ):
+        """
+        Initializes the CollapsibleBox.
+
+        Parameters
+        ----------
+        title : str, optional
+            The title of the box, by default ""
+        parent : QWidget, optional
+            The parent widget, by default None
+        start_open : bool, optional
+            Whether the box should start open, by default False
+        """
+        super().__init__(parent)
+
+        # Main layout
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
+
+        # Toggle Button (The Header)
+        self.toggle_button = QPushButton(f"   {title}")
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(start_open)
+        self.toggle_button.setStyleSheet(
+            "QPushButton { text-align: left; font-weight: bold; padding: 0.5em; border: none; }"
+            "QPushButton:hover { background-color: #555d68; }"
+        )
+        self.toggle_button.toggled.connect(self.on_toggle)
+        self.layout.addWidget(self.toggle_button)
+
+        # Content Area
+        self.content_area = QFrame()
+        self.content_layout = QVBoxLayout(self.content_area)
+        self.content_layout.setContentsMargins(10, 10, 10, 10)
+        self.layout.addWidget(self.content_area)
+
+        self.widgets_dict = {}
+        self.current_dict = {}
+
+        self.cut_off_title = cut_off_title
+
+        # Start at given state
+        self.on_toggle(start_open)
+
+    def on_toggle(self, checked: bool):
+        """
+        Set behaviour for expanding/ collapsing when clicked
+
+        Parameters
+        ----------
+        checked : bool
+            The state toggle has been changed to
+        """
+        self.content_area.setVisible(checked)
+        arrow = "▼" if checked else "▶"
+        self.toggle_button.setText(f"{arrow}  {self.toggle_button.text()[3:]}")
+
+    def add_widget(self, widget: QWidget):
+        """
+        Adds the widget to the collapsable view
+
+        Parameters
+        ----------
+        widget : QWidget
+            The widget to add
+        """
+        self.content_layout.addWidget(widget)
+
+    def add_parameter(self, name: str, value, editable: bool = False):
+        """
+        Adds a widget representing a given parameter to the collapsible box layout
+
+        Parameters
+        ----------
+        name : str
+            The name of the parameter
+        value : any
+            The value of the parameter
+        editable : bool, optional
+            Whether the parameter is editable, by default False
+        """
+        w = None
+        # Update the current dict with the new value
+        self.current_dict[name] = value
+        if isinstance(value, dict):
+            # If the value is a dict, create a new collapsible box for it
+            w = CollapsibleBox(title=name.title().replace("_", " "))
+            for k, v in value.items():
+                # Use recursion to add parameters for the nested dict to the new collapsible box
+                w.add_parameter(k, v)
+            self.widgets_dict[name] = w
+            # Add the new collapsible box widget to the layout
+            self.add_widget(w)
+
+        elif not editable:
+            # Create a simple label for the parameter and add it to the layout
+            w = QLabel(f"{name.title().replace('_', ' ')} : {value}")
+            self.add_widget(w)
+        else:
+            # TODO a full editable selector based on the type of value
+            pass
+
+    def remove_parameter(self, key: str):
+        """
+        Removes a parameter from both the gui and its instance in this object
+
+        Parameters
+        ----------
+        key : str
+            The key of the parameter to remove
+        """
+        # Remove the widget from the layout and delete it
+        self.layout.removeWidget(self.widgets_dict[key])
+        self.widgets_dict[key].deleteLater()
+        # Remove the parameter from the dictionaries
+        self.widgets_dict.pop(key)
+        self.current_dict.pop(key)
+
+    def update(self, new_dict: dict):
+        """
+        Update the current dict that the collapsible box represents
+
+        Parameters
+        ----------
+        new_dict : dict
+            The new dict to update the collapsible box with
+        """
+        # If the new dict is the same as the current dict, do nothing
+        if self.current_dict == new_dict:
+            return
+        # Remove any keys that are in the current dict but not in the new dict
+        for key in self.current_dict.keys() - new_dict.keys():
+            self.remove_parameter(key)
+        # Update existing keys and add new keys
+        for key, value in new_dict.items():
+            # Update the widget if the key already exists
+            if key in self.widgets_dict:
+                # If the value is the same as the current value, do nothing
+                if self.current_dict[key] == value:
+                    continue
+                # Update the current dict with the new value
+                self.current_dict[key] = value
+                if isinstance(value, dict):
+                    # If the item in the dict to be updated is a dict itself, use recursion to update it
+                    self.widgets_dict[key].update(value)
+                else:
+                    # If the item is not a dict, update the text of the corresponding widget
+                    self.widgets_dict[key].setText(f"{key.title().replace('_', ' ')} : {value}")
+            # Otherwise, add the new key and value as a new widget
+            else:
+                self.add_parameter(key, value)
+
+
+class SelectionDialog(QDialog):
+    """Selection dialog to allow so list of items to be given then return selected items"""
+
+    def __init__(self, available_items, text="Select items", parent=None):
+        """
+        Initializes the selection dialog.
+
+        Parameters
+        ----------
+        available_items : list
+            The list of items to display in the selection dialog.
+        text : str, optional
+            The title of the selection dialog (default is "Select items").
+        parent : QWidget, optional
+            The parent widget of the dialog (default is None).
+        """
+        super().__init__(parent)
+        self.setWindowTitle(text)
+        self.resize(300, 400)  # Width, Height
+
+        self.layout = QVBoxLayout()
+
+        self.list_widget = QListWidget()
+        self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.list_widget.addItems(available_items)
+        self.layout.addWidget(self.list_widget)
+
+        self.confirm_btn = QPushButton("Confirm")
+        self.confirm_btn.clicked.connect(self.accept)
+        self.layout.addWidget(self.confirm_btn)
+
+        self.setLayout(self.layout)
+
+    def get_selected_items(self):
+        """Helper method to return the text of the selected items."""
+        return [item.text() for item in self.list_widget.selectedItems()]

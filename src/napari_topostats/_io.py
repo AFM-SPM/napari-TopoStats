@@ -30,9 +30,13 @@ from qtpy.QtWidgets import (
 )
 from topostats import __version__ as topostats_version
 
+from napari_topostats.utils import unflatten_dict
+
 from . import _state as state
 from ._alerts import attach_status_label, show_error_dialog
+from ._components import CollapsibleBox
 
+# pylint: disable=ungrouped-imports
 try:
     from topostats.config import write_config_with_comments
 except ImportError:
@@ -50,30 +54,6 @@ full_config_container = None
 comment_descriptions = {}
 current_config_path = None
 updated_values = {}
-
-
-def _unflatten(flat: dict) -> dict:
-    """
-    Function used for reverting to the dict form where keys can correspond to dict values like json format
-
-    Parameters
-    ----------
-    flat : dict
-        The dictionary to unflatten
-
-    Returns
-    -------
-    dict
-        The unflattened dictionary
-    """
-    result = {}
-    for k, v in flat.items():
-        keys = k.split(".")
-        d = result
-        for part in keys[:-1]:
-            d = d.setdefault(part, {})
-        d[keys[-1]] = v
-    return result
 
 
 class ConfigWrapper:
@@ -129,77 +109,7 @@ class ConfigWrapper:
         dict
             The unflattened dictionary.
         """
-        return _unflatten(self.flat)
-
-
-class CollapsibleBox(QWidget):
-    """
-    A widget to contain over widgets in a collapsible area
-    """
-
-    def __init__(self, title: str = "", parent: QWidget | None = None, start_open: bool = False):
-        """
-        Initializes the CollapsibleBox.
-
-        Parameters
-        ----------
-        title : str, optional
-            The title of the box, by default ""
-        parent : QWidget, optional
-            The parent widget, by default None
-        start_open : bool, optional
-            Whether the box should start open, by default False
-        """
-        super().__init__(parent)
-
-        # Main layout
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        self.layout.setSpacing(0)
-
-        # Toggle Button (The Header)
-        self.toggle_button = QPushButton(title)
-        self.toggle_button.setCheckable(True)
-        self.toggle_button.setChecked(start_open)
-        self.toggle_button.setStyleSheet(
-            "QPushButton { text-align: left; font-weight: bold; padding: 0.5em; border: none; }"
-            "QPushButton:hover { background-color: #555d68; }"
-        )
-        self.toggle_button.toggled.connect(self.on_toggle)
-        self.layout.addWidget(self.toggle_button)
-
-        # Content Area
-        self.content_area = QFrame()
-        self.content_layout = QVBoxLayout(self.content_area)
-        self.content_layout.setContentsMargins(10, 10, 10, 10)
-        self.layout.addWidget(self.content_area)
-
-        # Start at given state
-        self.on_toggle(start_open)
-
-    def on_toggle(self, checked: bool):
-        """
-        Set behaviour for expanding/ collapsing when clicked
-
-        Parameters
-        ----------
-        checked : bool
-            The state toggle has been changed to
-        """
-        self.content_area.setVisible(checked)
-        arrow = "▼" if checked else "▶"
-        self.toggle_button.setText(f"{arrow}  {self.toggle_button.text()[3:]}")
-
-    def add_widget(self, widget: QWidget):
-        """
-        Adds the widget to the collapsable view
-
-        Parameters
-        ----------
-        widget : QWidget
-            The widget to add
-        """
-        self.content_layout.addWidget(widget)
+        return unflatten_dict(self.flat)
 
 
 def should_use_line_edit_for_float(value: float) -> bool:
@@ -291,7 +201,7 @@ def build_dynamic_widget(
     else:
         title = running_reference.split(".")[-1].replace("_", " ").upper()
 
-        container = CollapsibleBox(title=f"   {title}", start_open=running_reference in START_OPEN)
+        container = CollapsibleBox(title=title, start_open=running_reference in START_OPEN)
 
     for key, value in config_to_display.items():
 
@@ -628,7 +538,7 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> dict[
 
                 if comment_text is not None and final_key_for_map:
                     comment_map[final_key_for_map] = comment_text.strip()
-    return _unflatten(comment_map)
+    return unflatten_dict(comment_map)
 
 
 def create_info_icon(tooltip_text: str) -> QToolButton:
