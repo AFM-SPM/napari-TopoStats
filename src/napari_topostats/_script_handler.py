@@ -4,7 +4,7 @@ import importlib.util
 import inspect
 from pathlib import Path
 
-from ._alerts import SelectionDialog
+from ._components import SelectionDialog
 from ._state import get_topostats_widget
 from ._widget_function import WidgetFunction
 
@@ -61,12 +61,16 @@ def load_functions_from_file(file_path):
     for name, obj in inspect.getmembers(module):
         if inspect.isfunction(obj) and getattr(obj, "__module__", None) == module.__name__ and not name.startswith("_"):
             sig = inspect.signature(obj)
+            valid_func = True
             for param_name, param in sig.parameters.items():
-                if (
+                if not (
                     param_name in ALLOWABLE_PARAMETERS
                     or param.default is not inspect.Parameter.empty
                     or param.annotation in [int, str, float, bool]
                 ):
-                    extracted_functions[name] = obj
+                    valid_func = False
+                    break
+            if valid_func:
+                extracted_functions[name] = obj
 
     return extracted_functions

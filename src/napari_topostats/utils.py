@@ -1,12 +1,10 @@
 """Contains functions surrounding utilities and cosmetics."""
 
 import copy
+from typing import Any
 
 import numpy as np
-import pandas as pd
-from napari.layers import Labels
 from napari.types import ImageData
-from topostats.grainstats import GrainStats
 
 
 # ------- Misc -------
@@ -54,85 +52,6 @@ def afm2stack(
     return output
 
 
-def grainstats(image: Labels):
-    """Function used for running topostats grainstats function on a labels layer"""
-    cfg = image.metadata["config"]["grainstats"]
-    cfg.pop("run")
-    cfg.pop("class_names")
-    topostats_object = image.metadata["topostats_object"]
-    stats = GrainStats(
-        topostats_object,
-        base_output_dir="grains",
-        **cfg,
-    )
-    stats.calculate_stats()
-    df = get_grainstats_df(stats)
-
-    # Get scaling factors from metadata
-
-    # Convert centre coordinates back to pixels if they exist
-    if "centre_x" in df.columns and "centre_y" in df.columns:
-        pixel_to_nm_scaling = image.metadata.get("px2nm", 1.0)
-        metre_scaling_factor = image.metadata.get("metre_scaling_factor", 1e-9)
-        length_scaling_factor = pixel_to_nm_scaling * metre_scaling_factor
-        df["centre_x_px"] = df["centre_x"] / length_scaling_factor
-        df["centre_y_px"] = df["centre_y"] / length_scaling_factor
-
-        return df
-
-    return df
-
-
-def get_grainstats_df(stats) -> pd.DataFrame:
-    """
-    Reconstructs the 'grainstats' DataFrame from the nested
-    grain_crops.stats attributes.
-    """
-    rows = []
-
-    # 1. Check if grains exist
-    if not stats.grain_crops:
-        # Return empty DF with expected columns if no grains (optional, mimics old behavior)
-        return pd.DataFrame()
-
-    # Iterate through the nested structure
-    for grain_index, grain_crop in stats.grain_crops.items():
-
-        # Skip if stats haven't been calculated yet
-        if not hasattr(grain_crop, "stats") or not grain_crop.stats:
-            continue
-
-        for class_index, subgrains in grain_crop.stats.items():
-            for subgrain_index, stats_dict in subgrains.items():
-
-                # Create a copy of the stats to avoid modifying the object
-                row = stats_dict.copy()
-
-                # Inject the ID columns
-                row["grain_number"] = grain_index
-                row["class_number"] = class_index
-                row["subgrain_number"] = subgrain_index
-
-                # Handle Image Name
-                if hasattr(stats.topostats_object, "filename"):
-                    row["image"] = stats.topostats_object.filename
-                elif hasattr(stats.topostats_object, "image_name"):
-                    row["image"] = stats.topostats_object.image_name
-                    print("Using image_name")
-                else:
-                    row["image"] = "unknown"
-
-                # Handle 'threshold'
-                if hasattr(stats.topostats_object, "direction"):
-                    row["threshold"] = stats.topostats_object.direction
-
-                rows.append(row)
-
-    # Create DataFrame
-    df = pd.DataFrame(rows)
-    return df
-
-
 def calculate_contrast_limits(image: np.ndarray, percentage: float = 2.0) -> tuple[float, float]:
     """
     Calculate contrast limits for an image using the 2nd and 98th percentiles.
@@ -174,3 +93,136 @@ def unflatten_dict(flat: dict) -> dict:
             d = d.setdefault(part, {})
         d[keys[-1]] = v
     return result
+
+
+# pylint: disable=too-many-branches
+def _eval(obj: Any, string: str) -> Any:
+    """
+    Evaluate a path string on an object to access its attributes or subscripts. For example, given a list `lst`, the
+    string "lst[0].name" would return the name attribute of the first element of the list. This is done without
+    using `eval` to avoid security risks.
+
+    Parameters
+    ----------
+    obj : Any
+        The object on which to evaluate the string.
+    string : str
+        The path string to evaluate.
+
+    Returns
+    -------
+    Any
+        The result of the evaluation.
+    """
+    # Remove spaces from the string for easier parsing
+    string = string.replace(" ", "")
+    if string == "":
+        # If the string is empty, return the object itself
+        return obj
+
+    # Handle subscript access, e.g., [0], [1:3], ['key']
+    if string[0] == "[":
+        # Find the next punctuation to determine the subscript type
+        next_punc = next_punctuation(string, 1, checking_for=",()[].")
+        if next_punc != -1 and string[next_punc] == ",":
+            # Handle tuple subscripts, e.g., [1,2]
+            axes = []
+            for i in string[1 : string.index("]", 1)].split(","):
+                if i == ":":
+                    axes.append(slice(None))
+                elif i.isdigit():
+                    axes.append(int(i))
+            subscript = tuple(axes)
+            obj = obj[subscript]
+        else:
+            # Handle single index or key, e.g., [0] or ['key']
+            subscript = string[1 : string.index("]", 1)]
+            if subscript.isdigit():
+                obj = obj[int(subscript)]
+            else:
+                key = subscript.replace("'", "").replace('"', "")
+                obj = obj[key]
+        # Recursively evaluate the remaining string
+        remaining = string[string.index("]", 1) + 1 :]
+        return _eval(obj, remaining)
+
+    # Handle attribute access or method calls, e.g., .attr or .method()
+    if string[0] == ".":
+        index = next_punctuation(string, 1)
+        if index == -1:
+            # No further punctuation, just get the attribute
+            attr = string[1:]
+            if hasattr(obj, attr):
+                return getattr(obj, attr)
+            raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{attr}'")
+
+        if string[index] == "(":
+            # Handle method call, e.g., .method(args)
+            func_name = string[1:index]
+            if hasattr(obj, func_name):
+                func = getattr(obj, func_name)
+                args_str = string[index + 1 : string.index(")", index + 1)]
+                args = [arg.strip() for arg in args_str.split(",") if arg.strip()]
+                result = func(*args)
+                remaining = string[string.index(")", index + 1) + 1 :]
+                # Recursively evaluate the remaining string
+                return _eval(result, remaining)
+            raise AttributeError(f"'{type(obj).__name__}' object has no callable '{func_name}'")
+
+        # Otherwise, handle attribute access followed by more operations
+        attr = string[1:index]
+        if hasattr(obj, attr):
+            obj = getattr(obj, attr)
+        else:
+            raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{attr}'")
+        remaining = string[index:]
+        # Recursively evaluate the remaining string
+        return _eval(obj, remaining)
+
+    # If the string does not start with '[' or '.', return the object
+    return obj
+
+
+def next_punctuation(s: str, start: int = 0, checking_for: str = ".([") -> int:
+    """Find the next punctuation character in a string."""
+    for i in range(start, len(s)):
+        if s[i] in checking_for:
+            return i
+    return -1
+
+
+def is_binary_image(arr: np.ndarray) -> bool:
+    """Check if the array is a binary image (0s and 1s or 0s and 255s).
+    Parameters
+    ----------
+    arr : np.ndarray
+        The array to check.
+    Returns
+    -------
+    bool
+        True if the array is a binary image, False otherwise.
+    """
+    unique_vals = np.unique(arr)
+    # Check if unique values are subset of {0,1,255}
+    return set(unique_vals).issubset({0, 1, 255})
+
+
+def remove_all_but_last(word: str, text: str) -> str:
+    """Remove all occurrences of 'word' in 'text' except the last one.
+
+    Parameters
+    ----------
+    word : str
+        The word to remove.
+    text : str
+        The text from which to remove the word.
+
+    Returns
+    -------
+    str
+        The text with all occurrences of the word removed except the last one.
+    """
+    parts = text.rsplit(word, maxsplit=1)
+    if len(parts) == 1:
+        return text  # word not found or only once
+    return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return

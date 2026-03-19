@@ -832,3 +832,46 @@ def get_topostats_default_config():
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
     return config
+
+
+def add_values_to_dict_from_config(
+    config: dict[str, Any],
+    wrapper: ConfigWrapper,
+    function_key: str,
+    args: dict[str, Any],
+    params: list,
+):
+    """
+    Add values from the config to the args dictionary based on the function key and parameters.
+    This function checks if the parameters are present in the config and adds them to the args dictionary.
+
+    Parameters
+    ----------
+    config : dict[str, Any]
+        The configuration dictionary containing the function parameters.
+    wrapper : ConfigWrapper
+        The ConfigWrapper instance used to access flattened configuration values.
+    function_key : str
+        The key for the function in the configuration dictionary.
+    args : dict[str, Any]
+        The current dictionary of arguments to which the configuration values will be added.
+    params : list
+        The list of parameter names for the function.
+
+    Returns
+    -------
+    args : dict[str, Any]
+        The updated dictionary of arguments with values from the config added.
+    """
+    for param_name in [p.name for p in params]:
+        if param_name in config:
+            args[param_name] = config[param_name]
+
+        for flat_key, flat_val in wrapper.flat.items():
+            if flat_key.startswith(f"{function_key}.") and flat_key[len(f"{function_key}.") :] == param_name:
+                args[param_name] = flat_val
+                break
+        # Is this not redundant?
+        if param_name in config and isinstance(config[param_name], dict):
+            args[param_name] = config[param_name]
+    return args

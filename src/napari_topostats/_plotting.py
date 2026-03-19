@@ -196,17 +196,40 @@ class CurveViewer(QWidget):
         self.update_curve()
 
     def extract_curve(self, viewer, event):
-        """This runs every time the user clicks the mouse in the viewer."""
+        """Generator that runs when the user clicks and drags the mouse in the viewer."""
+        # 1. ON MOUSE PRESS
         if "Shift" not in event.modifiers:
             return
 
+        # Trigger the initial plot on click
+        self._process_event_coords(viewer, event)
+
+        yield  # Yield control back to napari to wait for drag events
+
+        # 2. ON MOUSE DRAG
+        while event.type == "mouse_move":
+            # Optional: stop tracking if the user lets go of Shift while dragging
+            if "Shift" not in event.modifiers:
+                break
+
+            # Trigger the plot update for the new coordinates
+            self._process_event_coords(viewer, event)
+            yield
+
+    def _process_event_coords(self, viewer, event):
+        """The core logic to extract and plot the curve at the current mouse position."""
         layer = viewer.layers.selection.active
         if layer is None or "force_curves" not in layer.metadata:
             self.info_label.setText("No force curves found in active layer.")
             return
 
         # Get click coordinates and convert to integers
-        coords = np.round(event.position).astype(int)
+        coords = np.round(layer.world_to_data(event.position)).astype(int)
+
+        # Prevent redundant updates if the mouse moves but stays within the same integer pixel
+        if coords[-2] == self.y_coord and coords[-1] == self.x_coord:
+            return
+
         self.y_coord = coords[-2]
         self.x_coord = coords[-1]
         shape_x = layer.data.shape[-1]
@@ -219,9 +242,9 @@ class CurveViewer(QWidget):
         try:
             self.metadata = {
                 "global": raw_metadata["top_level"],
-                f"curve_{curve_num}": raw_metadata["curves"][curve_num],
-                f"curve_{curve_num}_approach": raw_metadata["segments"][curve_num * 2],
-                f"curve_{curve_num}_retract": raw_metadata["segments"][curve_num * 2 + 1],
+                f"curve_{curve_num}": raw_metadata["curves"][self.y_coord][self.x_coord],
+                f"curve_{curve_num}_approach": raw_metadata["segments"][self.y_coord][self.x_coord][0],
+                f"curve_{curve_num}_retract": raw_metadata["segments"][self.y_coord][self.x_coord][1],
             }
             if self.parameter_dialog is not None:
                 self.parameter_dialog.populate_parameters(self.metadata)

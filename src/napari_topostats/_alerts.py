@@ -305,3 +305,48 @@ class LoadingWidget(QWidget):
         if self.parent():
             self.setGeometry(self.parent().rect())
         super().resizeEvent(event)
+
+
+def construct_error_args(
+    e: Exception = None,
+    message: str = None,
+    raise_exception: bool = False,
+    topostats_error: bool = False,
+    type_class=None,
+) -> dict:
+    """
+    Construct a dictionary of error arguments.
+
+    Parameters
+    ----------
+    e : Exception, optional
+        The exception that was caught (default is None).
+    message : str, optional
+        A custom error message to display (default is None). If None, a message will be constructed from the exception.
+    raise_exception : bool, optional
+        Whether to raise the exception after constructing the error arguments (default is False).
+    topostats_error : bool, optional
+        Whether the error is specific to Topostats (default is False).
+    type_class : type, optional
+        The class type associated with the error (default is None).
+
+    Returns
+    -------
+    dict
+        A dictionary containing the error arguments.
+    """
+    error_args = {}
+    if message is not None:
+        error_args["message"] = message
+    else:
+        if topostats_error:
+            if type_class:
+                error_args["message"] = f"Topostats is failing with {type_class.__name__}: {e.__class__} {e}."
+            else:
+                error_args["message"] = f"Topostats is failing with: {e.__class__} {e}."
+        else:
+            error_args["message"] = f"An error occurred: {e.__class__} {e}."
+    error_args["raise_exception"] = raise_exception
+    error_args["topostats_error"] = topostats_error
+    error_args["exception"] = e
+    return error_args

@@ -1,5 +1,8 @@
 """Module for containing custom and reusable gui components"""
 
+import dask.array as da
+import numpy as np
+from napari.layers import Image, Labels
 from qtpy.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -10,6 +13,8 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from ._alerts import show_error_dialog
 
 
 class CollapsibleBox(QWidget):
@@ -209,3 +214,72 @@ class SelectionDialog(QDialog):
     def get_selected_items(self):
         """Helper method to return the text of the selected items."""
         return [item.text() for item in self.list_widget.selectedItems()]
+
+
+# TODO: This function really gets currently selected layer not image
+def get_selected_image(viewer, of_type: list = None) -> Image | None:
+    """
+    Get the currently selected image layer from the viewer.
+
+    Parameters
+    ----------
+    viewer : Viewer
+        The napari viewer instance from which to get the selected image layer.
+
+    Returns
+    -------
+    Image | None
+        The selected image layer, or None if no layer is selected.
+    """
+    selected = list(viewer.layers.selection)
+
+    if not selected:
+        show_error_dialog("No layer selected. Select a layer ")
+        return None
+    layer = selected[0]
+    if of_type is not None and layer.__class__ not in of_type:
+        pretty_types = [t.__name__ for t in of_type]
+        show_error_dialog(
+            f"Selected layer is not of a required type: {', '.join(pretty_types)}.",
+            raise_exception=False,
+        )
+        return None
+    if isinstance(layer, Image):
+        data = layer.data
+        if isinstance(data, (np.ndarray, da.Array)):  # conforms to ImageData
+            return layer
+        show_error_dialog("Layer data is not valid ImageData.", raise_exception=True)
+    elif isinstance(layer, Labels):
+        return layer
+    return None
+
+
+def get_selected_curves(viewer) -> list | None:
+    """
+    Get the currently selected curves from the viewer.
+    This assumes that the curves are stored in the metadata of the selected layer under the key "force_curves".
+
+    Parameters
+    ----------
+    viewer : Viewer
+        The napari viewer instance from which to get the selected curves.
+
+    Returns
+    -------
+    list | None
+        The selected curves, or None if no layer is selected or if the selected layer does not have curves
+        in its metadata.
+    """
+    selected = list(viewer.layers.selection)
+
+    if not selected:
+        show_error_dialog("No layer selected. Select a layer ")
+        return None
+    layer = selected[0]
+
+    if "force_curves" not in layer.metadata:
+        show_error_dialog("Selected layer does not contain curves", raise_exception=True)
+        return None
+    curves = layer.metadata["force_curves"]
+
+    return curves

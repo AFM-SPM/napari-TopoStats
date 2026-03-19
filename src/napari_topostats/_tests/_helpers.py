@@ -12,7 +12,7 @@ from napari_afmreader._reader import reader_function
 from pytestqt.qtbot import QtBot
 from qtpy.QtCore import Qt
 
-from napari_topostats._widget import AVAILABLE_FUNCTIONS, TopoStatsRootWidget
+from napari_topostats._widget import TOPOSTATS_FUNCTIONS, TopoStatsRootWidget
 
 
 def load_test_image(napari_viewer: Viewer, image_path: str | Path) -> Image | None:
@@ -63,7 +63,7 @@ def run_functions_in_grid(
         Names of functions to run in the function grid.
     """
     if functions_to_run == ["all"]:
-        functions_to_run = [f.name for f in AVAILABLE_FUNCTIONS]
+        functions_to_run = [f.name for f in TOPOSTATS_FUNCTIONS]
         functions_to_run.remove("load_config")
     button_grid = topostats_widget.function_grid
 

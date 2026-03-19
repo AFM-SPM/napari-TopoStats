@@ -35,6 +35,7 @@ if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() 
     loading_spinner.start()
     QApplication.processEvents()
 
+from forcestats.contact import find_contact_point
 from napari.layers import Image, Labels
 from napari.viewer import Viewer
 from packaging.version import parse as parse_version
@@ -43,25 +44,25 @@ from topostats import __version__ as topostats_version
 from topostats.filters import Filters
 from topostats.grains import Grains
 
-from napari_topostats.utils import (
-    afm2stack,
-    grainstats,
-)
-
 if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() is not None:
     loading_spinner.stop()
 
-from ._alerts import show_error_dialog
-from ._batch_process import batch_process
-from ._button_grid import ButtonGrid
-from ._io import (
+
+from napari_topostats._alerts import show_error_dialog
+from napari_topostats._batch_process import batch_process
+from napari_topostats._button_grid import ButtonGrid
+from napari_topostats._grainstats import grainstats
+from napari_topostats._io import (
     load_config,
     load_config_impl,
     write_new_default_config,
 )
-from ._plotting import open_curve_viewer
-from ._state import MIN_TOPOSTATS_VERSION, get_running_function, set_topostats_widget
-from ._widget_function import WidgetFunction
+from napari_topostats._plotting import open_curve_viewer
+from napari_topostats._state import MIN_TOPOSTATS_VERSION, get_running_function, set_topostats_widget
+from napari_topostats._widget_function import WidgetFunction
+from napari_topostats.utils import (
+    afm2stack,
+)
 
 if parse_version(parse_version(topostats_version).base_version) < parse_version(MIN_TOPOSTATS_VERSION):
     show_error_dialog(
@@ -79,7 +80,7 @@ if parse_version(parse_version(topostats_version).base_version) < parse_version(
 # Attributes from the config can be dynamically inserted into path_to_data or metadata_paths using the syntax
 # <config_category.attribute> (this will reference config["config_category"]["attribute"]).
 
-AVAILABLE_FUNCTIONS = [
+TOPOSTATS_FUNCTIONS = [
     WidgetFunction(
         name="load_config",
         tooltip="Load a configuration file to use with TopoStats functions.",
@@ -128,11 +129,21 @@ AVAILABLE_FUNCTIONS = [
         function_to_run=batch_process,
         tooltip="Batch process multiple AFM images in a selected folder using the current configuration.",
     ),
+]
+
+FORCESTATS_FUNCTIONS = [
     WidgetFunction(
         name="view_curves",
         function_to_run=open_curve_viewer,
         tooltip="Open curve window for viewing AFM curves for each point of the image",
         overide_get_widget=True,
+    ),
+    WidgetFunction(
+        name="contact_point",
+        function_key="contact_point",
+        function_to_run=find_contact_point,
+        path_to_data="return",
+        tooltip="Find the contact point for each curve in the selected image layer and create a new image map.",
     ),
 ]
 
@@ -216,7 +227,96 @@ class TopoStatsRootWidget(QWidget):
             A dictionary of function names and their corresponding WidgetFunction or FunctionGui objects.
         """
         functions = {}
-        for function in AVAILABLE_FUNCTIONS:
+        for function in TOPOSTATS_FUNCTIONS:
+            function_name = function.name
+            display_name = function_name.replace("_", " ").title()
+            functions[display_name] = function
+        return functions
+
+    def get_running_function_widget(self) -> str | None:
+        """
+        Get the name of the currently running function, if any.
+
+        Returns
+        -------
+        str | None
+            The name of the currently running function, or None if no function is running.
+        """
+
+        return get_running_function()
+
+    def add_function(self, function_to_add: WidgetFunction):
+        """Add a function to the button grid (designed for retrospective use, after loading widget)"""
+        function_name = function_to_add.name
+        display_name = function_name.replace("_", " ").title()
+        self._functions[display_name] = function_to_add
+        self.function_grid.add_function(function_to_add, label=display_name)
+
+
+class ForceStatsRootWidget(QWidget):
+    """
+    A root widget where all force stats functions can be accessed.
+    This widget serves as a container for the button grid and provides
+    a layout for the various controls.
+    """
+
+    def __init__(self, viewer: Viewer, parent=None):
+        # Initialize the widget with a viewer
+        if parent:
+            super().__init__(parent)
+        else:
+            super().__init__()
+        self._viewer = viewer
+        # Make layout so children are arranged vertically
+        layout = QVBoxLayout(self)
+        # Add the function grid to the layout with the available functions
+        self._functions = self.get_functions()
+        self.function_grid = ButtonGrid(self, functions=self._functions, viewer=self._viewer)
+        # Set the size policy to allow the widget to expand
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Set the layout margins and add the function grid
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.addWidget(self.function_grid)
+
+        # Bottom-right button row
+        bottom_row = QHBoxLayout()
+
+        # Create a container for the status label that doesn't expand
+        status_container = QWidget()
+        status_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        status_layout = QHBoxLayout(status_container)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(status_container)
+        bottom_row.addStretch()  # Push button to the right
+
+        bottom_widget = QWidget()
+        bottom_widget.setLayout(bottom_row)
+        bottom_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        # Attach status label to the status container instead of bottom_widget
+        attach_status_label(status_container)
+
+        # Store reference to status_container for the button callback
+        bottom_widget.set_status_message = status_container.set_status_message
+
+        layout.addWidget(bottom_widget)
+
+        # Set the layout for the widget
+        self.setLayout(layout)
+        set_topostats_widget(widget=self)
+
+    def get_functions(self):
+        """
+        Get the available functions for the button grid.
+
+        Returns
+        -------
+        functions : dict[str, WidgetFunction | FunctionGui]
+            A dictionary of function names and their corresponding WidgetFunction or FunctionGui objects.
+        """
+        functions = {}
+        for function in FORCESTATS_FUNCTIONS:
             function_name = function.name
             display_name = function_name.replace("_", " ").title()
             functions[display_name] = function
