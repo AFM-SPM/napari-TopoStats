@@ -148,7 +148,95 @@ FORCESTATS_FUNCTIONS = [
 ]
 
 
-class TopoStatsRootWidget(QWidget):
+class RootWidget(QWidget):
+    """
+    A root widget where all force stats functions can be accessed.
+    This widget serves as a container for the button grid and provides
+    a layout for the various controls.
+    """
+
+    def __init__(self, viewer: Viewer, functions: dict[str, WidgetFunction], parent=None):
+        # Initialize the widget with a viewer
+        if parent:
+            super().__init__(parent)
+        else:
+            super().__init__()
+        self._viewer = viewer
+        # Make layout so children are arranged vertically
+        self.vlayout = QVBoxLayout(self)
+        # Add the function grid to the layout with the available functions
+        self._functions = self.get_functions(functions)
+        self.function_grid = ButtonGrid(self, functions=self._functions, viewer=self._viewer)
+        # Set the size policy to allow the widget to expand
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Set the layout margins and add the function grid
+        self.vlayout.setContentsMargins(5, 5, 5, 5)
+        self.vlayout.addWidget(self.function_grid)
+
+        # Bottom-right button row
+        self.bottom_row = QHBoxLayout()
+
+        # Create a container for the status label that doesn't expand
+        status_container = QWidget()
+        status_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        status_layout = QHBoxLayout(status_container)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        self.vlayout.addWidget(status_container)
+        self.bottom_row.addStretch()  # Push button to the right
+
+        self.bottom_widget = QWidget()
+        self.bottom_widget.setLayout(self.bottom_row)
+        self.bottom_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        # Attach status label to the status container instead of bottom_widget
+        attach_status_label(status_container)
+
+        # Store reference to status_container for the button callback
+        self.bottom_widget.set_status_message = status_container.set_status_message
+
+        self.vlayout.addWidget(self.bottom_widget)
+
+        # Set the layout for the widget
+        self.setLayout(self.vlayout)
+
+    def get_functions(self, _functions: dict[str, WidgetFunction]):
+        """
+        Get the available functions for the button grid.
+
+        Returns
+        -------
+        functions : dict[str, WidgetFunction | FunctionGui]
+            A dictionary of function names and their corresponding WidgetFunction or FunctionGui objects.
+        """
+        functions = {}
+        for function in _functions:
+            function_name = function.name
+            display_name = function_name.replace("_", " ").title()
+            functions[display_name] = function
+        return functions
+
+    def get_running_function_widget(self) -> str | None:
+        """
+        Get the name of the currently running function, if any.
+
+        Returns
+        -------
+        str | None
+            The name of the currently running function, or None if no function is running.
+        """
+
+        return get_running_function()
+
+    def add_function(self, function_to_add: WidgetFunction):
+        """Add a function to the button grid (designed for retrospective use, after loading widget)"""
+        function_name = function_to_add.name
+        display_name = function_name.replace("_", " ").title()
+        self._functions[display_name] = function_to_add
+        self.function_grid.add_function(function_to_add, label=display_name)
+
+
+class TopoStatsRootWidget(RootWidget):
     """
     A root widget where all topostats functions can be accessed.
     This widget serves as a container for the button grid and provides
@@ -158,32 +246,9 @@ class TopoStatsRootWidget(QWidget):
     def __init__(self, viewer: Viewer, parent=None):
         # Initialize the widget with a viewer
         if parent:
-            super().__init__(parent)
+            super().__init__(viewer=viewer, parent=parent, functions=TOPOSTATS_FUNCTIONS)
         else:
-            super().__init__()
-        self._viewer = viewer
-        # Make layout so children are arranged vertically
-        layout = QVBoxLayout(self)
-        # Add the function grid to the layout with the available functions
-        self._functions = self.get_functions()
-        self.function_grid = ButtonGrid(self, functions=self._functions, viewer=self._viewer)
-        # Set the size policy to allow the widget to expand
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        # Set the layout margins and add the function grid
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.addWidget(self.function_grid)
-
-        # Bottom-right button row
-        bottom_row = QHBoxLayout()
-
-        # Create a container for the status label that doesn't expand
-        status_container = QWidget()
-        status_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
-        status_layout = QHBoxLayout(status_container)
-        status_layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(status_container)
-        bottom_row.addStretch()  # Push button to the right
+            super().__init__(viewer=viewer, functions=TOPOSTATS_FUNCTIONS)
 
         reset_button = QPushButton("Reset Default Config")
         reset_button.setToolTip("Reset the default configuration to the original TopoStats default.")
@@ -194,66 +259,17 @@ class TopoStatsRootWidget(QWidget):
             if default_config_path.exists():
                 write_new_default_config(default_config_path)
                 load_config_impl(self._viewer, config_path=None, use_default=True)
-                bottom_widget.set_status_message("✅ Default configuration reset successfully.")
+                self.bottom_row.set_status_message("✅ Default configuration reset successfully.")
             else:
-                bottom_widget.set_status_message("No default configuration file found to reset.")
+                self.bottom_row.set_status_message("No default configuration file found to reset.")
 
         reset_button.clicked.connect(on_reset_clicked)
-        bottom_row.addWidget(reset_button)
+        self.bottom_row.addWidget(reset_button)
 
-        bottom_widget = QWidget()
-        bottom_widget.setLayout(bottom_row)
-        bottom_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-        # Attach status label to the status container instead of bottom_widget
-        attach_status_label(status_container)
-
-        # Store reference to status_container for the button callback
-        bottom_widget.set_status_message = status_container.set_status_message
-
-        layout.addWidget(bottom_widget)
-
-        # Set the layout for the widget
-        self.setLayout(layout)
         set_topostats_widget(widget=self)
 
-    def get_functions(self):
-        """
-        Get the available functions for the button grid.
 
-        Returns
-        -------
-        functions : dict[str, WidgetFunction | FunctionGui]
-            A dictionary of function names and their corresponding WidgetFunction or FunctionGui objects.
-        """
-        functions = {}
-        for function in TOPOSTATS_FUNCTIONS:
-            function_name = function.name
-            display_name = function_name.replace("_", " ").title()
-            functions[display_name] = function
-        return functions
-
-    def get_running_function_widget(self) -> str | None:
-        """
-        Get the name of the currently running function, if any.
-
-        Returns
-        -------
-        str | None
-            The name of the currently running function, or None if no function is running.
-        """
-
-        return get_running_function()
-
-    def add_function(self, function_to_add: WidgetFunction):
-        """Add a function to the button grid (designed for retrospective use, after loading widget)"""
-        function_name = function_to_add.name
-        display_name = function_name.replace("_", " ").title()
-        self._functions[display_name] = function_to_add
-        self.function_grid.add_function(function_to_add, label=display_name)
-
-
-class ForceStatsRootWidget(QWidget):
+class ForceStatsRootWidget(RootWidget):
     """
     A root widget where all force stats functions can be accessed.
     This widget serves as a container for the button grid and provides
@@ -263,80 +279,6 @@ class ForceStatsRootWidget(QWidget):
     def __init__(self, viewer: Viewer, parent=None):
         # Initialize the widget with a viewer
         if parent:
-            super().__init__(parent)
+            super().__init__(viewer=viewer, parent=parent, functions=FORCESTATS_FUNCTIONS)
         else:
-            super().__init__()
-        self._viewer = viewer
-        # Make layout so children are arranged vertically
-        layout = QVBoxLayout(self)
-        # Add the function grid to the layout with the available functions
-        self._functions = self.get_functions()
-        self.function_grid = ButtonGrid(self, functions=self._functions, viewer=self._viewer)
-        # Set the size policy to allow the widget to expand
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        # Set the layout margins and add the function grid
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.addWidget(self.function_grid)
-
-        # Bottom-right button row
-        bottom_row = QHBoxLayout()
-
-        # Create a container for the status label that doesn't expand
-        status_container = QWidget()
-        status_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
-        status_layout = QHBoxLayout(status_container)
-        status_layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(status_container)
-        bottom_row.addStretch()  # Push button to the right
-
-        bottom_widget = QWidget()
-        bottom_widget.setLayout(bottom_row)
-        bottom_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-        # Attach status label to the status container instead of bottom_widget
-        attach_status_label(status_container)
-
-        # Store reference to status_container for the button callback
-        bottom_widget.set_status_message = status_container.set_status_message
-
-        layout.addWidget(bottom_widget)
-
-        # Set the layout for the widget
-        self.setLayout(layout)
-        set_topostats_widget(widget=self)
-
-    def get_functions(self):
-        """
-        Get the available functions for the button grid.
-
-        Returns
-        -------
-        functions : dict[str, WidgetFunction | FunctionGui]
-            A dictionary of function names and their corresponding WidgetFunction or FunctionGui objects.
-        """
-        functions = {}
-        for function in FORCESTATS_FUNCTIONS:
-            function_name = function.name
-            display_name = function_name.replace("_", " ").title()
-            functions[display_name] = function
-        return functions
-
-    def get_running_function_widget(self) -> str | None:
-        """
-        Get the name of the currently running function, if any.
-
-        Returns
-        -------
-        str | None
-            The name of the currently running function, or None if no function is running.
-        """
-
-        return get_running_function()
-
-    def add_function(self, function_to_add: WidgetFunction):
-        """Add a function to the button grid (designed for retrospective use, after loading widget)"""
-        function_name = function_to_add.name
-        display_name = function_name.replace("_", " ").title()
-        self._functions[display_name] = function_to_add
-        self.function_grid.add_function(function_to_add, label=display_name)
+            super().__init__(viewer=viewer, functions=FORCESTATS_FUNCTIONS)
