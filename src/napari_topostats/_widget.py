@@ -15,6 +15,7 @@ Replace code below according to your needs.
 # ns-rse 2025-12-08 - We seem to need to allow ungrouped imports so that LoadingWidget() can be used
 # pylint: disable=ungrouped-imports
 
+import inspect
 import os
 from pathlib import Path
 
@@ -59,10 +60,12 @@ from napari_topostats._io import (
 )
 from napari_topostats._plotting import open_curve_viewer
 from napari_topostats._state import MIN_TOPOSTATS_VERSION, get_running_function, set_topostats_widget
-from napari_topostats._widget_function import WidgetFunction
+from napari_topostats._widget_function import WidgetFunction, WidgetFunctionManager
 from napari_topostats.utils import (
     afm2stack,
 )
+
+from ._script_handler import get_loaded_functions
 
 if parse_version(parse_version(topostats_version).base_version) < parse_version(MIN_TOPOSTATS_VERSION):
     show_error_dialog(
@@ -147,6 +150,8 @@ FORCESTATS_FUNCTIONS = [
     ),
 ]
 
+MAX_LOADED_FUNCTIONS = 3  # Maximum number of functions that can be loaded from external scripts to prevent overload
+
 
 class RootWidget(QWidget):
     """
@@ -166,7 +171,10 @@ class RootWidget(QWidget):
         self.vlayout = QVBoxLayout(self)
         # Add the function grid to the layout with the available functions
         self._functions = self.get_functions(functions)
-        self.function_grid = ButtonGrid(self, functions=self._functions, viewer=self._viewer)
+        self.function_manager = WidgetFunctionManager(self._functions, self._viewer)
+        self.function_grid = ButtonGrid(
+            self, functions=self._functions, viewer=self._viewer, function_manager=self.function_manager
+        )
         # Set the size policy to allow the widget to expand
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -200,7 +208,7 @@ class RootWidget(QWidget):
         # Set the layout for the widget
         self.setLayout(self.vlayout)
 
-    def get_functions(self, _functions: dict[str, WidgetFunction]):
+    def get_functions(self, _functions: dict[str, WidgetFunction | tuple[str, list[WidgetFunction]]]):
         """
         Get the available functions for the button grid.
 
@@ -228,11 +236,33 @@ class RootWidget(QWidget):
 
         return get_running_function()
 
-    def add_function(self, function_to_add: WidgetFunction):
+    def add_function(self, function_to_add: WidgetFunction, to_group: bool = False):
         """Add a function to the button grid (designed for retrospective use, after loading widget)"""
         function_name = function_to_add.name
         display_name = function_name.replace("_", " ").title()
         self._functions[display_name] = function_to_add
+        if to_group:
+            if "curve" in inspect.signature(function_to_add.function_to_run).parameters:
+                group_to_add_to = "Loaded Curve Functions"
+            else:
+                group_to_add_to = "Loaded Image Functions"
+            group_function = self._functions.get(group_to_add_to)
+            if not group_function:
+                type_of_function = (
+                    "curves" if "curve" in inspect.signature(function_to_add.function_to_run).parameters else "images"
+                )
+                group_function = WidgetFunction(
+                    name=group_to_add_to.lower().replace(" ", "_"),
+                    function_to_run=[function_to_add],
+                    tooltip=f"Functions loaded from external scripts that operate on {type_of_function}.",
+                    function_manager=self.function_manager,
+                )
+                self._functions[group_to_add_to] = group_function
+                self.function_grid.add_function(group_function, label=group_to_add_to)
+            if group_function and group_function.is_group:
+                group_function.add_to_group(function_to_add)
+                return
+
         self.function_grid.add_function(function_to_add, label=display_name)
 
 
@@ -245,10 +275,39 @@ class TopoStatsRootWidget(RootWidget):
 
     def __init__(self, viewer: Viewer, parent=None):
         # Initialize the widget with a viewer
+        available_functions = TOPOSTATS_FUNCTIONS.copy()
         if parent:
-            super().__init__(viewer=viewer, parent=parent, functions=TOPOSTATS_FUNCTIONS)
+            super().__init__(viewer=viewer, parent=parent, functions=available_functions)
         else:
-            super().__init__(viewer=viewer, functions=TOPOSTATS_FUNCTIONS)
+            super().__init__(viewer=viewer, functions=available_functions)
+        loaded_functions = get_loaded_functions()
+        extra_topostats_functions = []
+        extra_forcestats_functions = []
+        for func in loaded_functions:
+            params = inspect.signature(func.function_to_run).parameters
+            if func.name not in [f.name for f in available_functions]:
+                if "curve" in params or "curves" in params:
+                    extra_forcestats_functions.append(func)
+                else:
+                    extra_topostats_functions.append(func)
+        if extra_topostats_functions:
+            self.add_function(
+                WidgetFunction(
+                    name="loaded_image_functions",
+                    function_to_run=extra_topostats_functions,
+                    tooltip="Functions loaded from external scripts that operate on images.",
+                    function_manager=self.function_manager,
+                )
+            )
+        if extra_forcestats_functions:
+            self.add_function(
+                WidgetFunction(
+                    name="loaded_curve_functions",
+                    function_to_run=extra_forcestats_functions,
+                    tooltip="Functions loaded from external scripts that operate on curves.",
+                    function_manager=self.function_manager,
+                )
+            )
 
         reset_button = QPushButton("Reset Default Config")
         reset_button.setToolTip("Reset the default configuration to the original TopoStats default.")
@@ -267,18 +326,3 @@ class TopoStatsRootWidget(RootWidget):
         self.bottom_row.addWidget(reset_button)
 
         set_topostats_widget(widget=self)
-
-
-class ForceStatsRootWidget(RootWidget):
-    """
-    A root widget where all force stats functions can be accessed.
-    This widget serves as a container for the button grid and provides
-    a layout for the various controls.
-    """
-
-    def __init__(self, viewer: Viewer, parent=None):
-        # Initialize the widget with a viewer
-        if parent:
-            super().__init__(viewer=viewer, parent=parent, functions=FORCESTATS_FUNCTIONS)
-        else:
-            super().__init__(viewer=viewer, functions=FORCESTATS_FUNCTIONS)

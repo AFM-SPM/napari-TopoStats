@@ -5,6 +5,6 @@ try:
 except ImportError:
     __version__ = "unknown"
 
-from ._widget import ForceStatsRootWidget, TopoStatsRootWidget
+from ._widget import TopoStatsRootWidget
 
-__all__ = ("TopoStatsRootWidget", "ForceStatsRootWidget")
+__all__ = ("TopoStatsRootWidget",)

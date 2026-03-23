@@ -8,11 +8,13 @@ from ._components import SelectionDialog
 from ._state import get_topostats_widget
 from ._widget_function import WidgetFunction
 
-ALLOWABLE_PARAMETERS = ["viewer", "image"]
+loaded_functions = []
+ALLOWABLE_PARAMETERS = ["viewer", "image", "curves", "curve"]
 
 
 def load_py_files(paths, viewer):
     """Load functions from python files into the button grid"""
+    global loaded_functions  # pylint: disable=global-variable-not-assigned
     py_functions = {}
     for py_file in paths:
         py_functions.update(load_functions_from_file(py_file))
@@ -35,7 +37,21 @@ def load_py_files(paths, viewer):
                 function_to_run=func,
                 tooltip=inspect.getdoc(func),
             )
-            get_topostats_widget().add_function(widget_function)
+            topostats_widget = get_topostats_widget()
+            if topostats_widget is not None:
+                topostats_widget.add_function(widget_function, to_group=True)
+            if widget_function not in loaded_functions:
+                loaded_functions.append(widget_function)
+
+
+def fetch_saved_scripts():
+    """Fetch user saved scripts from app data and load them into the button grid"""
+    return []
+
+
+def get_loaded_functions():
+    """Get the list of currently loaded functions from python files."""
+    return loaded_functions
 
 
 def load_functions_from_file(file_path):
@@ -63,10 +79,10 @@ def load_functions_from_file(file_path):
             sig = inspect.signature(obj)
             valid_func = True
             for param_name, param in sig.parameters.items():
-                if not (
-                    param_name in ALLOWABLE_PARAMETERS
-                    or param.default is not inspect.Parameter.empty
-                    or param.annotation in [int, str, float, bool]
+                if (
+                    param_name not in ALLOWABLE_PARAMETERS
+                    and param.default is inspect.Parameter.empty
+                    and param.annotation not in [int, str, float, bool]
                 ):
                     valid_func = False
                     break

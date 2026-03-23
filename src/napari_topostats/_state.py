@@ -12,6 +12,18 @@ topostats_widget = None
 current_error_dialog = None
 MIN_TOPOSTATS_VERSION = "2.4.0"  # Oldest compatible version of topostats, should match pyproject.toml
 running_function = None  # Currently running function (None if no function is running)
+widget_manager = None  # Global instance of WidgetFunctionManager
+
+
+def get_widget_manager():
+    """Get the global widget manager instance."""
+    return widget_manager
+
+
+def set_widget_manager(manager):
+    """Set the global widget manager instance."""
+    global widget_manager  # pylint:disable=global-statement
+    widget_manager = manager
 
 
 def set_running_function(function_name: str | None):

@@ -36,8 +36,10 @@ from ._alerts import LoadingWidget, construct_error_args, show_error_dialog
 from ._components import get_selected_curves, get_selected_image
 from ._io import add_values_to_dict_from_config, get_current_config
 from ._parallel_processing import ProcessWorker
-from ._state import get_running_function, set_running_function
+from ._state import get_running_function, is_valid_widget, is_visible_widget, set_running_function
 from .utils import _eval, calculate_contrast_limits, is_binary_image, remove_all_but_last
+
+RUN_IMMEDIATELY_EXEMPTIONS = set()
 
 
 def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
@@ -191,12 +193,12 @@ class WidgetFunction:
         user hovers over the button for the function in the button grid.
     """
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-instance-attributes
     def __init__(
         self,
         name: str,
         function_key: str | None = None,
-        function_to_run: Callable | None = None,
+        function_to_run: Callable | list[Callable] | None = None,
         type_class: Any | None = None,
         path_to_data: str | None = None,
         uses_config: bool = False,
@@ -205,9 +207,11 @@ class WidgetFunction:
         metadata_paths: dict = None,
         tooltip: str | None = None,
         overide_get_widget: bool = False,
+        function_manager=None,
     ):
         self.name = name
         self.path_to_data = path_to_data
+        self.function_manager = function_manager
         if path_to_data is not None:
             self.function_key = function_key
             self.type_class = type_class
@@ -216,10 +220,29 @@ class WidgetFunction:
             self.of_type = of_type
             self.metadata_paths = metadata_paths
         self.function_to_run = function_to_run
+        if function_to_run is not None and isinstance(function_to_run, list):
+            self.is_group = True
+            self.group_functions = {f.name: f for f in function_to_run}
+
+            def func(function_name: str):
+                widget_function = self.group_functions.get(function_name)
+                self.function_manager.add_function_as_widget(function_name, widget_function)
+
+            self.function_to_run = magicgui(func, function_name={"choices": list(self.group_functions.keys())})
+        else:
+            self.is_group = False
+
         self.tooltip = tooltip
         self.overide_get_widget = overide_get_widget
         self.overide_viewer = None
-        self.function_gui = None
+        self.function_gui = self.function_to_run if isinstance(self.function_to_run, FunctionGui) else None
+
+    def add_to_group(self, widget_function):
+        """Add a widget function to the group of functions if this WidgetFunction is a group."""
+        if not self.is_group:
+            return
+        self.group_functions[widget_function.name] = widget_function
+        self.function_gui.function_name.choices = list(self.group_functions.keys())
 
     def add_overide_viewer(self, viewer: Viewer):
         """Adds an overide viewer, this is sometimes required for abstract use of the plugin such as tests"""
@@ -758,3 +781,107 @@ class WidgetFunction:
                 f"Function {self.function_key} returned an unsupported type: {type(return_value)}.",
                 topostats_error=True,
             )
+
+
+class WidgetFunctionManager:
+    """Class to manage the widget functions and their corresponding widgets in the napari viewer."""
+
+    def __init__(self, functions: dict, viewer: Viewer):
+        self.docked_functions: dict[str, QWidget] = {}
+        self.functions: dict = functions
+        self.viewer = viewer
+
+    # pylint: disable=too-many-branches
+    def add_function_as_widget(self, func_name: str, function: WidgetFunction = None):
+        """
+        Add the widget for a given function to the viewer and run the function if it is not in the
+        RUN_IMMEDIATELY_EXEMPTIONS list
+
+        Parameters
+        ----------
+        func_name : str
+            The name of the function that was clicked.
+        """
+
+        widget = None
+        if func_name in self.docked_functions and (
+            not is_valid_widget(self.docked_functions[func_name])
+            or not is_visible_widget(self.docked_functions[func_name])
+        ):
+            # Try to destroy the old widget if it still exists
+            try:
+                if hasattr(self.docked_functions[func_name], "native"):
+                    self.docked_functions[func_name].native.destroy()
+            except RuntimeError:
+                # Already deleted
+                pass
+            self.docked_functions.pop(func_name)
+
+        function = function or self.functions.get(func_name)
+        # Check if the widget is already docked and add it if not
+        if func_name not in self.docked_functions:
+            if function.overide_get_widget:
+                func = function.function_to_run
+                sig = inspect.signature(func)
+                params = list(sig.parameters.values())
+                if len(params) == 1 and params[0].name == "viewer":
+                    widget = func(self.viewer)
+                elif len(params) == 0:
+                    widget = func()
+                else:
+                    show_error_dialog(
+                        f"Function {func_name} expected input when none was given.",
+                        raise_exception=True,
+                        topostats_error=True,
+                    )
+                # pylint: disable=used-before-assignment
+                self.viewer.window.add_dock_widget(widget, name=func_name)
+                self.docked_functions[func_name] = widget
+                return
+            widget = function.get_function_gui()
+            for param in widget:
+                if param.name != "call_button":
+                    self.viewer.window.add_dock_widget(widget, name=func_name)
+                    self.docked_functions[func_name] = widget
+                    break
+        if func_name in self.docked_functions:
+            widget = self.docked_functions[func_name]
+        if function.overide_get_widget:
+            return
+
+        if func_name not in RUN_IMMEDIATELY_EXEMPTIONS and not function.is_group:
+            # If the function is not in the RUN_IMMEDIATELY_EXEMPTIONS list, run it with the appropriate parameters,
+            # using the selected image layer as the image parameter
+            if hasattr(widget, "image") and widget.image.value is None:
+                selected_image = get_selected_image(self.viewer)
+                if selected_image is not None:
+                    widget.image.value = selected_image
+            if hasattr(widget, "viewer"):
+                widget.viewer.value = self.viewer
+            widget()
+
+    def get_widget_from_function(self, function: WidgetFunction) -> FunctionGui | None:
+        """
+        Get the widget representation of the passed function by selecting between generating it or returning the
+        passed function if it is already a widget
+
+        Parameters
+        ----------
+        function : WidgetFunction
+            The WidgetFunction object to retrieve the widget for.
+
+        Returns
+        -------
+        FunctionGui or None
+            The widget for the function, or None if the function is not valid.
+        """
+        if isinstance(function, WidgetFunction):
+            # If the function is a WidgetFunction, get its GUI representation.
+            widget = function.get_function_gui()
+        else:
+            show_error_dialog(
+                f"Function {function.name} is not a valid WidgetFunction or FunctionGui.",
+                raise_exception=True,
+            )
+            return None
+        return widget
