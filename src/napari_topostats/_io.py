@@ -32,9 +32,9 @@ from topostats import __version__ as topostats_version
 
 from napari_topostats.utils import unflatten_dict
 
-from . import _state as state
 from ._alerts import attach_status_label, show_error_dialog
 from ._components import CollapsibleBox
+from ._state import MIN_TOPOSTATS_VERSION, get_widget_manager
 
 # pylint: disable=ungrouped-imports
 try:
@@ -42,7 +42,7 @@ try:
 except ImportError:
     show_error_dialog(
         f"TopoStats version {topostats_version} is not supported. Please install the latest version of TopoStats"
-        f"or if that fails, install version {state.MIN_TOPOSTATS_VERSION}."
+        f"or if that fails, install version {MIN_TOPOSTATS_VERSION}."
     )
 
 
@@ -372,21 +372,22 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
     if full_config_container is None:
         show_error_dialog("Failed to create full config container.")
         return False
-    if "Edit Full Config" not in state.docked_widgets:
+    widget_manager = get_widget_manager()
+    if "Edit Full Config" not in widget_manager.get_docked_widgets():
+
         # Create a button to open the config editor
         btn = QPushButton("Edit Config")
         btn.clicked.connect(open_config_editor)
-        docked = viewer.window.add_dock_widget(btn, name="Edit Full Config")
+        docked = widget_manager.add_docked_widget(btn, name="Edit Full Config")
+
         # Remove from state.docked_widgets when widget is closed
         docked.visibilityChanged.connect(
             lambda visible: (
-                state.docked_widgets.remove("Edit Full Config")
-                if not visible and "Edit Full Config" in state.docked_widgets
+                widget_manager.remove_docked_widget("Edit Full Config")
+                if not visible and "Edit Full Config" in widget_manager.get_docked_widgets()
                 else None
             )
         )
-        # Add the button to the docked widgets list so it can be accessed
-        state.docked_widgets.append("Edit Full Config")
 
     return True
 

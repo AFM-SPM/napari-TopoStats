@@ -82,7 +82,7 @@ def load_functions_from_file(file_path):
                 if (
                     param_name not in ALLOWABLE_PARAMETERS
                     and param.default is inspect.Parameter.empty
-                    and param.annotation not in [int, str, float, bool]
+                    and param.annotation not in [int, str, float, bool, Path]
                 ):
                     valid_func = False
                     break

@@ -1,10 +1,15 @@
 """Module for containing custom and reusable gui components"""
 
+# pylint:disable=too-many-positional-arguments
+
 import dask.array as da
 import numpy as np
 from napari.layers import Image, Labels
+from qtpy.QtCore import Qt
+from qtpy.QtGui import QStandardItem, QStandardItemModel
 from qtpy.QtWidgets import (
     QAbstractItemView,
+    QComboBox,
     QDialog,
     QFrame,
     QLabel,
@@ -216,6 +221,96 @@ class SelectionDialog(QDialog):
         return [item.text() for item in self.list_widget.selectedItems()]
 
 
+class SelectionDropdown(QComboBox):
+    """A dropdown with checkable items to allow multiple selection"""
+
+    def __init__(
+        self,
+        items: list,
+        parent: QWidget = None,
+        type_text: str = "items",
+        starting_items: list = None,
+        on_change: callable = None,
+    ):
+        """
+        Initializes the SelectionDropdown.
+
+        Parameters
+        ----------
+        items : list
+            The list of items to display in the dropdown.
+        parent : QWidget, optional
+            The parent widget of the dropdown (default is None).
+        type_text : str, optional
+            The type of items being displayed (default is "items").
+        starting_items : list, optional
+            The list of items that should be initially checked (default is None).
+        on_change : callable, optional
+            A callback function to be called when the selection changes (default is None).
+        """
+
+        super().__init__(parent)
+        self.type_text = type_text
+        self.on_change = on_change
+        starting_items = starting_items or []
+
+        # Make it editable so we can display the selected text in the line edit
+        self.setEditable(True)
+        self.lineEdit().setReadOnly(True)
+        self.lineEdit().setText(f"Loading {self.type_text}...")
+
+        self.model = QStandardItemModel(self)
+        self.setModel(self.model)
+
+        # Add checkable items
+        for text in items:
+            item = QStandardItem(text)
+            item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            item.setData(Qt.Checked if text in starting_items else Qt.Unchecked, Qt.CheckStateRole)
+            self.model.appendRow(item)
+
+        self.update_text()
+        # Update the text when a box is checked/unchecked
+        self.model.itemChanged.connect(self.on_selection_change)
+
+    def on_selection_change(self):
+        """
+        Handle changes in selection and update the displayed text accordingly.
+        """
+        if self.on_change:
+            self.on_change(self.get_checked_items())
+        self.update_text()
+
+    def update_text(self):
+        """
+        Update the text displayed in the line edit based on the current selection.
+        """
+        checked = self.get_checked_items()
+        if len(checked) == 0:
+            self.lineEdit().setText(f"No {self.type_text} selected")
+        elif len(checked) < 4:
+            self.lineEdit().setText(f"{', '.join(checked)}")
+        else:
+            self.lineEdit().setText(
+                f"{len(checked)} {self.type_text} selected" if checked else f"No {self.type_text} selected"
+            )
+
+    def get_checked_items(self):
+        """
+        Return a list of the currently checked items.
+
+        Returns
+        -------
+        list
+            A list of the currently checked items.
+        """
+        return [
+            self.model.item(i).text()
+            for i in range(self.model.rowCount())
+            if self.model.item(i).checkState() == Qt.Checked
+        ]
+
+
 # TODO: This function really gets currently selected layer not image
 def get_selected_image(viewer, of_type: list = None) -> Image | None:
     """
@@ -280,6 +375,10 @@ def get_selected_curves(viewer) -> list | None:
     if "force_curves" not in layer.metadata:
         show_error_dialog("Selected layer does not contain curves", raise_exception=True)
         return None
+
+    # TODO add the ability to load all the curves in one go here
     curves = layer.metadata["force_curves"]
+    if hasattr(curves, "load_all_curves"):
+        curves = curves.load_all_curves()
 
     return curves

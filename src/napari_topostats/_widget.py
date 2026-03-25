@@ -1,4 +1,5 @@
 # pylint: disable=wrong-import-order, wrong-import-position, ungrouped-imports
+# ruff: noqa: E402
 
 """
 This module contains the root napari widget which is used for accessing the various functions this plugin provides.
@@ -23,6 +24,7 @@ from napari import current_viewer  # pylint: disable=no-name-in-module
 from qtpy.QtWidgets import (
     QApplication,
     QHBoxLayout,
+    QLabel,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
@@ -58,8 +60,8 @@ from napari_topostats._io import (
     load_config_impl,
     write_new_default_config,
 )
-from napari_topostats._plotting import open_curve_viewer
-from napari_topostats._state import MIN_TOPOSTATS_VERSION, get_running_function, set_topostats_widget
+from napari_topostats._plotting import open_curve_viewer, start_drawing
+from napari_topostats._state import MIN_TOPOSTATS_VERSION, WidgetManager, get_running_function, set_topostats_widget
 from napari_topostats._widget_function import WidgetFunction, WidgetFunctionManager
 from napari_topostats.utils import (
     afm2stack,
@@ -150,6 +152,7 @@ FORCESTATS_FUNCTIONS = [
     ),
 ]
 
+
 MAX_LOADED_FUNCTIONS = 3  # Maximum number of functions that can be loaded from external scripts to prevent overload
 
 
@@ -167,11 +170,14 @@ class RootWidget(QWidget):
         else:
             super().__init__()
         self._viewer = viewer
+        # Setup the key binding for the line tool to allow users to draw a line and view the profile
+        self._viewer.bind_key("a", start_drawing, overwrite=True)
         # Make layout so children are arranged vertically
         self.vlayout = QVBoxLayout(self)
         # Add the function grid to the layout with the available functions
         self._functions = self.get_functions(functions)
-        self.function_manager = WidgetFunctionManager(self._functions, self._viewer)
+        self.widget_manager = WidgetManager(viewer)
+        self.function_manager = WidgetFunctionManager(self._functions, self._viewer, self.widget_manager)
         self.function_grid = ButtonGrid(
             self, functions=self._functions, viewer=self._viewer, function_manager=self.function_manager
         )
@@ -275,7 +281,7 @@ class TopoStatsRootWidget(RootWidget):
 
     def __init__(self, viewer: Viewer, parent=None):
         # Initialize the widget with a viewer
-        available_functions = TOPOSTATS_FUNCTIONS.copy()
+        available_functions = TOPOSTATS_FUNCTIONS.copy() + FORCESTATS_FUNCTIONS.copy()
         if parent:
             super().__init__(viewer=viewer, parent=parent, functions=available_functions)
         else:
@@ -324,5 +330,11 @@ class TopoStatsRootWidget(RootWidget):
 
         reset_button.clicked.connect(on_reset_clicked)
         self.bottom_row.addWidget(reset_button)
+
+        # Add a text label to tell the user they can press 'a' to open the curve viewer and use the line tool
+        line_tool_label = QLabel("Hold 'a' to draw a line and view the profile plot")
+        line_tool_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        line_tool_label.setWordWrap(True)
+        self.bottom_row.addWidget(line_tool_label)
 
         set_topostats_widget(widget=self)

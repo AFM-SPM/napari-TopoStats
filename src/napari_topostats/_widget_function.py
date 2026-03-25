@@ -36,7 +36,7 @@ from ._alerts import LoadingWidget, construct_error_args, show_error_dialog
 from ._components import get_selected_curves, get_selected_image
 from ._io import add_values_to_dict_from_config, get_current_config
 from ._parallel_processing import ProcessWorker
-from ._state import get_running_function, is_valid_widget, is_visible_widget, set_running_function
+from ._state import WidgetManager, get_running_function, set_running_function
 from .utils import _eval, calculate_contrast_limits, is_binary_image, remove_all_but_last
 
 RUN_IMMEDIATELY_EXEMPTIONS = set()
@@ -786,10 +786,11 @@ class WidgetFunction:
 class WidgetFunctionManager:
     """Class to manage the widget functions and their corresponding widgets in the napari viewer."""
 
-    def __init__(self, functions: dict, viewer: Viewer):
-        self.docked_functions: dict[str, QWidget] = {}
+    def __init__(self, functions: dict, viewer: Viewer, widget_manager: WidgetManager):
+        self.docked_widgets: dict[str, QWidget] = {}
         self.functions: dict = functions
         self.viewer = viewer
+        self.widget_manager = widget_manager
 
     # pylint: disable=too-many-branches
     def add_function_as_widget(self, func_name: str, function: WidgetFunction = None):
@@ -804,22 +805,11 @@ class WidgetFunctionManager:
         """
 
         widget = None
-        if func_name in self.docked_functions and (
-            not is_valid_widget(self.docked_functions[func_name])
-            or not is_visible_widget(self.docked_functions[func_name])
-        ):
-            # Try to destroy the old widget if it still exists
-            try:
-                if hasattr(self.docked_functions[func_name], "native"):
-                    self.docked_functions[func_name].native.destroy()
-            except RuntimeError:
-                # Already deleted
-                pass
-            self.docked_functions.pop(func_name)
+        self.widget_manager.ensure_valid(func_name)
 
         function = function or self.functions.get(func_name)
         # Check if the widget is already docked and add it if not
-        if func_name not in self.docked_functions:
+        if func_name not in self.widget_manager.get_docked_widgets():
             if function.overide_get_widget:
                 func = function.function_to_run
                 sig = inspect.signature(func)
@@ -835,17 +825,14 @@ class WidgetFunctionManager:
                         topostats_error=True,
                     )
                 # pylint: disable=used-before-assignment
-                self.viewer.window.add_dock_widget(widget, name=func_name)
-                self.docked_functions[func_name] = widget
+                self.widget_manager.add_docked_widget(widget=widget, name=func_name)
                 return
             widget = function.get_function_gui()
             for param in widget:
                 if param.name != "call_button":
-                    self.viewer.window.add_dock_widget(widget, name=func_name)
-                    self.docked_functions[func_name] = widget
+                    self.widget_manager.add_docked_widget(widget=widget, name=func_name)
                     break
-        if func_name in self.docked_functions:
-            widget = self.docked_functions[func_name]
+        widget = self.widget_manager.get_widget(func_name) if self.widget_manager.get_widget(func_name) else widget
         if function.overide_get_widget:
             return
 
