@@ -56,8 +56,8 @@ class WidgetManager:
 
         # Only add the new widget if there isn't already a valid and visible widget with the same name
         if name not in self.docked_widgets:
-            self.docked_widgets[name] = widget
-            self.viewer.window.add_dock_widget(widget, area=area, name=name)
+            self.docked_widgets[name] = self.viewer.window.add_dock_widget(widget, area=area, name=name)
+        return self.docked_widgets[name]
 
     def ensure_valid(self, name):
         """

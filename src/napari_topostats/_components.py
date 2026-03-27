@@ -4,6 +4,7 @@
 
 import dask.array as da
 import numpy as np
+import pyqtgraph as pg
 from napari.layers import Image, Labels
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QStandardItem, QStandardItemModel
@@ -20,6 +21,20 @@ from qtpy.QtWidgets import (
 )
 
 from ._alerts import show_error_dialog
+
+VIBRANT_PALETTE = [
+    "#FF00FF",  # Magenta
+    "#00FFFF",  # Cyan
+    "#FFFF00",  # Yellow
+    "#00FF00",  # Lime
+    "#FF8000",  # Orange
+    "#FF0000",  # Red
+    "#0080FF",  # Sky Blue
+    "#80FF00",  # Electric Lime
+    "#FF0080",  # Pink
+]
+channel_colours = {}
+colour_idx = 0
 
 
 class CollapsibleBox(QWidget):
@@ -263,15 +278,29 @@ class SelectionDropdown(QComboBox):
         self.setModel(self.model)
 
         # Add checkable items
+        self.set_items(items, starting_items)
+        # Update the text when a box is checked/unchecked
+        self.model.itemChanged.connect(self.on_selection_change)
+
+    def set_items(self, items: list, starting_items: list = None):
+        """
+        Set the items in the dropdown and their checked state.
+
+        Parameters
+        ----------
+        items : list
+            The list of items to display in the dropdown.
+        starting_items : list, optional
+            The list of items that should be initially checked (default is None).
+        """
+        self.model.clear()
+        starting_items = starting_items or []
         for text in items:
             item = QStandardItem(text)
             item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             item.setData(Qt.Checked if text in starting_items else Qt.Unchecked, Qt.CheckStateRole)
             self.model.appendRow(item)
-
         self.update_text()
-        # Update the text when a box is checked/unchecked
-        self.model.itemChanged.connect(self.on_selection_change)
 
     def on_selection_change(self):
         """
@@ -309,6 +338,123 @@ class SelectionDropdown(QComboBox):
             for i in range(self.model.rowCount())
             if self.model.item(i).checkState() == Qt.Checked
         ]
+
+
+class MultiPlotWidget(pg.PlotWidget):
+    """A widget to display multiple plots in a grid layout"""
+
+    def __init__(self, title: str, parent=None):
+        """Initializes the MultiPlotWidget."""
+        super().__init__(title=title, parent=parent)
+
+        # Get the primary plot item
+        self.p1 = self.plotItem
+        # self.p1.setLabels(left='Channel 1 (Low Intensity)', bottom='Frames')
+
+        self.p2_view = pg.ViewBox()
+        self.p1.showAxis("right")
+        self.p2 = pg.PlotItem(viewBox=self.p2_view)
+        self.p1.scene().addItem(self.p2_view)
+        self.p1.getAxis("right").linkToView(self.p2_view)
+        self.p2_view.setXLink(self.p1)
+
+        # self.p1.getAxis('right').setLabel('Channel 2 (High Intensity)', color='#00ff00')
+        # self.p1.getAxis('right').setPen('#00ff00')
+
+        self.p1.vb.sigResized.connect(self.update_views)
+        self.profile_lines = {}
+        self.current_unit = None
+        self.previous_unit = None
+        self.line_data = {}
+
+    def update_views(self):
+        """Forces the secondary ViewBox to match the primary's geometry."""
+        self.p2_view.setGeometry(self.p1.vb.sceneBoundingRect())
+        self.p2_view.linkedViewChanged(self.p1.vb, self.p2_view.XAxis)
+
+    def plot(self, xdata: np.ndarray, ydata: np.ndarray, channel: str, unit: str = "m"):
+        """
+        Plots the given data on the appropriate axis based on the unit.
+
+        Parameters
+        ----------
+        xdata : np.ndarray
+            The x-axis data.
+        ydata : np.ndarray
+            The y-axis data.
+        channel : str
+            The name of the channel.
+        unit : str, optional
+            The unit of the data, by default "m".
+        """
+        # pylint:disable=too-many-branches
+        global channel_colours, colour_idx  # pylint: disable=global-variable-not-assigned
+        if unit == "nm":
+            unit = "m"
+            ydata = np.array(ydata) / 1e9
+
+        if self.profile_lines.get(unit) is None:
+            self.profile_lines[unit] = {}
+
+        if unit not in self.profile_lines or (channel not in self.profile_lines[unit]):
+            if channel not in channel_colours:
+                if len(channel_colours) >= len(VIBRANT_PALETTE):
+                    for key in channel_colours:
+                        if key not in self.available_channels:
+                            channel_colours.pop(key)
+                            break
+                channel_colours[channel] = VIBRANT_PALETTE[colour_idx % len(VIBRANT_PALETTE)]
+                colour_idx += 1
+            self.profile_lines[unit][channel] = self.p1.plot(
+                [], [], pen=channel_colours[channel], name=channel, unit=unit
+            )
+            self.p1.setLabel("left", channel, units=unit)
+        # TODO does this need to be split into unit so it matches structure of profile_lines?
+        self.line_data[channel] = (xdata, ydata)
+        self.profile_lines[unit][channel].setData(xdata, ydata)
+        if unit != self.current_unit:
+            self.previous_unit = self.current_unit
+            self.current_unit = unit
+            if self.previous_unit and self.previous_unit in self.profile_lines:
+                for line_channel in self.profile_lines[self.previous_unit]:
+                    # TODO is this leaving phantom lines?
+                    self.profile_lines[self.previous_unit][line_channel].setData([], [])
+                    self.profile_lines[self.previous_unit][line_channel] = self.p2.plot(
+                        self.line_data[line_channel][0],
+                        self.line_data[line_channel][1],
+                        pen=channel_colours[line_channel],
+                        name=line_channel,
+                        unit=self.previous_unit,
+                    )
+                    self.p2.setLabel("right", "", units=self.previous_unit)
+                for line_channel in self.profile_lines[self.current_unit]:
+                    # TODO is this leaving phantom lines?
+                    self.profile_lines[self.current_unit][line_channel].setData([], [])
+                    self.profile_lines[self.current_unit][line_channel] = self.p1.plot(
+                        self.line_data[line_channel][0],
+                        self.line_data[line_channel][1],
+                        pen=channel_colours[line_channel],
+                        name=line_channel,
+                        unit=self.current_unit,
+                    )
+                    self.p1.setLabel("left", "", units=self.current_unit)
+
+        print(self.profile_lines)
+
+        if None not in [self.current_unit, self.previous_unit]:
+            for u, lines in self.profile_lines.items():
+                for _, line in lines.items():
+                    line.setVisible(u in [self.current_unit, self.previous_unit])
+
+    def get_profile_lines(self):
+        """Returns the current profile lines."""
+        return self.profile_lines
+
+    def remove_profile_line(self, channel: str):
+        """Removes the profile line for the given channel."""
+        for _, lines in self.profile_lines.items():
+            if channel in lines:
+                lines[channel].setData([], [])
 
 
 # TODO: This function really gets currently selected layer not image
@@ -382,3 +528,19 @@ def get_selected_curves(viewer) -> list | None:
         curves = curves.load_all_curves()
 
     return curves
+
+
+def get_current_layer(viewer, requires_force_curves=False):
+    """Utility function to get the current active layer, excluding the Profile Line layer"""
+    active = viewer.layers.selection.active
+    if active and active.name != "Profile Line" and (not requires_force_curves or "force_curves" in active.metadata):
+        return active
+
+    for layer in reversed(viewer.layers):
+        if (
+            layer.visible
+            and layer.name != "Profile Line"
+            and (not requires_force_curves or "force_curves" in layer.metadata)
+        ):
+            return layer
+    return None

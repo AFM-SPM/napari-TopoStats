@@ -6,6 +6,7 @@
 
 import numpy as np
 import pyqtgraph as pg
+from napari import Viewer
 from napari_afmreader._reader import get_loaded_image
 from qtpy.QtWidgets import (
     QCheckBox,
@@ -20,24 +21,11 @@ from qtpy.QtWidgets import (
 )
 from skimage.draw import line  # pylint: disable=no-name-in-module
 
-from napari_topostats._components import CollapsibleBox, SelectionDropdown
-from napari_topostats._state import get_widget_manager
+from napari_topostats._components import CollapsibleBox, MultiPlotWidget, SelectionDropdown, get_current_layer
+from napari_topostats._state import WidgetManager, get_widget_manager
 from napari_topostats.utils import unflatten_dict
 
 profile_viewer = None
-VIBRANT_PALETTE = [
-    "#FF00FF",  # Magenta
-    "#00FFFF",  # Cyan
-    "#FFFF00",  # Yellow
-    "#00FF00",  # Lime
-    "#FF8000",  # Orange
-    "#FF0000",  # Red
-    "#0080FF",  # Sky Blue
-    "#80FF00",  # Electric Lime
-    "#FF0080",  # Pink
-]
-colour_idx = 0
-channel_colours = {}
 
 
 def open_curve_viewer(viewer):
@@ -291,10 +279,12 @@ class CurveViewer(QWidget):
 class ProfileViewer(QWidget):
     """Custom docked widget for displaying profiles along a line"""
 
-    def __init__(self, viewer, shapes_layer=None):
+    def __init__(self, viewer, shapes_layer=None, widget_manager=None):
         super().__init__()
         self.viewer = viewer
         self.shapes_layer = shapes_layer
+        self.widget_manager = widget_manager or get_widget_manager()
+        self.active = True
 
         # Setup the layout
         self.setLayout(QVBoxLayout())
@@ -304,7 +294,7 @@ class ProfileViewer(QWidget):
         self.settings_widget = QWidget()
         self.settings_layout = QHBoxLayout(self.settings_widget)
         self.channel_displayed_label = QLabel("Selected channels: ")
-        self.active_layer = self.get_current_layer()
+        self.active_layer = get_current_layer(self.viewer)
         self.loaded_image = get_loaded_image(self.active_layer.metadata.get("afmreader_id"))
         print(f"Loaded image: {self.loaded_image}")
         self.available_channels = self.loaded_image.get_available_channels() if self.loaded_image else []
@@ -320,15 +310,14 @@ class ProfileViewer(QWidget):
         viewer.layers.selection.events.changed.connect(self.on_selection_change)
 
         # Plot widget for the profile
-        self.plot_widget = pg.PlotWidget(title="Line Profile")
+        self.plot_widget = MultiPlotWidget(title="Line Profile")
 
-        self.profile_lines = {}
         self.layout().addWidget(self.plot_widget)
         self.layout().addWidget(self.settings_widget)
 
     def on_selection_change(self, event=None):
         """Called when the user changes the active layer to update the available channels"""
-        temp_active = self.get_current_layer()
+        temp_active = get_current_layer(self.viewer)
         print(f"Active layer changed: {temp_active}")
         if temp_active == self.active_layer:
             return
@@ -336,13 +325,17 @@ class ProfileViewer(QWidget):
         if self.active_layer is not None:
             self.loaded_image = get_loaded_image(self.active_layer.metadata.get("afmreader_id"))
             self.available_channels = self.loaded_image.get_available_channels() if self.loaded_image else []
-            self.channel_selector.set_items(self.available_channels)
+            self.channel_selector.set_items(
+                self.available_channels,
+                starting_items=[self.loaded_image.get_current_channel()] if self.loaded_image else [],
+            )
         else:
             self.available_channels = []
             self.channel_selector.set_items(self.available_channels)
 
     def on_line_changed(self, shapes_layer, event=None):
         """Called when the shapes in the Profile Line layer change"""
+        print("Current channel: ", self.loaded_image.get_current_channel() if self.loaded_image else "None")
 
         self.shapes_layer = shapes_layer
         if shapes_layer is None or len(shapes_layer.data) == 0:
@@ -370,11 +363,15 @@ class ProfileViewer(QWidget):
 
     def _update_profile_from_line(self, shapes_layer, start_point, end_point):
         """Update the profile plot based on the coordinates of the drawn line"""
-        global colour_idx, channel_colours
+        global colour_idx
 
         self.shapes_layer = shapes_layer
         # Get the top-most visible data layer
-        self.active_layer = self.get_current_layer()
+        self.active_layer = get_current_layer(self.viewer)
+
+        if self.active_layer is None:
+            close_profile_viewer(self.viewer, self.shapes_layer, self.widget_manager)
+            return
 
         # Convert the start and end points from data coordinates in the shapes layer to world coordinates
         start_point = shapes_layer.data_to_world(start_point)
@@ -395,7 +392,7 @@ class ProfileViewer(QWidget):
 
             for channel in self.channel_selector.get_checked_items():
 
-                data = self.loaded_image.get_map(channel)
+                data, _ = self.loaded_image.get_map(channel)
                 # Handle multi-dimensional data (take the last 2D slice if needed)
                 if data.ndim > 2:
                     slice_idx = tuple(self.viewer.dims.current_step[:-2])
@@ -410,43 +407,23 @@ class ProfileViewer(QWidget):
                         values.append(data_slice[r, c])
 
                 if values:
-                    if channel not in self.profile_lines:
-                        if channel not in channel_colours:
-                            if len(channel_colours) >= len(VIBRANT_PALETTE):
-                                for key in channel_colours:
-                                    if key not in self.available_channels:
-                                        channel_colours.pop(key)
-                                        break
-                            channel_colours[channel] = VIBRANT_PALETTE[colour_idx % len(VIBRANT_PALETTE)]
-                            colour_idx += 1
-                        self.profile_lines[channel] = self.plot_widget.plot(
-                            [], [], pen=channel_colours[channel], name=channel
-                        )
-                    self.profile_lines[channel].setData(range(len(values)), values)
+                    unit = "nm" if "height" in channel.lower() or "point" in channel.lower() else "N"
+                    self.plot_widget.plot(np.arange(len(values)), values, channel, unit=unit)
                     self.info_label.setText(f"Profile: {len(values)} points.")
 
-            for channel, channel_line in self.profile_lines.items():
-                if channel not in self.channel_selector.get_checked_items():
-                    channel_line.setData([], [])
+            for _, lines in self.plot_widget.get_profile_lines().items():
+                for channel in lines:
+                    if channel not in self.channel_selector.get_checked_items():
+                        self.plot_widget.remove_profile_line(channel)
 
-    def get_current_layer(self, requires_force_curves=False):
-        """Utility function to get the current active layer, excluding the Profile Line layer"""
-        active = self.viewer.layers.selection.active
-        if (
-            active
-            and active.name != "Profile Line"
-            and (not requires_force_curves or "force_curves" in active.metadata)
-        ):
-            return active
 
-        for layer in reversed(self.viewer.layers):
-            if (
-                layer.visible
-                and layer.name != "Profile Line"
-                and (not requires_force_curves or "force_curves" in layer.metadata)
-            ):
-                return layer
-        return None
+def close_profile_viewer(viewer: Viewer, shapes_layer, widget_manager: WidgetManager):
+    """Utility function to close the profile viewer and remove the shapes layer"""
+    global profile_viewer  # pylint: disable=global-statement
+    widget_manager.remove_docked_widget("Profile Viewer")
+    profile_viewer = None
+    if shapes_layer and "Profile Line" in viewer.layers:
+        viewer.layers.remove(shapes_layer)
 
 
 def start_drawing(viewer):
@@ -456,6 +433,10 @@ def start_drawing(viewer):
     """
 
     global profile_viewer  # pylint: disable=global-statement
+
+    active_layer = get_current_layer(viewer)
+    if active_layer is None:
+        return
 
     # Keep a track of the previously active layer and its mode to restore later
     previous_active_layer = viewer.layers.selection.active
@@ -471,7 +452,7 @@ def start_drawing(viewer):
     widget_manager.ensure_valid("Profile Viewer")
 
     if profile_viewer is None or "Profile Viewer" not in widget_manager.get_docked_widgets():
-        profile_viewer = ProfileViewer(viewer, shapes_layer=shapes_layer)
+        profile_viewer = ProfileViewer(viewer, shapes_layer=shapes_layer, widget_manager=widget_manager)
         widget_manager.add_docked_widget(profile_viewer, area="right", name="Profile Viewer")
 
     shapes_layer.events.set_data.connect(lambda event=None: profile_viewer.on_line_changed(shapes_layer, event))
@@ -490,9 +471,7 @@ def start_drawing(viewer):
 
     # Remove the shapes layer and profile viewer if no line is drawn
     if len(shapes_layer.data) == 0:
-        widget_manager.remove_docked_widget("Profile Viewer")
-        profile_viewer = None
-        viewer.layers.remove(shapes_layer)
+        close_profile_viewer(viewer, shapes_layer, widget_manager)
 
 
 class ParameterDialog(QDialog):

@@ -19,6 +19,7 @@ from napari import current_viewer  # pylint: disable=no-name-in-module
 from napari.layers import Image, Labels, Layer
 from napari.layers.labels._labels_constants import Mode
 from napari.viewer import Viewer
+from napari_afmreader._reader import get_loaded_image
 from qtpy.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -400,9 +401,22 @@ class WidgetFunction:
                     # recursion of function calling itself as it effectively wraps itself in all_curves with lamda
                     original_func = self.function_to_run
 
+                    reader_id = (
+                        selected_image.metadata.get("afmreader_id", None)
+                        if selected_image and selected_image.metadata
+                        else None
+                    )
+
+                    if reader_id is not None:
+                        loaded_image = get_loaded_image(reader_id)
+                        flip_image = loaded_image.flip_image
+                    else:
+                        flip_image = True
                     # If the function is designed to take a single curve, wrap it in all_curves to apply
                     # to all curves in the selected layer
-                    self.function_to_run = lambda **kwargs: all_curves(func=original_func, **kwargs)
+                    self.function_to_run = lambda **kwargs: all_curves(
+                        func=original_func, **kwargs, flip_image=flip_image
+                    )
                     new_param = inspect.Parameter(
                         name="curves",
                         kind=inspect.Parameter.KEYWORD_ONLY,
@@ -623,9 +637,19 @@ class WidgetFunction:
             if len(current_scale) != self.ndims:
                 current_scale = current_scale[-self.ndims :]
 
+            reader_id = original.metadata.get("afmreader_id", None) if original and original.metadata else None
+            print(f"Reader ID: {reader_id}")
+            if reader_id is not None:
+                loaded_image = get_loaded_image(reader_id)
+                print(f"Loaded image for reader ID: {loaded_image}")
+                if loaded_image is not None:
+                    channel_name = self.function_key.replace("find_", "")
+                    print(f"Adding custom channel '{channel_name}' to loaded image with return value.")
+                    loaded_image.add_custom_channel(channel_name, return_value)
+
             # Common metadata logic
-            base_metadata = {"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}
-            combined_metadata = base_metadata | metadata
+            duplicated_metadata = original.metadata.copy() if original and original.metadata else {}
+            combined_metadata = duplicated_metadata | metadata
 
             # If the return value is a binary image, add it as a labels layer
             if is_binary_image(return_value):
@@ -787,7 +811,7 @@ class WidgetFunctionManager:
     """Class to manage the widget functions and their corresponding widgets in the napari viewer."""
 
     def __init__(self, functions: dict, viewer: Viewer, widget_manager: WidgetManager):
-        self.docked_widgets: dict[str, QWidget] = {}
+        self.docked_functions: dict[str, QWidget] = {}
         self.functions: dict = functions
         self.viewer = viewer
         self.widget_manager = widget_manager
@@ -825,14 +849,14 @@ class WidgetFunctionManager:
                         topostats_error=True,
                     )
                 # pylint: disable=used-before-assignment
-                self.widget_manager.add_docked_widget(widget=widget, name=func_name)
+                self.add_docked_function(widget, func_name)
                 return
             widget = function.get_function_gui()
             for param in widget:
                 if param.name != "call_button":
-                    self.widget_manager.add_docked_widget(widget=widget, name=func_name)
+                    self.add_docked_function(widget, func_name)
                     break
-        widget = self.widget_manager.get_widget(func_name) if self.widget_manager.get_widget(func_name) else widget
+        widget = self.docked_functions.get(func_name) or widget
         if function.overide_get_widget:
             return
 
@@ -872,3 +896,19 @@ class WidgetFunctionManager:
             )
             return None
         return widget
+
+    def add_docked_function(self, widget, name: str, area: str = "right"):
+        """
+        Add a widget to the viewer as a docked widget and keep track of it in the state.
+
+        Parameters
+        ----------
+        widget : QWidget
+            The widget to add to the viewer.
+        name : str
+            The name of the widget, used for tracking in the state.
+        area : str, optional
+            The area of the viewer to dock the widget in (default is "right").
+        """
+        self.docked_functions[name] = widget
+        self.widget_manager.add_docked_widget(widget, area=area, name=name)
