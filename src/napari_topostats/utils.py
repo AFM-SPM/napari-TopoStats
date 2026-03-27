@@ -1,6 +1,7 @@
 """Contains functions surrounding utilities and cosmetics."""
 
 import copy
+import inspect
 from typing import Any
 
 import numpy as np
@@ -226,3 +227,73 @@ def remove_all_but_last(word: str, text: str) -> str:
     if len(parts) == 1:
         return text  # word not found or only once
     return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return
+
+
+def all_curves(
+    curves,
+    func,
+    shape_x: int | None = None,
+    shape_y: int | None = None,
+    type_class=None,
+    flip_image: bool = True,
+    **kwargs,
+):
+    print(f"Running {func.__name__} on all curves with shape ({shape_x}, {shape_y})")
+    print(f"Curves is object of type {type(curves)}")
+    if None in (shape_x, shape_y):
+        if hasattr(curves, "dims"):
+            shape_y = curves.dims[0]
+            shape_x = curves.dims[1] if len(curves.dims) > 1 else 1
+        elif isinstance(curves[0], list):
+            shape_x = len(curves[0])
+            shape_y = len(curves)
+        else:
+            shape_x = len(curves)
+            shape_y = 1
+
+    if isinstance(curves[0], list):
+        # If curves is a list of lists, flatten it.
+        curves = [item for sublist in curves for item in sublist]
+
+    map = [[None for _ in range(shape_x)] for _ in range(shape_y)]
+
+    if type_class is not None:
+        class_sig = inspect.signature(type_class)
+        class_kwargs = {}
+        for p in class_sig.parameters:
+            if p in kwargs:
+                class_kwargs[p] = kwargs[p]
+
+    func_sig = inspect.signature(func)
+    func_kwargs = {}
+    for p in func_sig.parameters:
+        if p in kwargs:
+            func_kwargs[p] = kwargs[p]
+
+    for y in range(shape_y):
+        for x in range(shape_x):
+            idx = y * shape_x + x
+            curve = curves[idx]
+            if type_class is not None:
+                if "curve" in class_kwargs:
+                    # If curve is a parameter in type_class parameters, instantiate the class with curve and class_kwargs
+                    instance = type_class(curve=curve, **class_kwargs)
+                else:
+                    # Otherwise, just pass the class_kwargs without curve
+                    instance = type_class(**class_kwargs)
+
+                # Run function on instance, passing func_kwargs
+                func = getattr(instance, func.__name__)
+                if "curve" in func_sig.parameters:
+                    point = func(curve=curve, **func_kwargs)
+                else:
+                    point = func(**func_kwargs)
+            else:
+                point = func(curve=curve, **func_kwargs)
+            map[y][x] = point
+    if isinstance(map[0][0], dict):
+        return map
+    map = np.array(map)
+    if flip_image:
+        map = np.flipud(map)
+    return map

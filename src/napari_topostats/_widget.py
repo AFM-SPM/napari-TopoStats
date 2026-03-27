@@ -38,7 +38,6 @@ if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() 
     loading_spinner.start()
     QApplication.processEvents()
 
-from forcestats.contact import find_contact_point
 from napari.layers import Image, Labels
 from napari.viewer import Viewer
 from packaging.version import parse as parse_version
@@ -142,13 +141,6 @@ FORCESTATS_FUNCTIONS = [
         function_to_run=open_curve_viewer,
         tooltip="Open curve window for viewing AFM curves for each point of the image",
         overide_get_widget=True,
-    ),
-    WidgetFunction(
-        name="contact_point",
-        function_key="contact_point",
-        function_to_run=find_contact_point,
-        path_to_data="return",
-        tooltip="Find the contact point for each curve in the selected image layer and create a new image map.",
     ),
 ]
 

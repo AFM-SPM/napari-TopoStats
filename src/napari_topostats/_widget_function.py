@@ -12,7 +12,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from forcestats.analysis import all_curves
 from magicgui import magicgui
 from magicgui.widgets import FunctionGui
 from napari import current_viewer  # pylint: disable=no-name-in-module
@@ -38,7 +37,7 @@ from ._components import get_selected_curves, get_selected_image
 from ._io import add_values_to_dict_from_config, get_current_config
 from ._parallel_processing import ProcessWorker
 from ._state import WidgetManager, get_running_function, set_running_function
-from .utils import _eval, calculate_contrast_limits, is_binary_image, remove_all_but_last
+from .utils import _eval, all_curves, calculate_contrast_limits, is_binary_image, remove_all_but_last
 
 RUN_IMMEDIATELY_EXEMPTIONS = set()
 
