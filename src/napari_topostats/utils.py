@@ -235,7 +235,7 @@ def all_curves(
     shape_x: int | None = None,
     shape_y: int | None = None,
     type_class=None,
-    flip_image: bool = True,
+    flip_image: bool = False,
     **kwargs,
 ):
     print(f"Running {func.__name__} on all curves with shape ({shape_x}, {shape_y})")
@@ -255,7 +255,7 @@ def all_curves(
         # If curves is a list of lists, flatten it.
         curves = [item for sublist in curves for item in sublist]
 
-    map = [[None for _ in range(shape_x)] for _ in range(shape_y)]
+    image_map = [[None for _ in range(shape_x)] for _ in range(shape_y)]
 
     if type_class is not None:
         class_sig = inspect.signature(type_class)
@@ -290,10 +290,10 @@ def all_curves(
                     point = func(**func_kwargs)
             else:
                 point = func(curve=curve, **func_kwargs)
-            map[y][x] = point
-    if isinstance(map[0][0], dict):
-        return map
-    map = np.array(map)
+            image_map[y][x] = point
+    if isinstance(image_map[0][0], dict):
+        return image_map
+    image_map = np.array(image_map)
     if flip_image:
-        map = np.flipud(map)
-    return map
+        image_map = np.flipud(image_map)
+    return image_map

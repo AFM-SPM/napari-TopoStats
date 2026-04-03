@@ -143,8 +143,12 @@ class CurveViewer(QWidget):
         self.channels_units = None
 
         # Create the plots with empty data for approach and retract segments
-        self.approach_line = self.plot_widget.plot([], [], pen="y", name="approach")
-        self.retract_line = self.plot_widget.plot([], [], pen="r", name="retract")
+        self.approach_line = self.plot_widget.plot(
+            [], [], pen="y", name="approach", available_channels=self.available_channels
+        )
+        self.retract_line = self.plot_widget.plot(
+            [], [], pen="r", name="retract", available_channels=self.available_channels
+        )
 
         # Setup the onclick event for so the curve viewer updates when the user clicks on a pixel
         self.viewer.mouse_drag_callbacks.append(self.extract_curve)
@@ -153,16 +157,16 @@ class CurveViewer(QWidget):
         """Open the experimental parameters dialog"""
         if self.parameter_dialog is None:
             self.parameter_dialog = ParameterDialog(self.metadata)
-        else:
-            if not self.parameter_dialog.isVisible():
-                try:
-                    self.parameter_dialog.show()
-                    self.parameter_dialog.raise_()
-                    self.parameter_dialog.activateWindow()
-                except RuntimeError:
-                    self.parameter_dialog.deleteLater()
-                    self.parameter_dialog = None
-            self.parameter_dialog.populate_parameters(self.metadata)
+
+        if not self.parameter_dialog.isVisible():
+            try:
+                self.parameter_dialog.show()
+                self.parameter_dialog.raise_()
+                self.parameter_dialog.activateWindow()
+            except RuntimeError:
+                self.parameter_dialog.deleteLater()
+                self.parameter_dialog = None
+        self.parameter_dialog.populate_parameters(self.metadata)
 
     def update_curve(self, selected_curve_dict=None):
         """Updates the plot with the selected curve dict"""
@@ -408,7 +412,9 @@ class ProfileViewer(QWidget):
 
                 if values:
                     unit = "nm" if "height" in channel.lower() or "point" in channel.lower() else "N"
-                    self.plot_widget.plot(np.arange(len(values)), values, channel, unit=unit)
+                    self.plot_widget.plot(
+                        np.arange(len(values)), values, channel, available_channels=self.available_channels, unit=unit
+                    )
                     self.info_label.setText(f"Profile: {len(values)} points.")
 
             for _, lines in self.plot_widget.get_profile_lines().items():

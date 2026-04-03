@@ -175,22 +175,35 @@ class WidgetFunction:
         The class type that the function belongs to, if applicable. This is used to instantiate the class and call the
         method. This may not be required for all functions, so it can be None. It is used if an instance of the
         enclosing class is required to run the function.
-    uses_config : bool, optional
-        Whether the function uses a configuration file to set its parameters. If True, the function will
-        load the configuration file and use it to set the parameters. If False, the function will
-        use only the parameters set in the widget. Note that certain parameters can also be taken from the napari
-        viewer, such as the selected image or from the image metadata, such as the pixel to nm scaling factor.
     path_to_data : str | None, optional
         The path to the data that the function returns. This is used to determine how to extract the data from the
         return value of the function. It can be "return" to return the data directly (from the function), "obj" to
         return the object itself, or a specific path to access a nested attribute or subscript in the return value
         or the object instance.
+    uses_config : bool, optional
+        Whether the function uses a configuration file to set its parameters. If True, the function will
+        load the configuration file and use it to set the parameters. If False, the function will
+        use only the parameters set in the widget. Note that certain parameters can also be taken from the napari
+        viewer, such as the selected image or from the image metadata, such as the pixel to nm scaling factor.
     ndims : int, optional
         The number of dimensions of the data to be rendered. Can be left as default 2, but can be set to 3 if the
         function returns 3D data.
+    of_type : list, optional
+        A list of layer types that the function can be applied to, used for determining which image to select from the
+        napari viewer. Optional as just used as protection layer to ensure correct layer type is selected
+    metadata_paths : dict, optional
+        A dictionary of additional metadata to extract from the return value or object instance, where the key is the
+        name of the metadata and the value is the path to extract it. These are then passed over to the layer rendering
+        function.
     tooltip : str | None, optional
         A tooltip for the widget, providing additional information about the function. This is displayed when the
         user hovers over the button for the function in the button grid.
+    overide_get_widget : bool, optional
+        This should be set to true if you want the function itself to handle adding a docked widget rather than that
+        being handled automatically in the WidgetFunctionManager.
+    function_manager : WidgetManager, optional
+        The WidgetManager instance that manages the widget functions. This is used to add functions to groups when the
+        function is part of a group of functions.
     """
 
     # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-instance-attributes
@@ -228,6 +241,8 @@ class WidgetFunction:
                 widget_function = self.group_functions.get(function_name)
                 self.function_manager.add_function_as_widget(function_name, widget_function)
 
+            print(f"Creating group widget function {name} with functions: {list(self.group_functions.keys())}")
+
             self.function_to_run = magicgui(func, function_name={"choices": list(self.group_functions.keys())})
         else:
             self.is_group = False
@@ -240,7 +255,9 @@ class WidgetFunction:
     def add_to_group(self, widget_function):
         """Add a widget function to the group of functions if this WidgetFunction is a group."""
         if not self.is_group:
+            print(f"Cannot add function to group {self.name} as it is not a group.")
             return
+        print(f"Adding function {widget_function.name} to group {self.name}")
         self.group_functions[widget_function.name] = widget_function
         self.function_gui.function_name.choices = list(self.group_functions.keys())
 
@@ -400,22 +417,11 @@ class WidgetFunction:
                     # recursion of function calling itself as it effectively wraps itself in all_curves with lamda
                     original_func = self.function_to_run
 
-                    reader_id = (
-                        selected_image.metadata.get("afmreader_id", None)
-                        if selected_image and selected_image.metadata
-                        else None
-                    )
+                    print(f"Kwargs before wrapping in all_curves: {kwargs}")
 
-                    if reader_id is not None:
-                        loaded_image = get_loaded_image(reader_id)
-                        flip_image = loaded_image.flip_image
-                    else:
-                        flip_image = True
                     # If the function is designed to take a single curve, wrap it in all_curves to apply
                     # to all curves in the selected layer
-                    self.function_to_run = lambda **kwargs: all_curves(
-                        func=original_func, **kwargs, flip_image=flip_image
-                    )
+                    self.function_to_run = lambda **kwargs: all_curves(func=original_func, **kwargs)
                     new_param = inspect.Parameter(
                         name="curves",
                         kind=inspect.Parameter.KEYWORD_ONLY,

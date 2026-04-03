@@ -372,7 +372,7 @@ class MultiPlotWidget(pg.PlotWidget):
         self.p2_view.setGeometry(self.p1.vb.sceneBoundingRect())
         self.p2_view.linkedViewChanged(self.p1.vb, self.p2_view.XAxis)
 
-    def plot(self, xdata: np.ndarray, ydata: np.ndarray, channel: str, unit: str = "m"):
+    def plot(self, xdata: np.ndarray, ydata: np.ndarray, channel: str, available_channels: list, unit: str = "m"):
         """
         Plots the given data on the appropriate axis based on the unit.
 
@@ -400,7 +400,7 @@ class MultiPlotWidget(pg.PlotWidget):
             if channel not in channel_colours:
                 if len(channel_colours) >= len(VIBRANT_PALETTE):
                     for key in channel_colours:
-                        if key not in self.available_channels:
+                        if key not in available_channels:
                             channel_colours.pop(key)
                             break
                 channel_colours[channel] = VIBRANT_PALETTE[colour_idx % len(VIBRANT_PALETTE)]

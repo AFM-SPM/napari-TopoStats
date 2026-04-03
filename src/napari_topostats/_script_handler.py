@@ -38,6 +38,9 @@ def load_py_files(paths, viewer):
                 tooltip=inspect.getdoc(func),
             )
             topostats_widget = get_topostats_widget()
+            print(
+                f"Adding function {func_name} topostats widget is {topostats_widget} widget_function is in loaded_functions: {widget_function in loaded_functions}"
+            )
             if topostats_widget is not None:
                 topostats_widget.add_function(widget_function, to_group=True)
             if widget_function not in loaded_functions:
