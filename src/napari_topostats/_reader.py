@@ -19,5 +19,5 @@ def napari_get_reader(path: list | str):
 def reader_function(path):
     """Reader to return functions from python file path"""
     viewer = current_viewer()
-    load_py_files(paths=[path], viewer=viewer)
+    load_py_files(paths=[path] if isinstance(path, str) else path, viewer=viewer)
     return [(None,)]

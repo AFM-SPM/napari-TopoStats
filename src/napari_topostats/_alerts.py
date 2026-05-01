@@ -105,6 +105,8 @@ def show_error_dialog(
     raise_exception : bool, optional
         If True, raise a ValueError after showing the dialog. Used for errors that should halt execution.
     """
+    if exception is not None:
+        raise exception
     if topostats_error:
         message += (
             f"\nThis error is potentially caused in the TopoStats package rather than in the Napari "
@@ -308,7 +310,7 @@ class LoadingWidget(QWidget):
 
 
 def construct_error_args(
-    e: Exception = None,
+    exception: Exception = None,
     message: str = None,
     raise_exception: bool = False,
     topostats_error: bool = False,
@@ -341,12 +343,14 @@ def construct_error_args(
     else:
         if topostats_error:
             if type_class:
-                error_args["message"] = f"Topostats is failing with {type_class.__name__}: {e.__class__} {e}."
+                error_args["message"] = (
+                    f"Topostats is failing with {type_class.__name__}: {exception.__class__} {exception}."
+                )
             else:
-                error_args["message"] = f"Topostats is failing with: {e.__class__} {e}."
+                error_args["message"] = f"Topostats is failing with: {exception.__class__} {exception}."
         else:
-            error_args["message"] = f"An error occurred: {e.__class__} {e}."
+            error_args["message"] = f"An error occurred: {exception.__class__} {exception}."
     error_args["raise_exception"] = raise_exception
     error_args["topostats_error"] = topostats_error
-    error_args["exception"] = e
+    error_args["exception"] = exception
     return error_args

@@ -8,8 +8,10 @@ from topostats.grainstats import GrainStats
 def grainstats(image: Labels):
     """Function used for running topostats grainstats function on a labels layer"""
     cfg = image.metadata["config"]["grainstats"]
-    cfg.pop("run")
-    cfg.pop("class_names")
+    if "run" in cfg:
+        cfg.pop("run")
+    if "class_names" in cfg:
+        cfg.pop("class_names")
     topostats_object = image.metadata["topostats_object"]
     stats = GrainStats(
         topostats_object,
@@ -69,7 +71,6 @@ def get_grainstats_df(stats) -> pd.DataFrame:
                     row["image"] = stats.topostats_object.filename
                 elif hasattr(stats.topostats_object, "image_name"):
                     row["image"] = stats.topostats_object.image_name
-                    print("Using image_name")
                 else:
                     row["image"] = "unknown"
 

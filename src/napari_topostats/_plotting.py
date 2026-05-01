@@ -300,9 +300,7 @@ class ProfileViewer(QWidget):
         self.channel_displayed_label = QLabel("Selected channels: ")
         self.active_layer = get_current_layer(self.viewer)
         self.loaded_image = get_loaded_image(self.active_layer.metadata.get("afmreader_id"))
-        print(f"Loaded image: {self.loaded_image}")
         self.available_channels = self.loaded_image.get_available_channels() if self.loaded_image else []
-        print(f"Available channels: {self.available_channels}")
         self.channel_selector = SelectionDropdown(
             items=self.available_channels,
             type_text="channels",
@@ -322,7 +320,6 @@ class ProfileViewer(QWidget):
     def on_selection_change(self, event=None):
         """Called when the user changes the active layer to update the available channels"""
         temp_active = get_current_layer(self.viewer)
-        print(f"Active layer changed: {temp_active}")
         if temp_active == self.active_layer:
             return
         self.active_layer = temp_active
@@ -339,7 +336,6 @@ class ProfileViewer(QWidget):
 
     def on_line_changed(self, shapes_layer, event=None):
         """Called when the shapes in the Profile Line layer change"""
-        print("Current channel: ", self.loaded_image.get_current_channel() if self.loaded_image else "None")
 
         self.shapes_layer = shapes_layer
         if shapes_layer is None or len(shapes_layer.data) == 0:
@@ -418,7 +414,7 @@ class ProfileViewer(QWidget):
                     self.info_label.setText(f"Profile: {len(values)} points.")
 
             for _, lines in self.plot_widget.get_profile_lines().items():
-                for channel in lines:
+                for channel in list(lines):
                     if channel not in self.channel_selector.get_checked_items():
                         self.plot_widget.remove_profile_line(channel)
 

@@ -133,8 +133,8 @@ def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=
             except KeyError as e:
                 raised_error = e
         if raised_error:
-            show_error_dialog(
-                "Couldn't find data for either direction",
+            return construct_error_args(
+                message=f"Couldn't find data for either direction in path: {path_to_data}",
                 raise_exception=True,
                 topostats_error=True,
                 exception=raised_error,
@@ -146,11 +146,11 @@ def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=
         if type_class:
             return _eval(instance, path_to_data[3:]) if len(path_to_data) > 3 else instance
         else:
-            show_error_dialog(f"Invalid path_to_data: {path_to_data} - 'obj' requires type_class")
-            return None
+            return construct_error_args(
+                message=f"Invalid path_to_data: {path_to_data} - 'obj' requires type_class",
+            )
 
-    show_error_dialog(f"Invalid path_to_data: {path_to_data}", topostats_error=True)
-    return None
+    return construct_error_args(message=f"Invalid path_to_data: {path_to_data}", topostats_error=True)
 
 
 # Class representation of each function in the button grid.
@@ -237,13 +237,16 @@ class WidgetFunction:
             self.is_group = True
             self.group_functions = {f.name: f for f in function_to_run}
 
-            def func(function_name: str):
-                widget_function = self.group_functions.get(function_name)
-                self.function_manager.add_function_as_widget(function_name, widget_function)
+            def make_group_func(widget_function_self):
+                def func(function_name: str):
+                    wf = widget_function_self.group_functions.get(function_name)
+                    widget_function_self.function_manager.add_function_as_widget(function_name, wf)
 
-            print(f"Creating group widget function {name} with functions: {list(self.group_functions.keys())}")
+                return func
 
-            self.function_to_run = magicgui(func, function_name={"choices": list(self.group_functions.keys())})
+            self.function_to_run = magicgui(
+                make_group_func(self), function_name={"choices": list(self.group_functions.keys())}
+            )
         else:
             self.is_group = False
 
@@ -255,11 +258,27 @@ class WidgetFunction:
     def add_to_group(self, widget_function):
         """Add a widget function to the group of functions if this WidgetFunction is a group."""
         if not self.is_group:
-            print(f"Cannot add function to group {self.name} as it is not a group.")
             return
-        print(f"Adding function {widget_function.name} to group {self.name}")
         self.group_functions[widget_function.name] = widget_function
-        self.function_gui.function_name.choices = list(self.group_functions.keys())
+
+        # Rebuild the magicgui widget with updated choices
+        new_choices = list(self.group_functions.keys())
+
+        def make_group_func(widget_function_self):
+            def func(function_name: str):
+                wf = widget_function_self.group_functions.get(function_name)
+                widget_function_self.function_manager.add_function_as_widget(function_name, wf)
+
+            return func
+
+        self.function_to_run.function_name.choices = new_choices
+
+        self.function_to_run = magicgui(make_group_func(self), function_name={"choices": new_choices})
+        docked_function = self.function_manager.get_docked_function(self.name)
+        if docked_function is not None:
+            docked_function.function_name.choices = new_choices
+        if self.function_gui is not None:
+            self.function_gui.function_name.choices = new_choices
 
     def add_overide_viewer(self, viewer: Viewer):
         """Adds an overide viewer, this is sometimes required for abstract use of the plugin such as tests"""
@@ -363,7 +382,11 @@ class WidgetFunction:
 
             # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught, attribute-defined-outside-init
             def func(**kwargs):
-                nonlocal including_config_params_from_class, including_config_params_from_function
+                local_params_function = including_config_params_from_function.copy()
+                local_params_from_class = (
+                    including_config_params_from_class.copy() if self.type_class is not None else []
+                )
+                func_to_execute = self.function_to_run
                 viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
                 loading_widget = LoadingWidget(viewer)
                 loading_widget.start(
@@ -373,9 +396,7 @@ class WidgetFunction:
                 method_args = {}
                 class_args = {}
                 # Determine all relevant parameters
-                all_params = including_config_params_from_function + (
-                    including_config_params_from_class if self.type_class else []
-                )
+                all_params = local_params_function + (local_params_from_class if self.type_class else [])
 
                 uses_topostats_object = "topostats_object" in [p.name for p in all_params]
 
@@ -395,7 +416,6 @@ class WidgetFunction:
                     "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs
                 ) or uses_topostats_object:
                     px2nm = selected_image.metadata.get("px2nm", 1.0)
-                    print(f"Using pixel_to_nm_scaling from image metadata: {px2nm}")
                 if "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs:
                     kwargs["pixel_to_nm_scaling"] = px2nm
 
@@ -413,15 +433,12 @@ class WidgetFunction:
                             None  # Set to None as wrapping in all_curves will remove requirement for type_class
                         )
 
-                    # Store a reference of the original function to wrap in all_curves, needed to avoid infinite
-                    # recursion of function calling itself as it effectively wraps itself in all_curves with lamda
-                    original_func = self.function_to_run
-
-                    print(f"Kwargs before wrapping in all_curves: {kwargs}")
-
                     # If the function is designed to take a single curve, wrap it in all_curves to apply
                     # to all curves in the selected layer
-                    self.function_to_run = lambda **kwargs: all_curves(func=original_func, **kwargs)
+                    # pylint: disable=function-redefined
+                    def func_to_execute(**kwargs):
+                        return all_curves(func=self.function_to_run, **kwargs)
+
                     new_param = inspect.Parameter(
                         name="curves",
                         kind=inspect.Parameter.KEYWORD_ONLY,
@@ -429,12 +446,8 @@ class WidgetFunction:
                         annotation=Any,
                     )
                     all_params = [p if p.name != "curve" else new_param for p in all_params]
-                    including_config_params_from_function = [
-                        p if p.name != "curve" else new_param for p in including_config_params_from_function
-                    ]
-                    including_config_params_from_class = [
-                        p if p.name != "curve" else new_param for p in including_config_params_from_class
-                    ]
+                    local_params_function = [p if p.name != "curve" else new_param for p in local_params_function]
+                    local_params_from_class = [p if p.name != "curve" else new_param for p in local_params_from_class]
 
                 if "curves" in [p.name for p in all_params] and "curves" not in kwargs:
 
@@ -457,9 +470,9 @@ class WidgetFunction:
                     kwargs["topostats_object"] = topostats_object
                 # Distribute arguments between method_args and class_args
                 for key, value in kwargs.items():
-                    if key in [p.name for p in including_config_params_from_function]:
+                    if key in [p.name for p in local_params_function]:
                         method_args[key] = value
-                    elif self.type_class and key in [p.name for p in including_config_params_from_class]:
+                    elif self.type_class and key in [p.name for p in local_params_from_class]:
                         class_args[key] = value
 
                 # Add config values if needed
@@ -469,7 +482,7 @@ class WidgetFunction:
                         io.config_wrapper,
                         self.function_key,
                         method_args,
-                        including_config_params_from_function,
+                        local_params_function,
                     )
                     if self.type_class:
                         class_args = add_values_to_dict_from_config(
@@ -477,15 +490,16 @@ class WidgetFunction:
                             io.config_wrapper,
                             self.function_key,
                             class_args,
-                            including_config_params_from_class,
+                            local_params_from_class,
                         )
 
                 # Enforce defaults
-                method_args = enforce_defaults(method_args, including_config_params_from_function)
+                method_args = enforce_defaults(method_args, local_params_function)
                 if self.type_class:
-                    class_args = enforce_defaults(class_args, including_config_params_from_class)
+                    class_args = enforce_defaults(class_args, local_params_from_class)
 
                 # Execute function or method
+                # pylint: disable=too-many-return-statements
                 def _func():
                     if self.type_class:
                         # ruff: noqa: BLE001
@@ -511,7 +525,7 @@ class WidgetFunction:
                     else:
                         # ruff: noqa: BLE001
                         try:
-                            return_value = self.function_to_run(**method_args)
+                            return_value = func_to_execute(**method_args)
                         except Exception as e:
                             return construct_error_args(e, raise_exception=True, topostats_error=True)
                     # Evaluate path_to_data
@@ -541,7 +555,9 @@ class WidgetFunction:
                         else:
                             result = evaluate_path_to_data(self.path_to_data, return_value)
                     except Exception as e:
-                        return construct_error_args(e=e, raise_exception=True, topostats_error=True)
+                        return construct_error_args(exception=e, raise_exception=True, topostats_error=True)
+                    if isinstance(result, dict) and "message" in result and "exception" in result:
+                        return result
                     return (result, metadata)
 
                 def _handle_result(result):
@@ -643,14 +659,12 @@ class WidgetFunction:
                 current_scale = current_scale[-self.ndims :]
 
             reader_id = original.metadata.get("afmreader_id", None) if original and original.metadata else None
-            print(f"Reader ID: {reader_id}")
             if reader_id is not None:
                 loaded_image = get_loaded_image(reader_id)
-                print(f"Loaded image for reader ID: {loaded_image}")
                 if loaded_image is not None:
                     channel_name = self.function_key.replace("find_", "")
-                    print(f"Adding custom channel '{channel_name}' to loaded image with return value.")
                     loaded_image.add_custom_channel(channel_name, return_value)
+                    # loaded_image.set_channel(channel_name)
 
             # Common metadata logic
             duplicated_metadata = original.metadata.copy() if original and original.metadata else {}
@@ -917,3 +931,19 @@ class WidgetFunctionManager:
         """
         self.docked_functions[name] = widget
         self.widget_manager.add_docked_widget(widget, area=area, name=name)
+
+    def get_docked_function(self, name):
+        """
+        Get the docked widget for a given function name.
+
+        Parameters
+        ----------
+        name : str
+            The name of the function.
+
+        Returns
+        -------
+        QWidget or None
+            The docked widget for the function, or None if it does not exist.
+        """
+        return self.docked_functions.get(name)

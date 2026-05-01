@@ -229,6 +229,7 @@ def remove_all_but_last(word: str, text: str) -> str:
     return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return
 
 
+# pylint: disable=too-many-positional-arguments
 def all_curves(
     curves,
     func,
@@ -237,9 +238,34 @@ def all_curves(
     type_class=None,
     flip_image: bool = False,
     **kwargs,
-):
-    print(f"Running {func.__name__} on all curves with shape ({shape_x}, {shape_y})")
-    print(f"Curves is object of type {type(curves)}")
+) -> np.ndarray:
+    """
+    Apply a function to all curves in a list of curves, with optional parameters for shaping the output and handling
+    classes. Should return a 2D array of the same shape as the input curves, where each element is the result of
+    applying the function to the corresponding curve.
+
+    Parameters
+    ----------
+    curves : list
+        The list of curves to apply the function to.
+    func : function
+        The function to apply to each curve.
+    shape_x : int, optional
+        The number of columns in the output map, by default None. If None, it will be inferred from the input curves.
+    shape_y : int, optional
+        The number of rows in the output map, by default None. If None, it will be inferred from the input curves.
+    type_class : class, optional
+        A class to instantiate for each curve, by default None.
+    flip_image : bool, optional
+        Whether to flip the output image vertically, by default False.
+    **kwargs : dict
+        Additional keyword arguments to pass to the function or class.
+
+    Returns
+    -------
+    np.ndarray
+        A 2D array of the results of applying the function to each curve.
+    """
     if None in (shape_x, shape_y):
         if hasattr(curves, "dims"):
             shape_y = curves.dims[0]
@@ -270,27 +296,23 @@ def all_curves(
         if p in kwargs:
             func_kwargs[p] = kwargs[p]
 
-    for y in range(shape_y):
-        for x in range(shape_x):
-            idx = y * shape_x + x
-            curve = curves[idx]
-            if type_class is not None:
-                if "curve" in class_kwargs:
-                    # If curve is a parameter in type_class parameters, instantiate the class with curve and class_kwargs
-                    instance = type_class(curve=curve, **class_kwargs)
-                else:
-                    # Otherwise, just pass the class_kwargs without curve
-                    instance = type_class(**class_kwargs)
-
-                # Run function on instance, passing func_kwargs
-                func = getattr(instance, func.__name__)
-                if "curve" in func_sig.parameters:
-                    point = func(curve=curve, **func_kwargs)
-                else:
-                    point = func(**func_kwargs)
+    for i, curve in enumerate(curves):
+        y = i // shape_x
+        x = i % shape_x
+        if type_class is not None:
+            if "curve" in class_kwargs:
+                # If curve is a parameter in type_class parameters, instantiate the class with curve and class_kwargs
+                instance = type_class(curve=curve, **class_kwargs)
             else:
-                point = func(curve=curve, **func_kwargs)
-            image_map[y][x] = point
+                # Otherwise, just pass the class_kwargs without curve
+                instance = type_class(**class_kwargs)
+
+            # Run function on instance, passing func_kwargs
+            func = getattr(instance, func.__name__)
+            point = func(curve=curve, **func_kwargs) if "curve" in func_sig.parameters else func(**func_kwargs)
+        else:
+            point = func(curve=curve, **func_kwargs)
+        image_map[y][x] = point
     if isinstance(image_map[0][0], dict):
         return image_map
     image_map = np.array(image_map)

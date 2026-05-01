@@ -4,6 +4,7 @@ import importlib.util
 import inspect
 from pathlib import Path
 
+from ._alerts import show_error_dialog
 from ._components import SelectionDialog
 from ._state import get_topostats_widget
 from ._widget_function import WidgetFunction
@@ -38,13 +39,10 @@ def load_py_files(paths, viewer):
                 tooltip=inspect.getdoc(func),
             )
             topostats_widget = get_topostats_widget()
-            print(
-                f"Adding function {func_name} topostats widget is {topostats_widget} widget_function is in loaded_functions: {widget_function in loaded_functions}"
-            )
-            if topostats_widget is not None:
-                topostats_widget.add_function(widget_function, to_group=True)
             if widget_function not in loaded_functions:
                 loaded_functions.append(widget_function)
+            if topostats_widget is not None:
+                topostats_widget.add_function(widget_function, to_group=True)
 
 
 def fetch_saved_scripts():
@@ -64,7 +62,7 @@ def load_functions_from_file(file_path):
 
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
-        print(f"Failed to load {file_path}")
+        show_error_dialog(f"Failed to load {file_path}")
         return {}
 
     module = importlib.util.module_from_spec(spec)
@@ -72,7 +70,7 @@ def load_functions_from_file(file_path):
     try:
         spec.loader.exec_module(module)
     except Exception as e:  # pylint: disable=broad-exception-caught #noqa: BLE001
-        print(f"Error executing {file_path}: {e}")
+        show_error_dialog(f"Error executing {file_path}: {e}")
         return {}
 
     extracted_functions = {}

@@ -159,6 +159,7 @@ class ButtonGrid(QListWidget):
             The tooltip for the button. If None, no tooltip will be set."""
         if isinstance(label, QListWidgetItem):
             super().addItem(label)
+            return
 
         item = QListWidgetItem(QIcon(_get_icon(label)), label)
         item.setBackground(_get_background_brush())

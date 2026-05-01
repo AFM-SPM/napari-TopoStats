@@ -289,6 +289,7 @@ class TopoStatsRootWidget(RootWidget):
                 else:
                     extra_topostats_functions.append(func)
         if extra_topostats_functions:
+            print(f"Adding extra topostats functions: {[func.name for func in extra_topostats_functions]}")
             self.add_function(
                 WidgetFunction(
                     name="loaded_image_functions",
@@ -298,6 +299,7 @@ class TopoStatsRootWidget(RootWidget):
                 )
             )
         if extra_forcestats_functions:
+            print(f"Adding extra forcestats functions: {[func.name for func in extra_forcestats_functions]}")
             self.add_function(
                 WidgetFunction(
                     name="loaded_curve_functions",
@@ -316,9 +318,9 @@ class TopoStatsRootWidget(RootWidget):
             if default_config_path.exists():
                 write_new_default_config(default_config_path)
                 load_config_impl(self._viewer, config_path=None, use_default=True)
-                self.bottom_row.set_status_message("✅ Default configuration reset successfully.")
+                self.bottom_widget.set_status_message("✅ Default configuration reset successfully.")
             else:
-                self.bottom_row.set_status_message("No default configuration file found to reset.")
+                self.bottom_widget.set_status_message("No default configuration file found to reset.")
 
         reset_button.clicked.connect(on_reset_clicked)
         self.bottom_row.addWidget(reset_button)

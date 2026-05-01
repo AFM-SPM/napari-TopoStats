@@ -439,8 +439,6 @@ class MultiPlotWidget(pg.PlotWidget):
                     )
                     self.p1.setLabel("left", "", units=self.current_unit)
 
-        print(self.profile_lines)
-
         if None not in [self.current_unit, self.previous_unit]:
             for u, lines in self.profile_lines.items():
                 for _, line in lines.items():
@@ -524,8 +522,6 @@ def get_selected_curves(viewer) -> list | None:
 
     # TODO add the ability to load all the curves in one go here
     curves = layer.metadata["force_curves"]
-    if hasattr(curves, "load_all_curves"):
-        curves = curves.load_all_curves()
 
     return curves
 
