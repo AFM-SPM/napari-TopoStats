@@ -26,7 +26,7 @@ jobs:
         platform: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.10", "3.11"]
     env:
-      QT_QPA_PLATFORM: xcb
+      QT_QPA_PLATFORM: offscreen
       LIBGL_ALWAYS_SOFTWARE: "1"
       QT_OPENGL: software
       XDG_RUNTIME_DIR: /tmp
