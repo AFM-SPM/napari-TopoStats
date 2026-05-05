@@ -10,7 +10,7 @@ from pytestqt.qtbot import QtBot
 from napari_topostats._state import WidgetManager
 from napari_topostats._widget import TopoStatsRootWidget
 
-os.environ["QT_QPA_PLATFORM"] = "offscreen"
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
 @pytest.fixture(scope="session", autouse=True)
