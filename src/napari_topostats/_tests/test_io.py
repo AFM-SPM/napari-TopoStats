@@ -47,8 +47,10 @@ def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
     ],
 )
 # ns-rse 2025-11-26 : See issue #72
+# pylint: disable=unused-argument
 def test_load_config(
     napari_viewer,
+    widget_manager,
     test_config_path: Path,
     use_default: bool,
     expected_result: str,
