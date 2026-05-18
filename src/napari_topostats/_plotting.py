@@ -392,7 +392,8 @@ class ProfileViewer(QWidget):
 
             for channel in self.channel_selector.get_checked_items():
 
-                data, _ = self.loaded_image.get_map(channel)
+                data, px2nm, z_units = self.loaded_image.get_map(channel)
+
                 # Handle multi-dimensional data (take the last 2D slice if needed)
                 if data.ndim > 2:
                     slice_idx = tuple(self.viewer.dims.current_step[:-2])
@@ -407,9 +408,22 @@ class ProfileViewer(QWidget):
                         values.append(data_slice[r, c])
 
                 if values:
-                    unit = "nm" if "height" in channel.lower() or "point" in channel.lower() else "N"
+                    if z_units == "nm":
+                        z_units = "m"
+                        values = np.array(values) * 1e-9
+                    elif z_units == "um":
+                        z_units = "m"
+                        values = np.array(values) * 1e-6
+                    elif z_units == "mm":
+                        z_units = "m"
+                        values = np.array(values) * 1e-3
+
                     self.plot_widget.plot(
-                        np.arange(len(values)), values, channel, available_channels=self.available_channels, unit=unit
+                        np.array(np.arange(len(values))) * float(px2nm),
+                        values,
+                        channel,
+                        available_channels=self.available_channels,
+                        unit=z_units,
                     )
                     self.info_label.setText(f"Profile: {len(values)} points.")
 

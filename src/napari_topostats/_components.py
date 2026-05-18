@@ -426,7 +426,9 @@ class MultiPlotWidget(pg.PlotWidget):
                         name=line_channel,
                         unit=self.previous_unit,
                     )
-                    self.p2.setLabel("right", "", units=self.previous_unit)
+                    print("Previous unit:", self.previous_unit)
+                    print("Current unit:", self.current_unit)
+                    self.p1.setLabel("right", "", units=self.previous_unit)
                 for line_channel in self.profile_lines[self.current_unit]:
                     # TODO is this leaving phantom lines?
                     self.profile_lines[self.current_unit][line_channel].setData([], [])
