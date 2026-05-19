@@ -389,6 +389,7 @@ class MultiPlotWidget(pg.PlotWidget):
         """
         # pylint:disable=too-many-branches
         global channel_colours, colour_idx  # pylint: disable=global-variable-not-assigned
+
         if unit == "nm":
             unit = "m"
             ydata = np.array(ydata) / 1e9
@@ -426,8 +427,6 @@ class MultiPlotWidget(pg.PlotWidget):
                         name=line_channel,
                         unit=self.previous_unit,
                     )
-                    print("Previous unit:", self.previous_unit)
-                    print("Current unit:", self.current_unit)
                     self.p1.setLabel("right", "", units=self.previous_unit)
                 for line_channel in self.profile_lines[self.current_unit]:
                     # TODO is this leaving phantom lines?
@@ -524,8 +523,10 @@ def get_selected_curves(viewer) -> list | None:
 
     # TODO add the ability to load all the curves in one go here
     curves = layer.metadata["force_curves"]
+    channel_units = layer.metadata.get("force_curves_units", {})
+    curves_meta = layer.metadata.get("force_curves_meta", {})
 
-    return curves
+    return curves, channel_units, curves_meta
 
 
 def get_current_layer(viewer, requires_force_curves=False):

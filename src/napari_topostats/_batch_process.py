@@ -69,7 +69,6 @@ def batch_process(
         except RuntimeError:
             # Worker thread has been deleted and is therefore not running
             pass
-    print(f"Config path: {str(get_current_config_path())}")
     args = argparse.Namespace(
         config_file=str(get_current_config_path()),
         module="topostats",

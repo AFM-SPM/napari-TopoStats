@@ -151,11 +151,33 @@ MAX_LOADED_FUNCTIONS = 3  # Maximum number of functions that can be loaded from 
 class RootWidget(QWidget):
     """
     A root widget where all force stats functions can be accessed.
+
     This widget serves as a container for the button grid and provides
     a layout for the various controls.
+
+    Parameters
+    ----------
+    viewer : Viewer
+        The napari viewer.
+    functions : dict[str, WidgetFunction]
+        The available functions to be displayed in the button grid.
+    parent : QWidget, optional
+        The parent widget, by default None.
     """
 
     def __init__(self, viewer: Viewer, functions: dict[str, WidgetFunction], parent=None):
+        """
+        Initialises RootWidget
+
+        Parameters
+        ----------
+        viewer : Viewer
+            The napari viewer.
+        functions : dict[str, WidgetFunction]
+            The available functions to be displayed in the button grid.
+        parent : QWidget, optional
+            The parent widget, by default None.
+        """
         # Initialize the widget with a viewer
         if parent:
             super().__init__(parent)
@@ -267,11 +289,29 @@ class RootWidget(QWidget):
 class TopoStatsRootWidget(RootWidget):
     """
     A root widget where all topostats functions can be accessed.
+
     This widget serves as a container for the button grid and provides
     a layout for the various controls.
+
+    Parameters
+    ----------
+    viewer : Viewer
+        The napari viewer.
+    parent : QWidget, optional
+        The parent widget, by default None.
     """
 
     def __init__(self, viewer: Viewer, parent=None):
+        """
+        Initialises TopoStatsRootWidget
+
+        Parameters
+        ----------
+        viewer : Viewer
+            The napari viewer.
+        parent : QWidget, optional
+            The parent widget, by default None.
+        """
         # Initialize the widget with a viewer
         available_functions = TOPOSTATS_FUNCTIONS.copy() + FORCESTATS_FUNCTIONS.copy()
         if parent:

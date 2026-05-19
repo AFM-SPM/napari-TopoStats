@@ -89,11 +89,30 @@ def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
 
 class CallableWithSignature:
     """
-    A callable that wraps a function and its signature. This allows the signature of the function to be updated for
-    its parameters and their defaults so that it can be used correctly with magicgui.
+    A callable that wraps a function and its signature.
+
+    This allows the signature of the function to be updated for its parameters
+    and their defaults so that it can be used correctly with magicgui.
+
+    Parameters
+    ----------
+    real_func : callable
+        The function to wrap.
+    sig : inspect.Signature
+        The signature to use for the wrapped function.
     """
 
     def __init__(self, real_func, sig):
+        """
+        Initialises CallableWithSignature
+
+        Parameters
+        ----------
+        real_func : callable
+            The function to wrap.
+        sig : inspect.Signature
+            The signature to use for the wrapped function.
+        """
         functools.update_wrapper(self, real_func)  # Sets __name__, __doc__, etc.
         self.real_func = real_func
         self.__signature__ = sig
@@ -451,9 +470,19 @@ class WidgetFunction:
 
                 if "curves" in [p.name for p in all_params] and "curves" not in kwargs:
 
-                    kwargs["curves"] = get_selected_curves(
+                    curves_data = get_selected_curves(
                         kwargs.get("viewer", current_viewer()),
                     )
+                    kwargs["curves"] = curves_data[0]
+                    if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
+                        kwargs["channel_units"] = curves_data[1]
+                    if "curves_meta" in [p.name for p in all_params] and "curves_meta" not in kwargs:
+                        kwargs["curves_meta"] = curves_data[2]
+                else:
+                    if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
+                        kwargs["channel_units"] = {}
+                    if "curves_meta" in [p.name for p in all_params] and "curves_meta" not in kwargs:
+                        kwargs["curves_meta"] = {}
 
                 if uses_topostats_object:
                     # Create TopoStats object and add to kwargs
@@ -567,12 +596,17 @@ class WidgetFunction:
                         return
                     viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
                     return_value, metadata = result
+                    if isinstance(return_value, tuple) and len(return_value) == 2 and isinstance(return_value[1], str):
+                        return_value, z_units = return_value
+                    else:
+                        z_units = None
                     if return_value is not None:
                         self.render_return_value(
                             return_value,
                             viewer,
                             selected_image,
                             metadata=metadata,
+                            z_units=z_units,
                         )
                     else:
                         show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
@@ -610,6 +644,8 @@ class WidgetFunction:
                     "topostats_object",
                     "curve",
                     "curves",
+                    "channel_units",
+                    "curves_meta",
                 ]:
                     new_parameters.append(new_p)
             # Create a magicgui function with the wrapped function and the new parameters
@@ -628,6 +664,7 @@ class WidgetFunction:
         viewer: Viewer,
         original: Layer,
         metadata: dict,
+        z_units: str | None = None,
     ):
         """
         Render the return value of a function in the napari viewer.
@@ -646,9 +683,12 @@ class WidgetFunction:
             The napari viewer instance where the layer will be added. If not provided, the current viewer will be used.
         original : Layer
             The original image layer, used for metadata and naming. If not provided, it will be set to None.
-        ndims : int, optional
-            The number of dimensions of the data to be rendered. If not provided, it will be set to 2.
+        metadata : dict
+            Additional metadata to add to the layer.
+        z_units : str, optional
+            The units for the z-axis. Default is None (though will be programmaticaly defaulted to nm).
         """
+
         # Check if the return value is a numpy array
 
         if isinstance(return_value, np.ndarray):
@@ -663,7 +703,11 @@ class WidgetFunction:
                 loaded_image = get_loaded_image(reader_id)
                 if loaded_image is not None:
                     channel_name = self.function_key.replace("find_", "")
-                    loaded_image.add_custom_channel(channel_name, return_value)
+                    original_channel = original.metadata.get("channel")
+                    if z_units is None:
+                        _, _, z_units = loaded_image.get_map(original_channel)
+
+                    loaded_image.add_custom_channel(channel_name, return_value, z_units=z_units)
                     # loaded_image.set_channel(channel_name)
 
             # Common metadata logic

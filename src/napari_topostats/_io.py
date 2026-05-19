@@ -341,7 +341,6 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
             widget.viewer.value = viewer
             widget.config_path.value = config_path
     current_config_path = str(config_path)
-    print(f"Current config path set to {current_config_path}")
 
     try:
         with open(config_path, encoding="utf-8") as f:

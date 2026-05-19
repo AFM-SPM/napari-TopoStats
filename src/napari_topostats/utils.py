@@ -2,10 +2,14 @@
 
 import copy
 import inspect
+import multiprocessing
+import time
 from typing import Any
 
 import numpy as np
+from joblib import Parallel, delayed
 from napari.types import ImageData
+from tqdm import tqdm
 
 
 # ------- Misc -------
@@ -230,6 +234,28 @@ def remove_all_but_last(word: str, text: str) -> str:
 
 
 # pylint: disable=too-many-positional-arguments
+def _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig):
+    """Worker function for parallel curve processing returning full value from function."""
+    if type_class is not None:
+        # Instantiate the class with curve if it's a parameter, otherwise just with class_kwargs
+        instance = type_class(curve=curve, **class_kwargs) if "curve" in class_kwargs else type_class(**class_kwargs)
+
+        # Get the bound method from the instance
+        method = getattr(instance, func.__name__)
+        return method(curve=curve, **func_kwargs) if has_curve_in_func_sig else method(**func_kwargs)
+    return func(curve=curve, **func_kwargs)
+
+
+# pylint: disable=too-many-positional-arguments
+def _all_curves_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig):
+    """Worker function for parallel curve processing."""
+    return_value = _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig)
+    if isinstance(return_value, tuple) and isinstance(return_value[1], str):
+        return return_value[0]
+    return return_value
+
+
+# pylint: disable=too-many-positional-arguments,too-many-arguments,too-many-locals
 def all_curves(
     curves,
     func,
@@ -237,6 +263,8 @@ def all_curves(
     shape_y: int | None = None,
     type_class=None,
     flip_image: bool = False,
+    parallel: bool | None = None,
+    num_workers: int | None = None,
     **kwargs,
 ) -> np.ndarray:
     """
@@ -258,6 +286,10 @@ def all_curves(
         A class to instantiate for each curve, by default None.
     flip_image : bool, optional
         Whether to flip the output image vertically, by default False.
+    parallel : bool, optional
+        Whether to run the processing in parallel, by default None (auto-detect based on process intensity).
+    num_workers : int, optional
+        The number of worker processes to use for parallel processing, by default None (cpu_count).
     **kwargs : dict
         Additional keyword arguments to pass to the function or class.
 
@@ -283,9 +315,10 @@ def all_curves(
 
     image_map = [[None for _ in range(shape_x)] for _ in range(shape_y)]
 
+    # Prepare keyword arguments for class and function
+    class_kwargs = {}
     if type_class is not None:
         class_sig = inspect.signature(type_class)
-        class_kwargs = {}
         for p in class_sig.parameters:
             if p in kwargs:
                 class_kwargs[p] = kwargs[p]
@@ -296,26 +329,51 @@ def all_curves(
         if p in kwargs:
             func_kwargs[p] = kwargs[p]
 
-    for i, curve in enumerate(curves):
-        y = i // shape_x
-        x = i % shape_x
-        if type_class is not None:
-            if "curve" in class_kwargs:
-                # If curve is a parameter in type_class parameters, instantiate the class with curve and class_kwargs
-                instance = type_class(curve=curve, **class_kwargs)
-            else:
-                # Otherwise, just pass the class_kwargs without curve
-                instance = type_class(**class_kwargs)
+    has_curve_in_func_sig = "curve" in func_sig.parameters
 
-            # Run function on instance, passing func_kwargs
-            func = getattr(instance, func.__name__)
-            point = func(curve=curve, **func_kwargs) if "curve" in func_sig.parameters else func(**func_kwargs)
-        else:
-            point = func(curve=curve, **func_kwargs)
-        image_map[y][x] = point
+    # Try to get z_units from the first curve
+    first_curve = curves[0][0] if not isinstance(curves, list) and hasattr(curves, "__getitem__") else curves[0]
+    start_time = time.perf_counter()
+    return_value = _all_curves_raw_worker(
+        first_curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
+    )
+    execution_time = time.perf_counter() - start_time
+    if parallel is None:
+        # Auto-detect based on execution time of first curve
+        parallel = execution_time > 0.001  # Threshold of 0.001 seconds for deciding to parallelize
+    if isinstance(return_value, tuple) and len(return_value) > 1 and isinstance(return_value[1], str):
+        z_units = return_value[1]
+    else:
+        z_units = "nm"
+
+    if num_workers is None:
+        # Default to all but 2 cores, minimum 1
+        num_workers = max(1, multiprocessing.cpu_count() - 2)
+
+    if parallel and num_workers > 1:
+
+        # Use joblib.Parallel with a generator expression to keep it lazy.
+        # batch_size=shape_x ensures we load one row of curves at a time per worker.
+        results = Parallel(n_jobs=num_workers, batch_size=shape_x)(
+            delayed(_all_curves_worker)(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig)
+            for curve in tqdm(curves, desc=f"Running {func.__name__} (Parallel)")
+        )
+
+        # Reshape results into the image map
+        for i, point in enumerate(results):
+            y = i // shape_x
+            x = i % shape_x
+            image_map[y][x] = point
+
+    else:
+        for i, curve in enumerate(tqdm(curves, desc=f"Running {func.__name__} (Sequential)")):
+            y = i // shape_x
+            x = i % shape_x
+            point = _all_curves_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig)
+            image_map[y][x] = point
     if isinstance(image_map[0][0], dict):
         return image_map
     image_map = np.array(image_map)
     if flip_image:
         image_map = np.flipud(image_map)
-    return image_map
+    return image_map, z_units

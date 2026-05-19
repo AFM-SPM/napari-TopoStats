@@ -10,7 +10,7 @@ from ._state import get_topostats_widget
 from ._widget_function import WidgetFunction
 
 loaded_functions = []
-ALLOWABLE_PARAMETERS = ["viewer", "image", "curves", "curve"]
+ALLOWABLE_PARAMETERS = ["viewer", "image", "curves", "curve", "channel_units"]
 
 
 def load_py_files(paths, viewer):
