@@ -256,6 +256,9 @@ class WidgetFunction:
             self.is_group = True
             self.group_functions = {f.name: f for f in function_to_run}
 
+            def get_choices(_widget=None):
+                return list(self.group_functions.keys())
+
             def make_group_func(widget_function_self):
                 def func(function_name: str):
                     wf = widget_function_self.group_functions.get(function_name)
@@ -263,9 +266,7 @@ class WidgetFunction:
 
                 return func
 
-            self.function_to_run = magicgui(
-                make_group_func(self), function_name={"choices": list(self.group_functions.keys())}
-            )
+            self.function_to_run = magicgui(make_group_func(self), function_name={"choices": get_choices})
         else:
             self.is_group = False
 
@@ -280,24 +281,15 @@ class WidgetFunction:
             return
         self.group_functions[widget_function.name] = widget_function
 
-        # Rebuild the magicgui widget with updated choices
-        new_choices = list(self.group_functions.keys())
+        if hasattr(self.function_to_run, "function_name"):
+            self.function_to_run.function_name.reset_choices()
 
-        def make_group_func(widget_function_self):
-            def func(function_name: str):
-                wf = widget_function_self.group_functions.get(function_name)
-                widget_function_self.function_manager.add_function_as_widget(function_name, wf)
-
-            return func
-
-        self.function_to_run.function_name.choices = new_choices
-
-        self.function_to_run = magicgui(make_group_func(self), function_name={"choices": new_choices})
         docked_function = self.function_manager.get_docked_function(self.name)
-        if docked_function is not None:
-            docked_function.function_name.choices = new_choices
-        if self.function_gui is not None:
-            self.function_gui.function_name.choices = new_choices
+        if docked_function is not None and hasattr(docked_function, "function_name"):
+            docked_function.function_name.reset_choices()
+
+        if self.function_gui is not None and hasattr(self.function_gui, "function_name"):
+            self.function_gui.function_name.reset_choices()
 
     def add_overide_viewer(self, viewer: Viewer):
         """Adds an overide viewer, this is sometimes required for abstract use of the plugin such as tests"""

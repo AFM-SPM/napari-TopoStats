@@ -262,15 +262,14 @@ class RootWidget(QWidget):
         display_name = function_name.replace("_", " ").title()
         self._functions[display_name] = function_to_add
         if to_group:
-            if "curve" in inspect.signature(function_to_add.function_to_run).parameters:
+            params = inspect.signature(function_to_add.function_to_run).parameters
+            if "curve" in params or "curves" in params:
                 group_to_add_to = "Loaded Curve Functions"
             else:
                 group_to_add_to = "Loaded Image Functions"
             group_function = self._functions.get(group_to_add_to)
             if not group_function:
-                type_of_function = (
-                    "curves" if "curve" in inspect.signature(function_to_add.function_to_run).parameters else "images"
-                )
+                type_of_function = "curves" if "curve" in params or "curves" in params else "images"
                 group_function = WidgetFunction(
                     name=group_to_add_to.lower().replace(" ", "_"),
                     function_to_run=[function_to_add],

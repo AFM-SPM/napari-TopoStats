@@ -21,6 +21,8 @@ def load_py_files(paths, viewer):
         py_functions.update(load_functions_from_file(py_file))
 
     # pylint: disable=protected-access
+    if not py_functions:
+        return
     dialog = SelectionDialog(
         available_items=py_functions.keys(), text="Select functions to import", parent=viewer.window._qt_window
     )
