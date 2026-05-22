@@ -1,4 +1,4 @@
-# pylint: disable=no-else-return
+# pylint: disable=no-else-return,too-many-lines
 """
 Module for dynamic widget generation from topostats functions including creating a window of options
 for those functions, running them and rendering the result.
@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from magicgui import magicgui
-from magicgui.widgets import FunctionGui
+from magicgui.widgets import Container, FunctionGui, PushButton
 from napari import current_viewer  # pylint: disable=no-name-in-module
 from napari.layers import Image, Labels, Layer
 from napari.layers.labels._labels_constants import Mode
@@ -32,9 +32,9 @@ from scipy.ndimage import label
 from topostats.classes import TopoStats
 
 from . import _io as io
-from ._alerts import LoadingWidget, construct_error_args, show_error_dialog
-from ._components import get_selected_curves, get_selected_image
-from ._io import add_values_to_dict_from_config, get_current_config
+from ._alerts import LoadingWidget, attach_status_label, construct_error_args, show_error_dialog
+from ._components import SelectionDialog, get_selected_curves, get_selected_image
+from ._io import add_values_to_dict_from_config, fetch_saved_scripts, get_current_config, save_scripts, unsave_scripts
 from ._parallel_processing import ProcessWorker
 from ._state import WidgetManager, get_running_function, set_running_function
 from .utils import _eval, all_curves, calculate_contrast_limits, is_binary_image, remove_all_but_last
@@ -225,7 +225,7 @@ class WidgetFunction:
         function is part of a group of functions.
     """
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-instance-attributes
+    # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-instance-attributes, too-many-statements, protected-access
     def __init__(
         self,
         name: str,
@@ -266,7 +266,76 @@ class WidgetFunction:
 
                 return func
 
+            save_scripts_btn = PushButton(
+                label="Save Scripts", tooltip="Save the currently loaded scripts for use in future sessions"
+            )
+
+            @save_scripts_btn.clicked.connect
+            def save_scripts_btn_clicked():
+                selection_dialog = SelectionDialog(
+                    get_choices(), "Select scripts to save", parent=current_viewer().window._qt_window
+                )
+                if selection_dialog.exec_():
+                    selected_scripts = selection_dialog.get_selected_items()
+                    if not selected_scripts:
+                        self.function_to_run.set_status_message("No scripts selected to save.")
+                        return
+                    saved_files = save_scripts(selected_scripts)
+
+                    if saved_files:
+                        if len(saved_files) > 3:
+                            self.function_to_run.set_status_message(
+                                f"✅ Saved: {', '.join(saved_files[:3])} and {len(saved_files) - 3} more"
+                            )
+                        else:
+                            self.function_to_run.set_status_message(f"✅ Saved: {', '.join(saved_files)}")
+                    else:
+                        self.function_to_run.set_status_message("No scripts saved.")
+
+            delete_scripts_btn = PushButton(
+                label="Delete Saved Scripts", tooltip="Delete saved scripts from future sessions"
+            )
+
+            @delete_scripts_btn.clicked.connect
+            def delete_scripts_btn_clicked():
+                scripts_metadata = fetch_saved_scripts()
+                if not scripts_metadata:
+                    self.function_to_run.set_status_message("No saved scripts to delete.")
+                    return
+                saved_functions = [
+                    func_name for scripts_file in scripts_metadata.values() for func_name in scripts_file
+                ]
+                selection_dialog = SelectionDialog(
+                    saved_functions, "Select scripts to delete", parent=current_viewer().window._qt_window
+                )
+                if selection_dialog.exec_():
+                    selected_scripts = selection_dialog.get_selected_items()
+                    if not selected_scripts:
+                        self.function_to_run.set_status_message("No scripts selected to delete.")
+                        return
+                    unsaved_files = unsave_scripts(selected_scripts)
+
+                    if unsaved_files:
+                        if len(unsaved_files) > 3:
+                            self.function_to_run.set_status_message(
+                                f"❌ Deleted: {', '.join(unsaved_files[:3])} and {len(unsaved_files) - 3} more"
+                            )
+                        else:
+                            self.function_to_run.set_status_message(f"❌ Deleted: {', '.join(unsaved_files)}")
+
+                        # Dynamically remove deleted scripts from choices and refresh dropdown
+                        for name in selected_scripts:
+                            if name in self.group_functions:
+                                del self.group_functions[name]
+                        self.function_to_run.function_name.reset_choices()
+                    else:
+                        self.function_to_run.set_status_message("No scripts deleted.")
+
+            button_row = Container(layout="horizontal", widgets=[save_scripts_btn, delete_scripts_btn], labels=False)
+
             self.function_to_run = magicgui(make_group_func(self), function_name={"choices": get_choices})
+            self.function_to_run.append(button_row)
+            attach_status_label(self.function_to_run)
         else:
             self.is_group = False
 

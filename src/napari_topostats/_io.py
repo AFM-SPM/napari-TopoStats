@@ -1,8 +1,11 @@
 """Provides functionality for loading and editting config files"""
 
+# pylint: disable=too-many-lines
+
 import contextlib
 import json
 import re
+import shutil
 from argparse import Namespace
 from pathlib import Path
 from typing import Any
@@ -34,7 +37,7 @@ from napari_topostats.utils import unflatten_dict
 
 from ._alerts import attach_status_label, show_error_dialog
 from ._components import CollapsibleBox
-from ._state import MIN_TOPOSTATS_VERSION, get_widget_manager
+from ._state import MIN_TOPOSTATS_VERSION, get_loaded_function_path, get_widget_manager
 
 # pylint: disable=ungrouped-imports
 try:
@@ -875,3 +878,131 @@ def add_values_to_dict_from_config(
         if param_name in config and isinstance(config[param_name], dict):
             args[param_name] = config[param_name]
     return args
+
+
+def save_scripts(selected_scripts):
+    """
+    Saves selected scripts to the TopoStats configuration directory.
+
+    Parameters
+    ----------
+    selected_scripts : list of str
+        Names of the scripts/functions to save.
+
+    Returns
+    -------
+    set of str
+        The names of the files that were successfully saved.
+    """
+    save_dir = Path(user_config_dir("TopoStats", "Napari")) / "scripts"
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    metadata_path = save_dir / "saved_scripts.json"
+
+    if metadata_path.exists():
+        with open(metadata_path, encoding="utf-8") as f:
+            metadata = json.load(f)
+    else:
+        metadata = {}
+
+    saved_files = set()
+
+    for name in selected_scripts:
+        file_path_str = get_loaded_function_path(name)
+        if file_path_str:
+            file_path = Path(file_path_str)
+            if file_path.exists() and file_path.suffix == ".py":
+                dest_path = save_dir / file_path.name
+                if file_path.resolve() != dest_path.resolve():
+                    shutil.copy(file_path, dest_path)
+                saved_files.add(file_path.name)
+
+                # Update metadata mapping filename to selected functions
+                if file_path.name not in metadata:
+                    metadata[file_path.name] = []
+                if name not in metadata[file_path.name]:
+                    metadata[file_path.name].append(name)
+
+    # Write metadata back
+    with open(metadata_path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=4)
+
+    return saved_files
+
+
+def unsave_scripts(selected_scripts):
+    """
+    Unsaves selected scripts from the TopoStats configuration directory.
+
+    Parameters
+    ----------
+    selected_scripts : list of str
+        Names of the scripts/functions to unsave.
+
+    Returns
+    -------
+    set of str
+        The names of the files that were successfully unsaved.
+    """
+    save_dir = Path(user_config_dir("TopoStats", "Napari")) / "scripts"
+    metadata_path = save_dir / "saved_scripts.json"
+
+    if not metadata_path.exists():
+        return set()
+
+    with open(metadata_path, encoding="utf-8") as f:
+        metadata = json.load(f)
+
+    unsaved_files = set()
+
+    for name in selected_scripts:
+        file_path_str = get_loaded_function_path(name)
+        if file_path_str:
+            file_path = Path(file_path_str)
+            if (
+                file_path.exists()
+                and file_path.suffix == ".py"
+                and file_path.name in metadata
+                and name in metadata[file_path.name]
+            ):
+                # Update metadata
+                metadata[file_path.name].remove(name)
+
+    for file_path, file_list in metadata.items():
+        file_path = save_dir / file_path
+        print(f"Checking {file_path} with list {file_list}")
+        if not file_list and file_path.exists():
+            print(f"Removing {file_path}")
+            file_path.unlink()
+            unsaved_files.add(file_path)
+    for file_path in unsaved_files:
+        if file_path.name in metadata:
+            del metadata[file_path.name]
+    unsaved_files = {f.name for f in unsaved_files}
+
+    # Write updated metadata back
+    with open(metadata_path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=4)
+
+    return unsaved_files
+
+
+def fetch_saved_scripts():
+    """
+    Fetches the metadata of saved scripts.
+
+    Returns
+    -------
+    dict
+        Metadata mapping filenames to lists of selected function names.
+    """
+    save_dir = Path(user_config_dir("TopoStats", "Napari")) / "scripts"
+    metadata_path = save_dir / "saved_scripts.json"
+
+    if not metadata_path.exists():
+        return {}
+
+    with open(metadata_path, encoding="utf-8") as f:
+        metadata = json.load(f)
+
+    return metadata

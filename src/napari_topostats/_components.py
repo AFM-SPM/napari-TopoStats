@@ -13,6 +13,7 @@ from qtpy.QtWidgets import (
     QComboBox,
     QDialog,
     QFrame,
+    QHBoxLayout,
     QLabel,
     QListWidget,
     QPushButton,
@@ -225,11 +226,31 @@ class SelectionDialog(QDialog):
         self.list_widget.addItems(available_items)
         self.layout.addWidget(self.list_widget)
 
+        # Helper buttons for quick selection
+        self.helpers_layout = QHBoxLayout()
+        self.select_all_btn = QPushButton("Select All")
+        self.select_all_btn.clicked.connect(self.select_all)
+        self.clear_btn = QPushButton("Clear Selection")
+        self.clear_btn.clicked.connect(self.clear_selection)
+        self.helpers_layout.addWidget(self.select_all_btn)
+        self.helpers_layout.addWidget(self.clear_btn)
+        self.layout.addLayout(self.helpers_layout)
+
         self.confirm_btn = QPushButton("Confirm")
         self.confirm_btn.clicked.connect(self.accept)
         self.layout.addWidget(self.confirm_btn)
 
         self.setLayout(self.layout)
+
+    def select_all(self):
+        """Select all items in the list widget."""
+        for i in range(self.list_widget.count()):
+            self.list_widget.item(i).setSelected(True)
+
+    def clear_selection(self):
+        """Deselect all items in the list widget."""
+        for i in range(self.list_widget.count()):
+            self.list_widget.item(i).setSelected(False)
 
     def get_selected_items(self):
         """Helper method to return the text of the selected items."""

@@ -227,3 +227,17 @@ def set_topostats_widget(widget):
 def get_topostats_widget():
     """Get the topostats widget"""
     return topostats_widget
+
+
+# Dictionary mapping loaded function names to their source python file path
+loaded_function_paths = {}
+
+
+def record_loaded_function_path(func_name: str, file_path: str):
+    """Record the source python file path for a dynamically loaded function."""
+    loaded_function_paths[func_name] = file_path
+
+
+def get_loaded_function_path(func_name: str) -> str | None:
+    """Get the source python file path for a dynamically loaded function."""
+    return loaded_function_paths.get(func_name)
