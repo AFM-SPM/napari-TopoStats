@@ -150,9 +150,6 @@ class CurveViewer(QWidget):
             [], [], pen="r", name="retract", available_channels=self.available_channels
         )
 
-        # Setup the onclick event for so the curve viewer updates when the user clicks on a pixel
-        self.viewer.mouse_drag_callbacks.append(self.extract_curve)
-
     def open_experimental_parameters(self):
         """Open the experimental parameters dialog"""
         if self.parameter_dialog is None:
@@ -204,6 +201,20 @@ class CurveViewer(QWidget):
         if retract is not None:
             self.show_retract = retract
         self.update_curve()
+
+    def showEvent(self, event):
+        """Register the mouse callback when the widget is shown."""
+        if self.extract_curve not in self.viewer.mouse_drag_callbacks:
+            self.viewer.mouse_drag_callbacks.append(self.extract_curve)
+        super().showEvent(event)
+
+    def hideEvent(self, event):
+        """Clean up the mouse callback and selection cross layer when hidden/closed."""
+        if self.extract_curve in self.viewer.mouse_drag_callbacks:
+            self.viewer.mouse_drag_callbacks.remove(self.extract_curve)
+        if "Selected Curve" in self.viewer.layers:
+            self.viewer.layers.remove("Selected Curve")
+        super().hideEvent(event)
 
     def extract_curve(self, viewer, event):
         """Generator that runs when the user clicks and drags the mouse in the viewer."""
@@ -259,6 +270,36 @@ class CurveViewer(QWidget):
             curve_dict = all_curve_data[self.y_coord][self.x_coord]
             self.set_available_channels(curve_dict.keys())
             self.update_curve(curve_dict)
+
+            # Update the cross on the viewer at the selected pixel position
+            selected_position = layer.data_to_world(coords)
+            y_pos, x_pos = selected_position[-2:]
+            y_scale, x_scale = np.abs(layer.scale[-2:])
+            half_size = max(y_scale, x_scale) * 3
+            cross_data = np.array(
+                [
+                    [[y_pos - half_size, x_pos - half_size], [y_pos + half_size, x_pos + half_size]],
+                    [[y_pos - half_size, x_pos + half_size], [y_pos + half_size, x_pos - half_size]],
+                ]
+            )
+            if "Selected Curve" in viewer.layers and not hasattr(viewer.layers["Selected Curve"], "edge_width"):
+                viewer.layers.remove("Selected Curve")
+
+            if "Selected Curve" not in viewer.layers:
+                active_layer = viewer.layers.selection.active
+                viewer.add_shapes(
+                    data=cross_data,
+                    name="Selected Curve",
+                    shape_type="line",
+                    edge_color="magenta",
+                    edge_width=max(y_scale, x_scale) * 0.5,
+                )
+                if active_layer is not None:
+                    viewer.layers.selection.active = active_layer
+            else:
+                selected_curve_layer = viewer.layers["Selected Curve"]
+                selected_curve_layer.data = cross_data
+                selected_curve_layer.edge_width = max(y_scale, x_scale) * 0.5
         except IndexError:
             self.info_label.setText("Clicked outside the image bounds.")
         # pylint: disable=broad-exception-caught
