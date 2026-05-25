@@ -94,6 +94,7 @@ which contains the data to be processed as well as a directory to save the outpu
 create with the new folder button if the directory doesn't exist). Otherwise, the directories defined in the config
 file will be used. Once these have been defined topostats will process in the background (the output and progress
 can been seen in the command line). You can carry on using napari while this happens.
+
 <img src="readme_images/batch_process.png" width="800" alt="Function window"/>
 
 **Viewing Curves** is a function which allows the viewing of the force-distance curves for a point on loaded AFM

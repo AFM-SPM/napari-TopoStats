@@ -54,19 +54,21 @@ from napari_topostats._alerts import show_error_dialog
 from napari_topostats._batch_process import batch_process
 from napari_topostats._button_grid import ButtonGrid
 from napari_topostats._grainstats import grainstats
+from napari_topostats._guide import check_guide, show_guide
 from napari_topostats._io import (
     load_config,
     load_config_impl,
     write_new_default_config,
 )
 from napari_topostats._plotting import open_curve_viewer, start_drawing
+from napari_topostats._script_handler import get_loaded_functions
 from napari_topostats._state import MIN_TOPOSTATS_VERSION, WidgetManager, get_running_function, set_topostats_widget
 from napari_topostats._widget_function import WidgetFunction, WidgetFunctionManager
 from napari_topostats.utils import (
     afm2stack,
 )
 
-from ._script_handler import get_loaded_functions
+check_guide(current_viewer())
 
 if parse_version(parse_version(topostats_version).base_version) < parse_version(MIN_TOPOSTATS_VERSION):
     show_error_dialog(
@@ -328,7 +330,6 @@ class TopoStatsRootWidget(RootWidget):
                 else:
                     extra_topostats_functions.append(func)
         if extra_topostats_functions:
-            print(f"Adding extra topostats functions: {[func.name for func in extra_topostats_functions]}")
             self.add_function(
                 WidgetFunction(
                     name="loaded_image_functions",
@@ -338,7 +339,6 @@ class TopoStatsRootWidget(RootWidget):
                 )
             )
         if extra_forcestats_functions:
-            print(f"Adding extra forcestats functions: {[func.name for func in extra_forcestats_functions]}")
             self.add_function(
                 WidgetFunction(
                     name="loaded_curve_functions",
@@ -362,6 +362,12 @@ class TopoStatsRootWidget(RootWidget):
                 self.bottom_widget.set_status_message("No default configuration file found to reset.")
 
         reset_button.clicked.connect(on_reset_clicked)
+
+        guide_button = QPushButton("Show Guide")
+        guide_button.setToolTip("Open the TopoStats guide.")
+        guide_button.clicked.connect(lambda: show_guide(viewer))
+        self.bottom_row.addWidget(guide_button)
+
         self.bottom_row.addWidget(reset_button)
 
         # Add a text label to tell the user they can press 'a' to open the curve viewer and use the line tool
