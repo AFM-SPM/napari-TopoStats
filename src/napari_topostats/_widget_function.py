@@ -133,12 +133,7 @@ def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=
             except KeyError as e:
                 raised_error = e
         if raised_error:
-            return construct_error_args(
-                message=f"Couldn't find data for either direction in path: {path_to_data}",
-                raise_exception=True,
-                topostats_error=True,
-                exception=raised_error,
-            )
+            raise ValueError("Couldn't find data for either direction") from raised_error
     if path_to_data.startswith("return"):
         return _eval(return_value, path_to_data[6:]) if len(path_to_data) > 6 else return_value
 
@@ -146,11 +141,9 @@ def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=
         if type_class:
             return _eval(instance, path_to_data[3:]) if len(path_to_data) > 3 else instance
         else:
-            return construct_error_args(
-                message=f"Invalid path_to_data: {path_to_data} - 'obj' requires type_class",
-            )
+            raise ValueError(f"Invalid path_to_data: {path_to_data} - 'obj' requires type_class")
 
-    return construct_error_args(message=f"Invalid path_to_data: {path_to_data}", topostats_error=True)
+    raise ValueError(f"Invalid path_to_data: {path_to_data}")
 
 
 # Class representation of each function in the button grid.
@@ -501,36 +494,21 @@ class WidgetFunction:
                 # Execute function or method
                 # pylint: disable=too-many-return-statements
                 def _func():
-                    if self.type_class:
-                        # ruff: noqa: BLE001
-                        try:
+                    # ruff: noqa: BLE001
+                    try:
+                        if self.type_class:
                             instance = self.type_class(**class_args)
-                        except Exception as e:
-                            return construct_error_args(
-                                e, raise_exception=True, topostats_error=True, type_class=self.type_class
-                            )
-                        method = getattr(instance, self.function_to_run.__name__, None)
-                        if method:
-                            # ruff: noqa: BLE001
-                            try:
+                            method = getattr(instance, self.function_to_run.__name__, None)
+                            if method:
                                 return_value = method(**method_args)
-                            except Exception as e:
+                            else:
                                 return construct_error_args(
-                                    e, raise_exception=True, topostats_error=True, type_class=self.type_class
+                                    message=f"Method {self.function_to_run.__name__} not found on instance."
                                 )
                         else:
-                            return construct_error_args(
-                                message=f"Method {self.function_to_run.__name__} not found on instance."
-                            )
-                    else:
-                        # ruff: noqa: BLE001
-                        try:
                             return_value = func_to_execute(**method_args)
-                        except Exception as e:
-                            return construct_error_args(e, raise_exception=True, topostats_error=True)
-                    # Evaluate path_to_data
-                    metadata = {}
-                    try:
+                        # Evaluate path_to_data
+                        metadata = {}
                         if self.metadata_paths is not None:
                             for key in self.metadata_paths:
                                 if self.metadata_paths[key] == "config":
@@ -539,7 +517,7 @@ class WidgetFunction:
                                     metadata[key] = evaluate_path_to_data(
                                         self.metadata_paths[key],
                                         return_value,
-                                        instance,
+                                        instance if self.type_class else None,
                                         self.type_class,
                                     )
                         if self.type_class and hasattr(instance, "topostats_object"):
@@ -555,7 +533,9 @@ class WidgetFunction:
                         else:
                             result = evaluate_path_to_data(self.path_to_data, return_value)
                     except Exception as e:
-                        return construct_error_args(exception=e, raise_exception=True, topostats_error=True)
+                        return construct_error_args(
+                            exception=e, raise_exception=True, topostats_error=True, type_class=self.type_class
+                        )
                     if isinstance(result, dict) and "message" in result and "exception" in result:
                         return result
                     return (result, metadata)
