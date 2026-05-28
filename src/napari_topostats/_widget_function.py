@@ -682,11 +682,30 @@ class WidgetFunction:
             layout = QVBoxLayout(container)
             nm_checkbox = QCheckBox("Convert to nm")
             nm_checkbox.setChecked(False)
+
             # Create table widget
             table = QTableWidget()
             table.setRowCount(len(df))
             table.setColumnCount(len(df.columns))
             table.setHorizontalHeaderLabels(df.columns.tolist())
+
+            if isinstance(original, Labels):
+                # Create a copy of the dataframe with an extra row for the background for proper alignmemt of labels
+                # This will not affect the original dataframe used for the table
+                features_df = df.copy()
+                features_df.index = features_df.index + 1
+                if 0 not in features_df.index:
+                    # Get the first row to copy the columns and dtypes
+                    bg_row = features_df.iloc[[0]].copy()
+                    bg_row.index = [0]
+                    # Fill the row with NaN
+                    bg_row.loc[0] = np.nan
+                    if "grain_number" in bg_row.columns:
+                        # Set grain_number to -1 for the background row so it is different from real grains (0-indexed)
+                        bg_row["grain_number"] = -1
+                    features_df = pd.concat([bg_row, features_df])
+                features_df["label_id"] = features_df.index
+                original.features = features_df
             original.mode = Mode.PICK
             is_updating = False
 
