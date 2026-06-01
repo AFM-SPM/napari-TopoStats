@@ -536,8 +536,6 @@ class WidgetFunction:
                         return construct_error_args(
                             exception=e, raise_exception=True, topostats_error=True, type_class=self.type_class
                         )
-                    if isinstance(result, dict) and "message" in result and "exception" in result:
-                        return result
                     return (result, metadata)
 
                 def _handle_result(result):

@@ -244,19 +244,19 @@ class CurveViewer(QWidget):
 
         curve_num = shape_x * self.y_coord + self.x_coord
 
-        all_curve_data = layer.metadata["force_curves"]
-        self.channels_units = layer.metadata["force_curves_units"]
-        raw_metadata = layer.metadata["force_curves_meta"]
+        curves_data = layer.metadata["force_curves"]
+        raw_metadata = curves_data.metadata
+        self.channels_units = raw_metadata.channel_units
         try:
             self.metadata = {
-                "global": raw_metadata["top_level"],
-                f"curve_{curve_num}": raw_metadata["curves"][self.y_coord][self.x_coord],
-                f"curve_{curve_num}_approach": raw_metadata["segments"][self.y_coord][self.x_coord][0],
-                f"curve_{curve_num}_retract": raw_metadata["segments"][self.y_coord][self.x_coord][1],
+                "global": raw_metadata.toplevel,
+                f"curve_{curve_num}": raw_metadata[self.y_coord, self.x_coord],
+                f"curve_{curve_num}_approach": raw_metadata[self.y_coord, self.x_coord, 0],
+                f"curve_{curve_num}_retract": raw_metadata[self.y_coord, self.x_coord, 1],
             }
             if self.parameter_dialog is not None:
                 self.parameter_dialog.populate_parameters(self.metadata)
-            curve_dict = all_curve_data[self.y_coord][self.x_coord]
+            curve_dict = curves_data.get_default_volume()[self.y_coord, self.x_coord]
             self.set_available_channels(curve_dict.keys())
             self.update_curve(curve_dict)
         except IndexError:
