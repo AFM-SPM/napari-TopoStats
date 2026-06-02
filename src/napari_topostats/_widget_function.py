@@ -446,7 +446,7 @@ class WidgetFunction:
 
                     kwargs["curves"] = get_selected_curves(
                         kwargs.get("viewer", current_viewer()),
-                    )
+                    ).get_default_volume()
 
                 if uses_topostats_object:
                     # Create TopoStats object and add to kwargs
