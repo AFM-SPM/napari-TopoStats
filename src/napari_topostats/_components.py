@@ -543,11 +543,8 @@ def get_selected_curves(viewer) -> list | None:
         return None
 
     # TODO add the ability to load all the curves in one go here
-    curves = layer.metadata["force_curves"]
-    channel_units = layer.metadata.get("force_curves_units", {})
-    curves_meta = layer.metadata.get("force_curves_meta", {})
 
-    return curves, channel_units, curves_meta
+    return layer.metadata["force_curves"]
 
 
 def get_current_layer(viewer, requires_force_curves=False):

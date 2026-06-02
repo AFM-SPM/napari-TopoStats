@@ -527,11 +527,12 @@ class WidgetFunction:
                     curves_data = get_selected_curves(
                         kwargs.get("viewer", current_viewer()),
                     )
-                    kwargs["curves"] = curves_data[0]
+                    default_volume = curves_data.get_default_volume()
+                    kwargs["curves"] = default_volume
                     if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
-                        kwargs["channel_units"] = curves_data[1]
+                        kwargs["channel_units"] = default_volume.channel_units
                     if "curves_meta" in [p.name for p in all_params] and "curves_meta" not in kwargs:
-                        kwargs["curves_meta"] = curves_data[2]
+                        kwargs["curves_meta"] = curves_data.metadata
                 else:
                     if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
                         kwargs["channel_units"] = {}

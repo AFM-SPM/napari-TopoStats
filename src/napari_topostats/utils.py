@@ -324,7 +324,7 @@ def all_curves(
     has_curve_in_func_sig = "curve" in func_sig.parameters
 
     # Try to get z_units from the first curve
-    first_curve = curves[0][0] if not isinstance(curves, list) and hasattr(curves, "__getitem__") else curves[0]
+    first_curve = curves[0, 0]
     start_time = time.perf_counter()
     return_value = _all_curves_raw_worker(
         first_curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
