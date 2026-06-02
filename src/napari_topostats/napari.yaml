@@ -6,9 +6,22 @@ visibility: public
 categories: ["Annotation", "Segmentation", "Acquisition"]
 contributions:
   commands:
-    - id: napari-TopoStats.make_root_widget
+    - id: napari-TopoStats.make_topostats_root
       python_name: napari_topostats:TopoStatsRootWidget
       title: TopoStats
+    - id: napari-TopoStats.get_reader
+      python_name: napari_topostats._reader:napari_get_reader
+      title: Open python files to run on images
   widgets:
-    - command: napari-TopoStats.make_root_widget
+    - command: napari-TopoStats.make_topostats_root
       display_name: TopoStats
+
+
+  readers:
+    - command: napari-TopoStats.get_reader
+      accepts_directories: false
+      filename_patterns:
+        [
+          "*.py",
+          "*.ipynb"
+        ]

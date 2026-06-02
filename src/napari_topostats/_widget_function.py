@@ -10,7 +10,6 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-import dask.array as da
 import numpy as np
 import pandas as pd
 from magicgui import magicgui
@@ -19,6 +18,7 @@ from napari import current_viewer  # pylint: disable=no-name-in-module
 from napari.layers import Image, Labels, Layer
 from napari.layers.labels._labels_constants import Mode
 from napari.viewer import Viewer
+from napari_afmreader._reader import get_loaded_image
 from qtpy.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -32,11 +32,14 @@ from scipy.ndimage import label
 from topostats.classes import TopoStats
 
 from . import _io as io
-from ._alerts import LoadingWidget, show_error_dialog
-from ._io import ConfigWrapper, get_current_config
+from ._alerts import LoadingWidget, construct_error_args, show_error_dialog
+from ._components import get_selected_curves, get_selected_image
+from ._io import add_values_to_dict_from_config, get_current_config
 from ._parallel_processing import ProcessWorker
-from ._state import get_running_function, set_running_function
-from .utils import calculate_contrast_limits
+from ._state import WidgetManager, get_running_function, set_running_function
+from .utils import _eval, all_curves, calculate_contrast_limits, is_binary_image, remove_all_but_last
+
+RUN_IMMEDIATELY_EXEMPTIONS = set()
 
 
 def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
@@ -84,146 +87,6 @@ def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
     return args
 
 
-def add_values_to_dict_from_config(
-    config: dict[str, Any],
-    wrapper: ConfigWrapper,
-    function_key: str,
-    args: dict[str, Any],
-    params: list,
-):
-    """
-    Add values from the config to the args dictionary based on the function key and parameters.
-    This function checks if the parameters are present in the config and adds them to the args dictionary.
-
-    Parameters
-    ----------
-    config : dict[str, Any]
-        The configuration dictionary containing the function parameters.
-    wrapper : ConfigWrapper
-        The ConfigWrapper instance used to access flattened configuration values.
-    function_key : str
-        The key for the function in the configuration dictionary.
-    args : dict[str, Any]
-        The current dictionary of arguments to which the configuration values will be added.
-    params : list
-        The list of parameter names for the function.
-
-    Returns
-    -------
-    args : dict[str, Any]
-        The updated dictionary of arguments with values from the config added.
-    """
-    for param_name in [p.name for p in params]:
-        if param_name in config:
-            args[param_name] = config[param_name]
-
-        for flat_key, flat_val in wrapper.flat.items():
-            if flat_key.startswith(f"{function_key}.") and flat_key[len(f"{function_key}.") :] == param_name:
-                args[param_name] = flat_val
-                break
-        # Is this not redundant?
-        if param_name in config and isinstance(config[param_name], dict):
-            args[param_name] = config[param_name]
-    return args
-
-
-# pylint: disable=too-many-branches
-def _eval(obj: Any, string: str) -> Any:
-    """
-    Evaluate a path string on an object to access its attributes or subscripts. For example, given a list `lst`, the
-    string "lst[0].name" would return the name attribute of the first element of the list. This is done without
-    using `eval` to avoid security risks.
-
-    Parameters
-    ----------
-    obj : Any
-        The object on which to evaluate the string.
-    string : str
-        The path string to evaluate.
-
-    Returns
-    -------
-    Any
-        The result of the evaluation.
-    """
-    # Remove spaces from the string for easier parsing
-    string = string.replace(" ", "")
-    if string == "":
-        # If the string is empty, return the object itself
-        return obj
-
-    # Handle subscript access, e.g., [0], [1:3], ['key']
-    if string[0] == "[":
-        # Find the next punctuation to determine the subscript type
-        next_punc = next_punctuation(string, 1, checking_for=",()[].")
-        if next_punc != -1 and string[next_punc] == ",":
-            # Handle tuple subscripts, e.g., [1,2]
-            axes = []
-            for i in string[1 : string.index("]", 1)].split(","):
-                if i == ":":
-                    axes.append(slice(None))
-                elif i.isdigit():
-                    axes.append(int(i))
-            subscript = tuple(axes)
-            obj = obj[subscript]
-        else:
-            # Handle single index or key, e.g., [0] or ['key']
-            subscript = string[1 : string.index("]", 1)]
-            if subscript.isdigit():
-                obj = obj[int(subscript)]
-            else:
-                key = subscript.replace("'", "").replace('"', "")
-                obj = obj[key]
-        # Recursively evaluate the remaining string
-        remaining = string[string.index("]", 1) + 1 :]
-        return _eval(obj, remaining)
-
-    # Handle attribute access or method calls, e.g., .attr or .method()
-    if string[0] == ".":
-        index = next_punctuation(string, 1)
-        if index == -1:
-            # No further punctuation, just get the attribute
-            attr = string[1:]
-            if hasattr(obj, attr):
-                return getattr(obj, attr)
-            else:
-                raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{attr}'")
-
-        if string[index] == "(":
-            # Handle method call, e.g., .method(args)
-            func_name = string[1:index]
-            if hasattr(obj, func_name):
-                func = getattr(obj, func_name)
-                args_str = string[index + 1 : string.index(")", index + 1)]
-                args = [arg.strip() for arg in args_str.split(",") if arg.strip()]
-                result = func(*args)
-                remaining = string[string.index(")", index + 1) + 1 :]
-                # Recursively evaluate the remaining string
-                return _eval(result, remaining)
-            else:
-                raise AttributeError(f"'{type(obj).__name__}' object has no callable '{func_name}'")
-        else:
-            # Handle attribute access followed by more operations
-            attr = string[1:index]
-            if hasattr(obj, attr):
-                obj = getattr(obj, attr)
-            else:
-                raise AttributeError(f"'{type(obj).__name__}' object has no attribute '{attr}'")
-            remaining = string[index:]
-            # Recursively evaluate the remaining string
-            return _eval(obj, remaining)
-    # If the string does not start with '[' or '.', return the object
-    return obj
-
-
-def next_punctuation(s: str, start: int = 0, checking_for: str = ".([") -> int:
-    """Find the next punctuation character in a string."""
-    for i in range(start, len(s)):
-        if s[i] in checking_for:
-            return i
-    return -1
-
-
 class CallableWithSignature:
     """
     A callable that wraps a function and its signature. This allows the signature of the function to be updated for
@@ -239,80 +102,6 @@ class CallableWithSignature:
         bound = self.__signature__.bind(*args, **kwargs)
         bound.apply_defaults()
         return self.real_func(**bound.arguments)
-
-
-def get_selected_image(viewer, of_type: list = None) -> Image | None:
-    """
-    Get the currently selected image layer from the viewer.
-
-    Parameters
-    ----------
-    viewer : Viewer
-        The napari viewer instance from which to get the selected image layer.
-
-    Returns
-    -------
-    Image | None
-        The selected image layer, or None if no layer is selected.
-    """
-    selected = list(viewer.layers.selection)
-
-    if not selected:
-        show_error_dialog("No layer selected. Select a layer ")
-        return None
-    layer = selected[0]
-    if of_type is not None and layer.__class__ not in of_type:
-        pretty_types = [t.__name__ for t in of_type]
-        show_error_dialog(
-            f"Selected layer is not of a required type: {', '.join(pretty_types)}.",
-            raise_exception=False,
-        )
-        return None
-    if isinstance(layer, Image):
-        data = layer.data
-        if isinstance(data, (np.ndarray, da.Array)):  # conforms to ImageData
-            return layer
-        show_error_dialog("Layer data is not valid ImageData.", raise_exception=True)
-    elif isinstance(layer, Labels):
-        return layer
-    return None
-
-
-def is_binary_image(arr: np.ndarray) -> bool:
-    """Check if the array is a binary image (0s and 1s or 0s and 255s).
-    Parameters
-    ----------
-    arr : np.ndarray
-        The array to check.
-    Returns
-    -------
-    bool
-        True if the array is a binary image, False otherwise.
-    """
-    unique_vals = np.unique(arr)
-    # Check if unique values are subset of {0,1}
-    return set(unique_vals).issubset({0, 1, 255})
-
-
-def remove_all_but_last(word: str, text: str) -> str:
-    """Remove all occurrences of 'word' in 'text' except the last one.
-
-    Parameters
-    ----------
-    word : str
-        The word to remove.
-    text : str
-        The text from which to remove the word.
-
-    Returns
-    -------
-    str
-        The text with all occurrences of the word removed except the last one.
-    """
-    parts = text.rsplit(word, maxsplit=1)
-    if len(parts) == 1:
-        return text  # word not found or only once
-    return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return
 
 
 def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=None):
@@ -344,12 +133,7 @@ def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=
             except KeyError as e:
                 raised_error = e
         if raised_error:
-            show_error_dialog(
-                "Couldn't find data for either direction",
-                raise_exception=True,
-                topostats_error=True,
-                exception=raised_error,
-            )
+            raise ValueError("Couldn't find data for either direction") from raised_error
     if path_to_data.startswith("return"):
         return _eval(return_value, path_to_data[6:]) if len(path_to_data) > 6 else return_value
 
@@ -357,11 +141,9 @@ def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=
         if type_class:
             return _eval(instance, path_to_data[3:]) if len(path_to_data) > 3 else instance
         else:
-            show_error_dialog(f"Invalid path_to_data: {path_to_data} - 'obj' requires type_class")
-            return None
+            raise ValueError(f"Invalid path_to_data: {path_to_data} - 'obj' requires type_class")
 
-    show_error_dialog(f"Invalid path_to_data: {path_to_data}", topostats_error=True)
-    return None
+    raise ValueError(f"Invalid path_to_data: {path_to_data}")
 
 
 # Class representation of each function in the button grid.
@@ -386,30 +168,43 @@ class WidgetFunction:
         The class type that the function belongs to, if applicable. This is used to instantiate the class and call the
         method. This may not be required for all functions, so it can be None. It is used if an instance of the
         enclosing class is required to run the function.
-    uses_config : bool, optional
-        Whether the function uses a configuration file to set its parameters. If True, the function will
-        load the configuration file and use it to set the parameters. If False, the function will
-        use only the parameters set in the widget. Note that certain parameters can also be taken from the napari
-        viewer, such as the selected image or from the image metadata, such as the pixel to nm scaling factor.
     path_to_data : str | None, optional
         The path to the data that the function returns. This is used to determine how to extract the data from the
         return value of the function. It can be "return" to return the data directly (from the function), "obj" to
         return the object itself, or a specific path to access a nested attribute or subscript in the return value
         or the object instance.
+    uses_config : bool, optional
+        Whether the function uses a configuration file to set its parameters. If True, the function will
+        load the configuration file and use it to set the parameters. If False, the function will
+        use only the parameters set in the widget. Note that certain parameters can also be taken from the napari
+        viewer, such as the selected image or from the image metadata, such as the pixel to nm scaling factor.
     ndims : int, optional
         The number of dimensions of the data to be rendered. Can be left as default 2, but can be set to 3 if the
         function returns 3D data.
+    of_type : list, optional
+        A list of layer types that the function can be applied to, used for determining which image to select from the
+        napari viewer. Optional as just used as protection layer to ensure correct layer type is selected
+    metadata_paths : dict, optional
+        A dictionary of additional metadata to extract from the return value or object instance, where the key is the
+        name of the metadata and the value is the path to extract it. These are then passed over to the layer rendering
+        function.
     tooltip : str | None, optional
         A tooltip for the widget, providing additional information about the function. This is displayed when the
         user hovers over the button for the function in the button grid.
+    overide_get_widget : bool, optional
+        This should be set to true if you want the function itself to handle adding a docked widget rather than that
+        being handled automatically in the WidgetFunctionManager.
+    function_manager : WidgetManager, optional
+        The WidgetManager instance that manages the widget functions. This is used to add functions to groups when the
+        function is part of a group of functions.
     """
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-instance-attributes
     def __init__(
         self,
         name: str,
         function_key: str | None = None,
-        function_to_run: Callable | None = None,
+        function_to_run: Callable | list[Callable] | None = None,
         type_class: Any | None = None,
         path_to_data: str | None = None,
         uses_config: bool = False,
@@ -417,9 +212,12 @@ class WidgetFunction:
         of_type: list = None,
         metadata_paths: dict = None,
         tooltip: str | None = None,
+        overide_get_widget: bool = False,
+        function_manager=None,
     ):
         self.name = name
         self.path_to_data = path_to_data
+        self.function_manager = function_manager
         if path_to_data is not None:
             self.function_key = function_key
             self.type_class = type_class
@@ -428,9 +226,52 @@ class WidgetFunction:
             self.of_type = of_type
             self.metadata_paths = metadata_paths
         self.function_to_run = function_to_run
+        if function_to_run is not None and isinstance(function_to_run, list):
+            self.is_group = True
+            self.group_functions = {f.name: f for f in function_to_run}
+
+            def make_group_func(widget_function_self):
+                def func(function_name: str):
+                    wf = widget_function_self.group_functions.get(function_name)
+                    widget_function_self.function_manager.add_function_as_widget(function_name, wf)
+
+                return func
+
+            self.function_to_run = magicgui(
+                make_group_func(self), function_name={"choices": list(self.group_functions.keys())}
+            )
+        else:
+            self.is_group = False
+
         self.tooltip = tooltip
+        self.overide_get_widget = overide_get_widget
         self.overide_viewer = None
-        self.function_gui = None
+        self.function_gui = self.function_to_run if isinstance(self.function_to_run, FunctionGui) else None
+
+    def add_to_group(self, widget_function):
+        """Add a widget function to the group of functions if this WidgetFunction is a group."""
+        if not self.is_group:
+            return
+        self.group_functions[widget_function.name] = widget_function
+
+        # Rebuild the magicgui widget with updated choices
+        new_choices = list(self.group_functions.keys())
+
+        def make_group_func(widget_function_self):
+            def func(function_name: str):
+                wf = widget_function_self.group_functions.get(function_name)
+                widget_function_self.function_manager.add_function_as_widget(function_name, wf)
+
+            return func
+
+        self.function_to_run.function_name.choices = new_choices
+
+        self.function_to_run = magicgui(make_group_func(self), function_name={"choices": new_choices})
+        docked_function = self.function_manager.get_docked_function(self.name)
+        if docked_function is not None:
+            docked_function.function_name.choices = new_choices
+        if self.function_gui is not None:
+            self.function_gui.function_name.choices = new_choices
 
     def add_overide_viewer(self, viewer: Viewer):
         """Adds an overide viewer, this is sometimes required for abstract use of the plugin such as tests"""
@@ -446,6 +287,11 @@ class WidgetFunction:
         FunctionGui
             The magicgui widget that can be used in the napari viewer as a representation of the function.
         """
+        if self.path_to_data is None:
+            if isinstance(self.function_to_run, FunctionGui):
+                return self.function_to_run
+            elif callable(self.function_to_run):
+                return magicgui(self.function_to_run)
         self.function_gui = self.get_widget()
         return self.function_gui
 
@@ -466,19 +312,19 @@ class WidgetFunction:
         if self.uses_config and (io.config_wrapper is None or io.full_config_container is None):
             io.load_config_impl(current_viewer(), use_default=True)
 
-        # Replace any dynamic components of the paths with actual values from the config if needed
-        flat_config = get_current_config(flat=True)
+            # Replace any dynamic components of the paths with actual values from the config if needed
+            flat_config = get_current_config(flat=True)
 
-        def lookup(match):
-            key = match.group(1)
-            if key in flat_config:
-                return str(flat_config[key])
-            return match.group(0)
+            def lookup(match):
+                key = match.group(1)
+                if key in flat_config:
+                    return str(flat_config[key])
+                return match.group(0)
 
-        for attr in ["path_to_data", "metadata_paths"]:
-            value = getattr(self, attr)
-            if isinstance(value, str):
-                setattr(self, attr, re.sub(r"<([^>]+)>", lookup, value))
+            for attr in ["path_to_data", "metadata_paths"]:
+                value = getattr(self, attr)
+                if isinstance(value, str):
+                    setattr(self, attr, re.sub(r"<([^>]+)>", lookup, value))
         # pylint: disable=too-many-nested-blocks
         try:
             # If path_to_data is not set, default to "return" or "obj" if type_class is provided
@@ -529,6 +375,11 @@ class WidgetFunction:
 
             # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught, attribute-defined-outside-init
             def func(**kwargs):
+                local_params_function = including_config_params_from_function.copy()
+                local_params_from_class = (
+                    including_config_params_from_class.copy() if self.type_class is not None else []
+                )
+                func_to_execute = self.function_to_run
                 viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
                 loading_widget = LoadingWidget(viewer)
                 loading_widget.start(
@@ -538,35 +389,64 @@ class WidgetFunction:
                 method_args = {}
                 class_args = {}
                 # Determine all relevant parameters
-                all_params = including_config_params_from_function + (
-                    including_config_params_from_class if self.type_class else []
-                )
+                all_params = local_params_function + (local_params_from_class if self.type_class else [])
 
                 uses_topostats_object = "topostats_object" in [p.name for p in all_params]
+
                 # Handle image selection if required
-                if "image" in [p.name for p in all_params] or uses_topostats_object:
-                    selected_image = get_selected_image(
-                        kwargs.get("viewer", current_viewer()),
-                        of_type=self.of_type,
-                    )
-                    if selected_image is None:
-                        loading_widget.stop()
-                        return
+                selected_image = get_selected_image(
+                    kwargs.get("viewer", current_viewer()),
+                    of_type=self.of_type,
+                )
+                if selected_image is None:
+                    loading_widget.stop()
+                    return
                 if "image" in [p.name for p in all_params]:
                     kwargs["image"] = selected_image
+
                 # Handle pixel_to_nm_scaling if required
                 if (
                     "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs
                 ) or uses_topostats_object:
                     px2nm = selected_image.metadata.get("px2nm", 1.0)
-                    print(f"Using pixel_to_nm_scaling from image metadata: {px2nm}")
                 if "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs:
                     kwargs["pixel_to_nm_scaling"] = px2nm
 
+                # Get the filename from the image layer if required
                 if ("filename" in [p.name for p in all_params] and "filename" not in kwargs) or uses_topostats_object:
                     filename = "image"
                 if "filename" in [p.name for p in all_params] and "filename" not in kwargs:
                     kwargs["filename"] = filename
+
+                if "curve" in [p.name for p in all_params] and "curve" not in kwargs:
+                    # Add the type class to kwargs so the function can be wrapped in all_curves if needed
+                    if self.type_class:
+                        kwargs["type_class"] = self.type_class
+                        self.type_class = (
+                            None  # Set to None as wrapping in all_curves will remove requirement for type_class
+                        )
+
+                    # If the function is designed to take a single curve, wrap it in all_curves to apply
+                    # to all curves in the selected layer
+                    # pylint: disable=function-redefined
+                    def func_to_execute(**kwargs):
+                        return all_curves(func=self.function_to_run, **kwargs)
+
+                    new_param = inspect.Parameter(
+                        name="curves",
+                        kind=inspect.Parameter.KEYWORD_ONLY,
+                        default=None,
+                        annotation=Any,
+                    )
+                    all_params = [p if p.name != "curve" else new_param for p in all_params]
+                    local_params_function = [p if p.name != "curve" else new_param for p in local_params_function]
+                    local_params_from_class = [p if p.name != "curve" else new_param for p in local_params_from_class]
+
+                if "curves" in [p.name for p in all_params] and "curves" not in kwargs:
+
+                    kwargs["curves"] = get_selected_curves(
+                        kwargs.get("viewer", current_viewer()),
+                    ).get_default_volume()
 
                 if uses_topostats_object:
                     # Create TopoStats object and add to kwargs
@@ -583,9 +463,9 @@ class WidgetFunction:
                     kwargs["topostats_object"] = topostats_object
                 # Distribute arguments between method_args and class_args
                 for key, value in kwargs.items():
-                    if key in [p.name for p in including_config_params_from_function]:
+                    if key in [p.name for p in local_params_function]:
                         method_args[key] = value
-                    elif self.type_class and key in [p.name for p in including_config_params_from_class]:
+                    elif self.type_class and key in [p.name for p in local_params_from_class]:
                         class_args[key] = value
 
                 # Add config values if needed
@@ -595,7 +475,7 @@ class WidgetFunction:
                         io.config_wrapper,
                         self.function_key,
                         method_args,
-                        including_config_params_from_function,
+                        local_params_function,
                     )
                     if self.type_class:
                         class_args = add_values_to_dict_from_config(
@@ -603,57 +483,32 @@ class WidgetFunction:
                             io.config_wrapper,
                             self.function_key,
                             class_args,
-                            including_config_params_from_class,
+                            local_params_from_class,
                         )
 
                 # Enforce defaults
-                method_args = enforce_defaults(method_args, including_config_params_from_function)
+                method_args = enforce_defaults(method_args, local_params_function)
                 if self.type_class:
-                    class_args = enforce_defaults(class_args, including_config_params_from_class)
+                    class_args = enforce_defaults(class_args, local_params_from_class)
 
                 # Execute function or method
+                # pylint: disable=too-many-return-statements
                 def _func():
-                    if self.type_class:
-                        # ruff: noqa: BLE001
-                        try:
-                            instance = self.type_class(**class_args)
-                        except Exception as e:
-                            error_args = {}
-                            error_args["message"] = (
-                                f"Topostats is failing with {self.type_class.__name__}: {e.__class__} {e}."
-                            )
-                            error_args["topostats_error"] = True
-                            return error_args
-                        method = getattr(instance, self.function_to_run.__name__, None)
-                        if method:
-                            # ruff: noqa: BLE001
-                            try:
-                                return_value = method(**method_args)
-                            except Exception as e:
-                                error_args = {}
-                                error_args["message"] = f"Topostats is failing with:{e.__class__} {e}."
-                                error_args["raise_exception"] = True
-                                error_args["topostats_error"] = True
-                                error_args["exception"] = e
-                                return error_args
-                        else:
-                            error_args = {}
-                            error_args["message"] = f"Method {self.function_to_run.__name__} not found on instance."
-                            return error_args
-                    else:
-                        # ruff: noqa: BLE001
-                        try:
-                            return_value = self.function_to_run(**method_args)
-                        except Exception as e:
-                            error_args = {}
-                            error_args["message"] = f"Topostats is failing with:{e.__class__} {e}."
-                            error_args["raise_exception"] = True
-                            error_args["topostats_error"] = True
-                            error_args["exception"] = e
-                            return error_args
-                    # Evaluate path_to_data
-                    metadata = {}
+                    # ruff: noqa: BLE001
                     try:
+                        if self.type_class:
+                            instance = self.type_class(**class_args)
+                            method = getattr(instance, self.function_to_run.__name__, None)
+                            if method:
+                                return_value = method(**method_args)
+                            else:
+                                return construct_error_args(
+                                    message=f"Method {self.function_to_run.__name__} not found on instance."
+                                )
+                        else:
+                            return_value = func_to_execute(**method_args)
+                        # Evaluate path_to_data
+                        metadata = {}
                         if self.metadata_paths is not None:
                             for key in self.metadata_paths:
                                 if self.metadata_paths[key] == "config":
@@ -662,7 +517,7 @@ class WidgetFunction:
                                     metadata[key] = evaluate_path_to_data(
                                         self.metadata_paths[key],
                                         return_value,
-                                        instance,
+                                        instance if self.type_class else None,
                                         self.type_class,
                                     )
                         if self.type_class and hasattr(instance, "topostats_object"):
@@ -678,12 +533,9 @@ class WidgetFunction:
                         else:
                             result = evaluate_path_to_data(self.path_to_data, return_value)
                     except Exception as e:
-                        error_args = {}
-                        error_args["message"] = f"Topostats is failing with: {e.__class__} {e}."
-                        error_args["raise_exception"] = True
-                        error_args["topostats_error"] = True
-                        error_args["exception"] = e
-                        return error_args
+                        return construct_error_args(
+                            exception=e, raise_exception=True, topostats_error=True, type_class=self.type_class
+                        )
                     return (result, metadata)
 
                 def _handle_result(result):
@@ -734,6 +586,8 @@ class WidgetFunction:
                     "image",
                     "filename",
                     "topostats_object",
+                    "curve",
+                    "curves",
                 ]:
                     new_parameters.append(new_p)
             # Create a magicgui function with the wrapped function and the new parameters
@@ -745,7 +599,7 @@ class WidgetFunction:
             show_error_dialog(f"❌ Exception in get_widget: {e}")
             raise
 
-    # pylint: disable=too-many-statements
+    # pylint: disable=too-many-statements, too-many-locals
     def render_return_value(
         self,
         return_value: Any,
@@ -776,26 +630,48 @@ class WidgetFunction:
         # Check if the return value is a numpy array
 
         if isinstance(return_value, np.ndarray):
+            # Get the scale from the original layer; default to (1, 1) if not found
+            current_scale = original.scale if original else (1, 1)
+            # If the return value has a different number of dimensions to the original, use only existing dimensions
+            if len(current_scale) != self.ndims:
+                current_scale = current_scale[-self.ndims :]
+
+            reader_id = original.metadata.get("afmreader_id", None) if original and original.metadata else None
+            if reader_id is not None:
+                loaded_image = get_loaded_image(reader_id)
+                if loaded_image is not None:
+                    channel_name = self.function_key.replace("find_", "")
+                    loaded_image.add_custom_channel(channel_name, return_value)
+                    # loaded_image.set_channel(channel_name)
+
+            # Common metadata logic
+            duplicated_metadata = original.metadata.copy() if original and original.metadata else {}
+            combined_metadata = duplicated_metadata | metadata
+
             # If the return value is a binary image, add it as a labels layer
             if is_binary_image(return_value):
                 labels, num_labels = label(return_value.astype(bool))
                 label_ids = list(range(1, num_labels + 1))
                 properties = {"label_id": label_ids}
+
                 viewer.add_labels(
                     labels.astype(np.uint16),
-                    name=f"{original.name} {self.function_key.title()} Mask",
+                    name=f"{original.name} {self.function_key.replace('_', ' ').title()} Mask",
                     properties=properties,
-                    metadata=({"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}) | metadata,
+                    metadata=combined_metadata,
+                    scale=current_scale,
                 )
             # If the return value is a greyscale image array, add it as an image layer
             else:
-                name = f"{original.name} {self.function_key.title()} Image"
+                name = f"{original.name} {self.function_key.replace('_', ' ').title()} Image"
                 name = remove_all_but_last("Image", name)
+
                 viewer.add_image(
                     return_value,
                     name=name,
                     contrast_limits=calculate_contrast_limits(return_value, percentage=0.5),
-                    metadata=({"px2nm": original.metadata.get("px2nm", 1.0)} if original else {}) | metadata,
+                    metadata=combined_metadata,
+                    scale=current_scale,
                 )
                 viewer.dims.ndisplay = self.ndims
         elif isinstance(return_value, pd.DataFrame):
@@ -804,11 +680,30 @@ class WidgetFunction:
             layout = QVBoxLayout(container)
             nm_checkbox = QCheckBox("Convert to nm")
             nm_checkbox.setChecked(False)
+
             # Create table widget
             table = QTableWidget()
             table.setRowCount(len(df))
             table.setColumnCount(len(df.columns))
             table.setHorizontalHeaderLabels(df.columns.tolist())
+
+            if isinstance(original, Labels):
+                # Create a copy of the dataframe with an extra row for the background for proper alignmemt of labels
+                # This will not affect the original dataframe used for the table
+                features_df = df.copy()
+                features_df.index = features_df.index + 1
+                if 0 not in features_df.index:
+                    # Get the first row to copy the columns and dtypes
+                    bg_row = features_df.iloc[[0]].copy()
+                    bg_row.index = [0]
+                    # Fill the row with NaN
+                    bg_row.loc[0] = np.nan
+                    if "grain_number" in bg_row.columns:
+                        # Set grain_number to -1 for the background row so it is different from real grains (0-indexed)
+                        bg_row["grain_number"] = -1
+                    features_df = pd.concat([bg_row, features_df])
+                features_df["label_id"] = features_df.index
+                original.features = features_df
             original.mode = Mode.PICK
             is_updating = False
 
@@ -852,7 +747,6 @@ class WidgetFunction:
                 # Get the grain number (or label id) from the dataframe
                 grain_id = df.iloc[row]["grain_number"]
 
-                # Center the view on it
                 # Find coordinates of that label in the image
                 mask = original.data == int(grain_id) + 1
                 if mask.any() and isinstance(original, Labels):
@@ -927,3 +821,126 @@ class WidgetFunction:
                 f"Function {self.function_key} returned an unsupported type: {type(return_value)}.",
                 topostats_error=True,
             )
+
+
+class WidgetFunctionManager:
+    """Class to manage the widget functions and their corresponding widgets in the napari viewer."""
+
+    def __init__(self, functions: dict, viewer: Viewer, widget_manager: WidgetManager):
+        self.docked_functions: dict[str, QWidget] = {}
+        self.functions: dict = functions
+        self.viewer = viewer
+        self.widget_manager = widget_manager
+
+    # pylint: disable=too-many-branches
+    def add_function_as_widget(self, func_name: str, function: WidgetFunction = None):
+        """
+        Add the widget for a given function to the viewer and run the function if it is not in the
+        RUN_IMMEDIATELY_EXEMPTIONS list
+
+        Parameters
+        ----------
+        func_name : str
+            The name of the function that was clicked.
+        """
+
+        widget = None
+        self.widget_manager.ensure_valid(func_name)
+
+        function = function or self.functions.get(func_name)
+        # Check if the widget is already docked and add it if not
+        if func_name not in self.widget_manager.get_docked_widgets():
+            if function.overide_get_widget:
+                func = function.function_to_run
+                sig = inspect.signature(func)
+                params = list(sig.parameters.values())
+                if len(params) == 1 and params[0].name == "viewer":
+                    widget = func(self.viewer)
+                elif len(params) == 0:
+                    widget = func()
+                else:
+                    show_error_dialog(
+                        f"Function {func_name} expected input when none was given.",
+                        raise_exception=True,
+                        topostats_error=True,
+                    )
+                # pylint: disable=used-before-assignment
+                self.add_docked_function(widget, func_name)
+                return
+            widget = function.get_function_gui()
+            for param in widget:
+                if param.name != "call_button":
+                    self.add_docked_function(widget, func_name)
+                    break
+        widget = self.docked_functions.get(func_name) or widget
+        if function.overide_get_widget:
+            return
+
+        if func_name not in RUN_IMMEDIATELY_EXEMPTIONS and not function.is_group:
+            # If the function is not in the RUN_IMMEDIATELY_EXEMPTIONS list, run it with the appropriate parameters,
+            # using the selected image layer as the image parameter
+            if hasattr(widget, "image") and widget.image.value is None:
+                selected_image = get_selected_image(self.viewer)
+                if selected_image is not None:
+                    widget.image.value = selected_image
+            if hasattr(widget, "viewer"):
+                widget.viewer.value = self.viewer
+            widget()
+
+    def get_widget_from_function(self, function: WidgetFunction) -> FunctionGui | None:
+        """
+        Get the widget representation of the passed function by selecting between generating it or returning the
+        passed function if it is already a widget
+
+        Parameters
+        ----------
+        function : WidgetFunction
+            The WidgetFunction object to retrieve the widget for.
+
+        Returns
+        -------
+        FunctionGui or None
+            The widget for the function, or None if the function is not valid.
+        """
+        if isinstance(function, WidgetFunction):
+            # If the function is a WidgetFunction, get its GUI representation.
+            widget = function.get_function_gui()
+        else:
+            show_error_dialog(
+                f"Function {function.name} is not a valid WidgetFunction or FunctionGui.",
+                raise_exception=True,
+            )
+            return None
+        return widget
+
+    def add_docked_function(self, widget, name: str, area: str = "right"):
+        """
+        Add a widget to the viewer as a docked widget and keep track of it in the state.
+
+        Parameters
+        ----------
+        widget : QWidget
+            The widget to add to the viewer.
+        name : str
+            The name of the widget, used for tracking in the state.
+        area : str, optional
+            The area of the viewer to dock the widget in (default is "right").
+        """
+        self.docked_functions[name] = widget
+        self.widget_manager.add_docked_widget(widget, area=area, name=name)
+
+    def get_docked_function(self, name):
+        """
+        Get the docked widget for a given function name.
+
+        Parameters
+        ----------
+        name : str
+            The name of the function.
+
+        Returns
+        -------
+        QWidget or None
+            The docked widget for the function, or None if it does not exist.
+        """
+        return self.docked_functions.get(name)

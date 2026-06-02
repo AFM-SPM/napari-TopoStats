@@ -7,9 +7,10 @@ import napari
 import pytest
 from pytestqt.qtbot import QtBot
 
+from napari_topostats._state import WidgetManager
 from napari_topostats._widget import TopoStatsRootWidget
 
-os.environ["QT_QPA_PLATFORM"] = "offscreen"
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -49,3 +50,9 @@ def topostats_widget(napari_viewer, qtbot: QtBot):
         pass
 
     qtbot.wait(50)  # Allow cleanup to complete
+
+
+@pytest.fixture
+def widget_manager(napari_viewer):
+    """Create a WidgetManager bound to the current test's viewer, updating the global singleton."""
+    return WidgetManager(napari_viewer)

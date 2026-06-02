@@ -105,6 +105,8 @@ def show_error_dialog(
     raise_exception : bool, optional
         If True, raise a ValueError after showing the dialog. Used for errors that should halt execution.
     """
+    if exception is not None:
+        raise exception
     if topostats_error:
         message += (
             f"\nThis error is potentially caused in the TopoStats package rather than in the Napari "
@@ -229,6 +231,14 @@ class LoadingWidget(QWidget):
     """A semi-transparent overlay for napari viewer."""
 
     def __init__(self, viewer):
+        """
+        Initialize the loading widget and attach it to the napari viewer.
+
+        Parameters
+        ----------
+        viewer : napari.Viewer
+            The napari viewer to attach the loading widget to.
+        """
         # Parent to the main napari window so it covers everything
         super().__init__(viewer.window._qt_window)
         self.viewer = viewer
@@ -297,3 +307,50 @@ class LoadingWidget(QWidget):
         if self.parent():
             self.setGeometry(self.parent().rect())
         super().resizeEvent(event)
+
+
+def construct_error_args(
+    exception: Exception = None,
+    message: str = None,
+    raise_exception: bool = False,
+    topostats_error: bool = False,
+    type_class=None,
+) -> dict:
+    """
+    Construct a dictionary of error arguments.
+
+    Parameters
+    ----------
+    e : Exception, optional
+        The exception that was caught (default is None).
+    message : str, optional
+        A custom error message to display (default is None). If None, a message will be constructed from the exception.
+    raise_exception : bool, optional
+        Whether to raise the exception after constructing the error arguments (default is False).
+    topostats_error : bool, optional
+        Whether the error is specific to Topostats (default is False).
+    type_class : type, optional
+        The class type associated with the error (default is None).
+
+    Returns
+    -------
+    dict
+        A dictionary containing the error arguments.
+    """
+    error_args = {}
+    if message is not None:
+        error_args["message"] = message
+    else:
+        if topostats_error:
+            if type_class:
+                error_args["message"] = (
+                    f"Topostats is failing with {type_class.__name__}: {exception.__class__} {exception}."
+                )
+            else:
+                error_args["message"] = f"Topostats is failing with: {exception.__class__} {exception}."
+        else:
+            error_args["message"] = f"An error occurred: {exception.__class__} {exception}."
+    error_args["raise_exception"] = raise_exception
+    error_args["topostats_error"] = topostats_error
+    error_args["exception"] = exception
+    return error_args

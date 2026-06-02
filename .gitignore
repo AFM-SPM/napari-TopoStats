@@ -1,8 +1,8 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*.egg-info/*
-./napari-loadafm/src/napari_topostats/__pycache__/**
+*.egg-info/
+./src/napari_topostats/__pycache__/**
 
 # Build directory
 build/*

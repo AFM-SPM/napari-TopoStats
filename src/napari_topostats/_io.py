@@ -30,15 +30,19 @@ from qtpy.QtWidgets import (
 )
 from topostats import __version__ as topostats_version
 
-from . import _state as state
-from ._alerts import attach_status_label, show_error_dialog
+from napari_topostats.utils import unflatten_dict
 
+from ._alerts import attach_status_label, show_error_dialog
+from ._components import CollapsibleBox
+from ._state import MIN_TOPOSTATS_VERSION, get_widget_manager
+
+# pylint: disable=ungrouped-imports
 try:
     from topostats.config import write_config_with_comments
 except ImportError:
     show_error_dialog(
         f"TopoStats version {topostats_version} is not supported. Please install the latest version of TopoStats"
-        f"or if that fails, install version {state.MIN_TOPOSTATS_VERSION}."
+        f"or if that fails, install version {MIN_TOPOSTATS_VERSION}."
     )
 
 
@@ -50,30 +54,6 @@ full_config_container = None
 comment_descriptions = {}
 current_config_path = None
 updated_values = {}
-
-
-def _unflatten(flat: dict) -> dict:
-    """
-    Function used for reverting to the dict form where keys can correspond to dict values like json format
-
-    Parameters
-    ----------
-    flat : dict
-        The dictionary to unflatten
-
-    Returns
-    -------
-    dict
-        The unflattened dictionary
-    """
-    result = {}
-    for k, v in flat.items():
-        keys = k.split(".")
-        d = result
-        for part in keys[:-1]:
-            d = d.setdefault(part, {})
-        d[keys[-1]] = v
-    return result
 
 
 class ConfigWrapper:
@@ -129,77 +109,7 @@ class ConfigWrapper:
         dict
             The unflattened dictionary.
         """
-        return _unflatten(self.flat)
-
-
-class CollapsibleBox(QWidget):
-    """
-    A widget to contain over widgets in a collapsible area
-    """
-
-    def __init__(self, title: str = "", parent: QWidget | None = None, start_open: bool = False):
-        """
-        Initializes the CollapsibleBox.
-
-        Parameters
-        ----------
-        title : str, optional
-            The title of the box, by default ""
-        parent : QWidget, optional
-            The parent widget, by default None
-        start_open : bool, optional
-            Whether the box should start open, by default False
-        """
-        super().__init__(parent)
-
-        # Main layout
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        self.layout.setSpacing(0)
-
-        # Toggle Button (The Header)
-        self.toggle_button = QPushButton(title)
-        self.toggle_button.setCheckable(True)
-        self.toggle_button.setChecked(start_open)
-        self.toggle_button.setStyleSheet(
-            "QPushButton { text-align: left; font-weight: bold; padding: 0.5em; border: none; }"
-            "QPushButton:hover { background-color: #555d68; }"
-        )
-        self.toggle_button.toggled.connect(self.on_toggle)
-        self.layout.addWidget(self.toggle_button)
-
-        # Content Area
-        self.content_area = QFrame()
-        self.content_layout = QVBoxLayout(self.content_area)
-        self.content_layout.setContentsMargins(10, 10, 10, 10)
-        self.layout.addWidget(self.content_area)
-
-        # Start at given state
-        self.on_toggle(start_open)
-
-    def on_toggle(self, checked: bool):
-        """
-        Set behaviour for expanding/ collapsing when clicked
-
-        Parameters
-        ----------
-        checked : bool
-            The state toggle has been changed to
-        """
-        self.content_area.setVisible(checked)
-        arrow = "▼" if checked else "▶"
-        self.toggle_button.setText(f"{arrow}  {self.toggle_button.text()[3:]}")
-
-    def add_widget(self, widget: QWidget):
-        """
-        Adds the widget to the collapsable view
-
-        Parameters
-        ----------
-        widget : QWidget
-            The widget to add
-        """
-        self.content_layout.addWidget(widget)
+        return unflatten_dict(self.flat)
 
 
 def should_use_line_edit_for_float(value: float) -> bool:
@@ -291,7 +201,7 @@ def build_dynamic_widget(
     else:
         title = running_reference.split(".")[-1].replace("_", " ").upper()
 
-        container = CollapsibleBox(title=f"   {title}", start_open=running_reference in START_OPEN)
+        container = CollapsibleBox(title=title, start_open=running_reference in START_OPEN)
 
     for key, value in config_to_display.items():
 
@@ -462,21 +372,22 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
     if full_config_container is None:
         show_error_dialog("Failed to create full config container.")
         return False
-    if "Edit Full Config" not in state.docked_widgets:
+    widget_manager = get_widget_manager()
+    if "Edit Full Config" not in widget_manager.get_docked_widgets():
+
         # Create a button to open the config editor
         btn = QPushButton("Edit Config")
         btn.clicked.connect(open_config_editor)
-        docked = viewer.window.add_dock_widget(btn, name="Edit Full Config")
+        docked = widget_manager.add_docked_widget(btn, name="Edit Full Config")
+
         # Remove from state.docked_widgets when widget is closed
         docked.visibilityChanged.connect(
             lambda visible: (
-                state.docked_widgets.remove("Edit Full Config")
-                if not visible and "Edit Full Config" in state.docked_widgets
+                widget_manager.remove_docked_widget("Edit Full Config")
+                if not visible and "Edit Full Config" in widget_manager.get_docked_widgets()
                 else None
             )
         )
-        # Add the button to the docked widgets list so it can be accessed
-        state.docked_widgets.append("Edit Full Config")
 
     return True
 
@@ -628,7 +539,7 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> dict[
 
                 if comment_text is not None and final_key_for_map:
                     comment_map[final_key_for_map] = comment_text.strip()
-    return _unflatten(comment_map)
+    return unflatten_dict(comment_map)
 
 
 def create_info_icon(tooltip_text: str) -> QToolButton:
@@ -922,3 +833,46 @@ def get_topostats_default_config():
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
     return config
+
+
+def add_values_to_dict_from_config(
+    config: dict[str, Any],
+    wrapper: ConfigWrapper,
+    function_key: str,
+    args: dict[str, Any],
+    params: list,
+):
+    """
+    Add values from the config to the args dictionary based on the function key and parameters.
+    This function checks if the parameters are present in the config and adds them to the args dictionary.
+
+    Parameters
+    ----------
+    config : dict[str, Any]
+        The configuration dictionary containing the function parameters.
+    wrapper : ConfigWrapper
+        The ConfigWrapper instance used to access flattened configuration values.
+    function_key : str
+        The key for the function in the configuration dictionary.
+    args : dict[str, Any]
+        The current dictionary of arguments to which the configuration values will be added.
+    params : list
+        The list of parameter names for the function.
+
+    Returns
+    -------
+    args : dict[str, Any]
+        The updated dictionary of arguments with values from the config added.
+    """
+    for param_name in [p.name for p in params]:
+        if param_name in config:
+            args[param_name] = config[param_name]
+
+        for flat_key, flat_val in wrapper.flat.items():
+            if flat_key.startswith(f"{function_key}.") and flat_key[len(f"{function_key}.") :] == param_name:
+                args[param_name] = flat_val
+                break
+        # Is this not redundant?
+        if param_name in config and isinstance(config[param_name], dict):
+            args[param_name] = config[param_name]
+    return args

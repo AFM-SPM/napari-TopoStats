@@ -1,11 +1,11 @@
 # napari-TopoStats
 
-[![License MIT](https://img.shields.io/pypi/l/napari-loadafm.svg?color=green)](https://github.com/MaxGamill-Sheffield/napari-loadafm/raw/main/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/napari-loadafm.svg?color=green)](https://pypi.org/project/napari-loadafm)
-[![Python Version](https://img.shields.io/pypi/pyversions/napari-loadafm.svg?color=green)](https://python.org)
-[![tests](https://github.com/MaxGamill-Sheffield/napari-loadafm/workflows/tests/badge.svg)](https://github.com/MaxGamill-Sheffield/napari-loadafm/actions)
-[![codecov](https://codecov.io/gh/MaxGamill-Sheffield/napari-loadafm/branch/main/graph/badge.svg)](https://codecov.io/gh/MaxGamill-Sheffield/napari-loadafm)
-[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-loadafm)](https://napari-hub.org/plugins/napari-loadafm)
+[![License MIT][license-shield]][license-link]
+[![PyPI][pypi-shield]][pypi-link]
+[![Python Version][python-version-shield]][python-version-link]
+[![tests][tests-shield]][tests-link]
+[![codecov][codecov-shield]][codecov-link]
+[![napari hub][napari-hub-shield]][napari-hub-link]
 
 ----------------------------------
 
@@ -27,7 +27,12 @@ conda enviroment command would be:
     conda create -n napari-env python=3.11
     conda activate napari-env
 
-With [Git installed] on your machine, install the napari-TopoStats package from GitHub using [pip][pip].
+The pypi release of napari-TopoStats can be installed with pip:
+
+    pip install napari-topostats
+
+Alternatively, to ensure the latest version is installed, with [Git installed] on your machine, you can install the
+napari-TopoStats package from GitHub using [pip][pip].
 
     pip install git+https://github.com/AFM-SPM/napari-TopoStats.git@main
 
@@ -91,6 +96,36 @@ file will be used. Once these have been defined topostats will process in the ba
 can been seen in the command line). You can carry on using napari while this happens.
 <img src="readme_images/batch_process.png" width="800" alt="Function window"/>
 
+**Viewing Curves** is a function which allows the viewing of the force-distance curves for a point on loaded AFM
+data. Once the viewing curves widget has been opened by clicking on its button in the button grid, an individual
+force curve can be viewed by holding shift and clicking on the point in the image. Clicking and dragging with the
+mouse while holding shift updates the viewer to wherever your mouse is. Once a curve is selected, you can change
+the channel of each axis by selecting the dropdown menu below the graph and selecting the desired channel. To view
+the metadata, click the **Experimental Parameters** button, which will open a window containing that information.
+
+<img src="readme_images/viewing_curves.png" width="800" alt="Viewing curves"/>
+
+**Viewing profile line**
+Pressing and holding the 'A' key
+activates the drawing line tool, note that a temporary "Profile Line" shapes line is created. A viewing window will
+open in the dock on the right, which will be updated with profile data as you draw a move the line. The channels
+being viewed can be changed by using the dropdown menu below the graph and selecting the desired channels. Images
+created by applying some function to the image will appear as channels in addition to the defaults.
+
+<img src="readme_images/line_profile.png" width="800" alt="Line profile"/>
+
+**Loading custom analysis scripts**
+Dragging and dropping a python file into the napari viewer allows you to load custom analysis code. A function
+which follows the following requirements should work in the GUI.
+
+1. Must take an image (be that from an image layer or a binary image from a labels layer) or force curve data,
+which could be an individual force curve (which will mean the code runs on the every curve and creates a map,
+therefore requiring the function to output a single value) or the entire set.
+2. Any image or force curve parameter must be named exactly `image` or `curves` or `curve`.
+3. Parameters must be labled with their type using typing annotations.
+4. There must be no parameters of any type other than integer, string, float, boolean or the napari viewer object.
+5. The function must not start with an underscore as that is assumed to be a private function.
+
 Current functions:
 
 1. Load config button allows a config file to be selected from your hard disk.
@@ -125,3 +160,15 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 [pip]: <https://pypi.org/project/pip/>
 [tox]: https://tox.readthedocs.io/en/latest/
 [file an issue]: https://github.com/AFM-SPM/napari-TopoStats/issues
+[license-shield]: https://img.shields.io/pypi/l/napari-loadafm.svg?color=green
+[license-link]: https://github.com/MaxGamill-Sheffield/napari-loadafm/raw/main/LICENSE
+[pypi-shield]: https://img.shields.io/pypi/v/napari-loadafm.svg?color=green
+[pypi-link]: https://pypi.org/project/napari-loadafm
+[python-version-shield]: https://img.shields.io/pypi/pyversions/napari-loadafm.svg?color=green
+[python-version-link]: https://python.org
+[tests-shield]: https://github.com/MaxGamill-Sheffield/napari-loadafm/workflows/tests/badge.svg
+[tests-link]: https://github.com/MaxGamill-Sheffield/napari-loadafm/actions
+[codecov-shield]: https://codecov.io/gh/MaxGamill-Sheffield/napari-loadafm/branch/main/graph/badge.svg
+[codecov-link]: https://codecov.io/gh/MaxGamill-Sheffield/napari-loadafm
+[napari-hub-shield]: https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-loadafm
+[napari-hub-link]: https://napari-hub.org/plugins/napari-loadafm
