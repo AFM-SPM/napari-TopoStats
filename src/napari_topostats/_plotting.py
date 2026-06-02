@@ -257,7 +257,8 @@ class CurveViewer(QWidget):
 
         curves_data = layer.metadata["force_curves"]
         raw_metadata = curves_data.metadata
-        self.channels_units = raw_metadata.channel_units
+        current_volume = curves_data.get_default_volume()
+        self.channels_units = current_volume.channel_units
         try:
             self.metadata = {
                 "global": raw_metadata.toplevel,
@@ -267,7 +268,7 @@ class CurveViewer(QWidget):
             }
             if self.parameter_dialog is not None:
                 self.parameter_dialog.populate_parameters(self.metadata)
-            curve_dict = curves_data.get_default_volume()[self.y_coord, self.x_coord]
+            curve_dict = current_volume[self.y_coord, self.x_coord]
             self.set_available_channels(curve_dict.keys())
             self.update_curve(curve_dict)
 
