@@ -302,16 +302,8 @@ def all_curves(
         if hasattr(curves, "dims"):
             shape_y = curves.dims[0]
             shape_x = curves.dims[1] if len(curves.dims) > 1 else 1
-        elif isinstance(curves[0], list):
-            shape_x = len(curves[0])
-            shape_y = len(curves)
         else:
-            shape_x = len(curves)
-            shape_y = 1
-
-    if isinstance(curves[0], list):
-        # If curves is a list of lists, flatten it.
-        curves = [item for sublist in curves for item in sublist]
+            raise ValueError("Curves must be of the CurvesDataset type defined by AFMReader.")
 
     image_map = [[None for _ in range(shape_x)] for _ in range(shape_y)]
 
