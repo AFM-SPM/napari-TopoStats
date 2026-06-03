@@ -9,48 +9,50 @@ from platformdirs import user_config_dir
 from qtpy.QtCore import QUrl
 from qtpy.QtWidgets import QDialog, QTextBrowser, QVBoxLayout
 
+from napari_topostats._alerts import show_error_dialog
+
 # Keep a reference to the dialog to prevent garbage collection and keep it non-modal
 _guide_dialog = None
 
 
-def get_readme_path():
+def get_guide_path():
     """
-    Get the path to the README.md file.
+    Get the path to the GUIDE.md file.
 
     Returns
     -------
     Path
-        The path to the README.md file.
+        The path to the GUIDE.md file.
 
     Raises
     ------
     FileNotFoundError
-        If README.md cannot be found.
+        If GUIDE.md cannot be found.
     """
-    dev_path = Path(__file__).resolve().parent.parent.parent / "README.md"
+    dev_path = Path(__file__).resolve().parent / "GUIDE.md"
     if dev_path.exists():
         return dev_path
 
-    raise FileNotFoundError("README.md could not be found.")
+    raise FileNotFoundError("GUIDE.md could not be found.")
 
 
 def load_guide():
     """
-    Load the README.md markdown file and convert it to HTML.
+    Load the GUIDE.md markdown file and convert it to HTML.
 
     Returns
     -------
     tuple[str, Path]
-        A tuple containing the converted HTML string and the parent directory Path of the README.md.
+        A tuple containing the converted HTML string and the parent directory Path of the GUIDE.md.
     """
-    readme_path = get_readme_path()
-    with open(readme_path, encoding="utf-8") as f:
+    guide_path = get_guide_path()
+    with open(guide_path, encoding="utf-8") as f:
         text = f.read()
 
     # Convert markdown to HTML with powerful extensions
     html_content = markdown.markdown(text, extensions=["extra", "codehilite", "tables"])
 
-    return html_content, readme_path.parent
+    return html_content, guide_path.parent
 
 
 def show_guide(viewer):
@@ -71,8 +73,9 @@ def show_guide(viewer):
         return
 
     try:
-        html_content, readme_dir = load_guide()
+        html_content, guide_dir = load_guide()
     except FileNotFoundError:
+        show_error_dialog("The guide could not be loaded because GUIDE.md was not found.")
         return
 
     # Use the main napari window as the parent if available
@@ -90,10 +93,10 @@ def show_guide(viewer):
     text_browser = QTextBrowser()
     text_browser.setOpenExternalLinks(True)
 
-    # Provide the base directory so relative image paths (e.g. readme_images/) are resolved
-    base_url = QUrl.fromLocalFile(str(readme_dir) + "/")
+    # Provide the base directory so relative image paths (e.g. guide_images/) are resolved
+    base_url = QUrl.fromLocalFile(str(guide_dir) + "/")
     text_browser.document().setBaseUrl(base_url)
-    text_browser.setSearchPaths([str(readme_dir)])
+    text_browser.setSearchPaths([str(guide_dir)])
     text_browser.setHtml(html_content)
 
     layout.addWidget(text_browser)

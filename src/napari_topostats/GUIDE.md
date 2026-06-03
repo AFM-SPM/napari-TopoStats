@@ -49,16 +49,16 @@ A small window will open prompting you to input the input channel for the image 
 Enter the channel used by your image (e.g. Height). The loaded image will appear as a layer in the GUI.
 Note: this loading utility comes from [napari-AFMReader].
 
-<img src="src/napari_topostats/guide_images/input_channel_window.png" width="800" alt="Input channel window"/>
+<img src="guide_images/input_channel_window.png" width="800" alt="Input channel window"/>
 
 Topostats tools can be accessed from the toolbar of napari (top left) as shown.
 
-<img src="src/napari_topostats/guide_images/toolbar.png" width="800" alt="Toolbar"/>
+<img src="guide_images/toolbar.png" width="800" alt="Toolbar"/>
 
 This will then open a window containing buttons with available functions.
 Select a layer, then click the button corresponding to the function you want to run on the layer.
 
-<img src="src/napari_topostats/guide_images/button_grid.png" width="800" alt="Button Grid"/>
+<img src="guide_images/button_grid.png" width="800" alt="Button Grid"/>
 
 Before running the function, you can choose to load a config file using the button and selecting the file.
 Both json and yaml file formats are supported.
@@ -67,7 +67,7 @@ There is also a button to save that file as the new default (instead of the topo
 be reset to the topostats default at anytime by clicking the Reset Default Config button in the bottom right
 of the main window.
 
-<img src="src/napari_topostats/guide_images/config_file.png" width="800" alt="Loading a config file"/>
+<img src="guide_images/config_file.png" width="800" alt="Loading a config file"/>
 
 When you run a function which requires the config, if you haven't loaded a config file manually, a default
 configuration is used which will be the config you have set as default if you have set one. If you haven't, the
@@ -77,7 +77,7 @@ allowing the config file to be edited directly through the napari gui. Changes m
 to the loaded config file, however, the updated config file can be saved as a file with the Save to file button
 at the bottom of the window. In this window, there is also a button to save the edited config file as the new default.
 
-<img src="src/napari_topostats/guide_images/edit_config_window.png" width="800" alt="Edit config window"/>
+<img src="guide_images/edit_config_window.png" width="800" alt="Edit config window"/>
 
 When you run a function for the first time, a window will open with options to adjust for that function
 (which are applied next time the function is run) if that function has options which can be adjusted.
@@ -85,7 +85,7 @@ There is also a run button in that window. This runs the function on the selecte
 same thing as clicking the function button in the grid). Note this window will only appear if there are options which
 can be adjusted outside of those in the config file.
 
-<img src="src/napari_topostats/guide_images/function_window.png" width="800" alt="Function window"/>
+<img src="guide_images/function_window.png" width="800" alt="Function window"/>
 
 **Batch Process** is a special function that works the same as if running `topostats process` in the command line,
 using the config you currently have loaded or the default config (with adjusted options if you have updated your
@@ -95,7 +95,7 @@ create with the new folder button if the directory doesn't exist). Otherwise, th
 file will be used. Once these have been defined topostats will process in the background (the output and progress
 can been seen in the command line). You can carry on using napari while this happens.
 
-<img src="src/napari_topostats/guide_images/batch_process.png" width="800" alt="Function window"/>
+<img src="guide_images/batch_process.png" width="800" alt="Function window"/>
 
 **Viewing Curves** is a function which allows the viewing of the force-distance curves for a point on loaded AFM
 data. Once the viewing curves widget has been opened by clicking on its button in the button grid, an individual
@@ -104,7 +104,7 @@ mouse while holding shift updates the viewer to wherever your mouse is. Once a c
 the channel of each axis by selecting the dropdown menu below the graph and selecting the desired channel. To view
 the metadata, click the **Experimental Parameters** button, which will open a window containing that information.
 
-<img src="src/napari_topostats/guide_images/viewing_curves.png" width="800" alt="Viewing curves"/>
+<img src="guide_images/viewing_curves.png" width="800" alt="Viewing curves"/>
 
 **Viewing profile line**
 Pressing and holding the 'A' key
@@ -113,7 +113,7 @@ open in the dock on the right, which will be updated with profile data as you dr
 being viewed can be changed by using the dropdown menu below the graph and selecting the desired channels. Images
 created by applying some function to the image will appear as channels in addition to the defaults.
 
-<img src="src/napari_topostats/guide_images/line_profile.png" width="800" alt="Line profile"/>
+<img src="guide_images/line_profile.png" width="800" alt="Line profile"/>
 
 **Loading custom analysis scripts**
 Dragging and dropping a python file into the napari viewer allows you to load custom analysis code. A function

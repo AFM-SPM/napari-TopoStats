@@ -35,8 +35,8 @@ output/config.yaml
 # Include icons
 !src/napari_topostats/icons/
 !src/napari_topostats/icons/**
-!readme_images/
-!readme_images/**
+!src/napari_topostats/guide_images/
+!src/napari_topostats/guide_images/**
 
 # Include test data
 !src/napari_topostats/_tests/_test_data/
