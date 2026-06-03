@@ -328,6 +328,7 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
             config_dir = Path(user_config_dir("TopoStats", "Napari"))
             config_path = config_dir / "config.yaml"
             if not config_path.exists():
+                config_dir.mkdir(parents=True, exist_ok=True)
                 write_new_default_config(config_path)
         else:
             # If no path provided, prompt the user via a standard file dialog.
@@ -828,8 +829,8 @@ def get_topostats_default_config():
     dict
         The default config.
     """
-    # this function is currently bugged for some reason, it seems write_config_with_comments fails to write the file
     config_path = Path(user_config_dir("TopoStats", "Napari")) / "default_config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     write_new_default_config(config_path)
 
     with open(config_path, encoding="utf-8") as f:

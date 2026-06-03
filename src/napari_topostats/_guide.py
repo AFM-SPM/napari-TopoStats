@@ -111,6 +111,7 @@ def check_guide(viewer):
         The napari viewer instance.
     """
     user_settings_path = Path(user_config_dir("TopoStats", "Napari")) / "settings.json"
+    user_settings_path.parent.mkdir(parents=True, exist_ok=True)
     if not user_settings_path.exists():
         settings = {"plugin-version": version("napari-topostats")}
         with open(user_settings_path, "w", encoding="utf-8") as f:
