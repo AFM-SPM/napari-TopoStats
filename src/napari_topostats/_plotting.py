@@ -511,6 +511,9 @@ def start_drawing(viewer):
     if "Profile Line" in viewer.layers:
         shapes_layer = viewer.layers["Profile Line"]
         shapes_layer.data = []
+        current_index = viewer.layers.index(shapes_layer)
+        if current_index < len(viewer.layers) - 1:
+            viewer.layers.move(current_index, len(viewer.layers))
     else:
         shapes_layer = viewer.add_shapes(name="Profile Line", shape_type="line", edge_color="cyan", edge_width=1)
 
