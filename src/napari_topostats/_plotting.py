@@ -341,7 +341,10 @@ class ProfileViewer(QWidget):
         self.settings_layout = QHBoxLayout(self.settings_widget)
         self.channel_displayed_label = QLabel("Selected channels: ")
         self.active_layer = get_current_layer(self.viewer)
-        self.loaded_image = get_loaded_image(self.active_layer.metadata.get("afmreader_id"))
+        reader_id = (
+            self.active_layer.metadata.get("afmreader_id") if self.active_layer and self.active_layer.metadata else None
+        )
+        self.loaded_image = get_loaded_image(reader_id) if reader_id is not None else None
         self.available_channels = self.loaded_image.get_available_channels() if self.loaded_image else []
         self.channel_selector = SelectionDropdown(
             items=self.available_channels,
@@ -364,9 +367,13 @@ class ProfileViewer(QWidget):
         temp_active = get_current_layer(self.viewer)
         if temp_active == self.active_layer:
             return
+        # Ignore selection changes to the drawing layer itself to prevent clearing loaded image context
+        if temp_active is not None and temp_active.name == "Profile Line":
+            return
         self.active_layer = temp_active
         if self.active_layer is not None:
-            self.loaded_image = get_loaded_image(self.active_layer.metadata.get("afmreader_id"))
+            reader_id = self.active_layer.metadata.get("afmreader_id") if self.active_layer.metadata else None
+            self.loaded_image = get_loaded_image(reader_id) if reader_id is not None else None
             self.available_channels = self.loaded_image.get_available_channels() if self.loaded_image else []
             self.channel_selector.set_items(
                 self.available_channels,
@@ -430,7 +437,7 @@ class ProfileViewer(QWidget):
         # Get all integer pixel coordinates along the line
         rr, cc = line(r0, c0, r1, c1)
 
-        if self.active_layer is not None:
+        if self.active_layer is not None and self.loaded_image is not None:
 
             for channel in self.channel_selector.get_checked_items():
 
@@ -500,12 +507,13 @@ def start_drawing(viewer):
     previous_active_layer = viewer.layers.selection.active
     previous_mode = previous_active_layer.mode if previous_active_layer else None
 
-    # Remove existing "Profile Line" layer if it exists to reset the tool
+    # Reuse or create the shapes layer for drawing the profile line to prevent OpenGL state corruption
     if "Profile Line" in viewer.layers:
-        viewer.layers.remove("Profile Line")
+        shapes_layer = viewer.layers["Profile Line"]
+        shapes_layer.data = []
+    else:
+        shapes_layer = viewer.add_shapes(name="Profile Line", shape_type="line", edge_color="cyan", edge_width=1)
 
-    # Add a new shapes layer for drawing the profile line
-    shapes_layer = viewer.add_shapes(name="Profile Line", shape_type="line", edge_color="cyan", edge_width=1)
     widget_manager = get_widget_manager()
     widget_manager.ensure_valid("Profile Viewer")
 
