@@ -418,6 +418,11 @@ class ProfileViewer(QWidget):
         # Get the top-most visible data layer
         self.active_layer = get_current_layer(self.viewer)
 
+        # Use a size that is always one pixel on the active layer regardless of its scale
+        y_scale, x_scale = np.abs(self.active_layer.scale[-2:])
+        edge_width = max(y_scale, x_scale) * 1.0
+        self.shapes_layer.edge_width = edge_width
+
         if self.active_layer is None:
             close_profile_viewer(self.viewer, self.shapes_layer, self.widget_manager)
             return
@@ -507,15 +512,25 @@ def start_drawing(viewer):
     previous_active_layer = viewer.layers.selection.active
     previous_mode = previous_active_layer.mode if previous_active_layer else None
 
+    # Use a size that is always one pixel on the active layer regardless of its scale
+    y_scale, x_scale = np.abs(active_layer.scale[-2:])
+    edge_width = max(y_scale, x_scale) * 1.0
+
     # Reuse or create the shapes layer for drawing the profile line to prevent OpenGL state corruption
     if "Profile Line" in viewer.layers:
         shapes_layer = viewer.layers["Profile Line"]
         shapes_layer.data = []
+        shapes_layer.edge_width = edge_width
         current_index = viewer.layers.index(shapes_layer)
         if current_index < len(viewer.layers) - 1:
             viewer.layers.move(current_index, len(viewer.layers))
     else:
-        shapes_layer = viewer.add_shapes(name="Profile Line", shape_type="line", edge_color="cyan", edge_width=1)
+        shapes_layer = viewer.add_shapes(
+            name="Profile Line",
+            shape_type="line",
+            edge_color="cyan",
+            edge_width=edge_width,
+        )
 
     widget_manager = get_widget_manager()
     widget_manager.ensure_valid("Profile Viewer")
