@@ -438,28 +438,24 @@ class MultiPlotWidget(pg.PlotWidget):
             self.previous_unit = self.current_unit
             self.current_unit = unit
             if self.previous_unit and self.previous_unit in self.profile_lines:
+
                 for line_channel in self.profile_lines[self.previous_unit]:
-                    # TODO is this leaving phantom lines?
-                    self.profile_lines[self.previous_unit][line_channel].setData([], [])
-                    self.profile_lines[self.previous_unit][line_channel] = self.p2.plot(
-                        self.line_data[line_channel][0],
-                        self.line_data[line_channel][1],
-                        pen=channel_colours[line_channel],
-                        name=line_channel,
-                        unit=self.previous_unit,
-                    )
-                    self.p1.setLabel("right", "", units=self.previous_unit)
+                    line_item = self.profile_lines[self.previous_unit][line_channel]
+                    if line_item in self.p1.items:
+                        self.p1.removeItem(line_item)
+                    if line_item not in self.p2.items:
+                        self.p2.addItem(line_item)
+                    line_item.setData(self.line_data[line_channel][0], self.line_data[line_channel][1])
+                self.p1.setLabel("right", "", units=self.previous_unit)
+
                 for line_channel in self.profile_lines[self.current_unit]:
-                    # TODO is this leaving phantom lines?
-                    self.profile_lines[self.current_unit][line_channel].setData([], [])
-                    self.profile_lines[self.current_unit][line_channel] = self.p1.plot(
-                        self.line_data[line_channel][0],
-                        self.line_data[line_channel][1],
-                        pen=channel_colours[line_channel],
-                        name=line_channel,
-                        unit=self.current_unit,
-                    )
-                    self.p1.setLabel("left", "", units=self.current_unit)
+                    line_item = self.profile_lines[self.current_unit][line_channel]
+                    if line_item in self.p2.items:
+                        self.p2.removeItem(line_item)
+                    if line_item not in self.p1.items:
+                        self.p1.addItem(line_item)
+                    line_item.setData(self.line_data[line_channel][0], self.line_data[line_channel][1])
+                self.p1.setLabel("left", "", units=self.current_unit)
 
         if None not in [self.current_unit, self.previous_unit]:
             for u, lines in self.profile_lines.items():
@@ -474,7 +470,12 @@ class MultiPlotWidget(pg.PlotWidget):
         """Removes the profile line for the given channel."""
         for _, lines in self.profile_lines.items():
             if channel in lines:
-                lines[channel].setData([], [])
+                line_item = lines[channel]
+
+                self.p1.removeItem(line_item)
+                self.p2.removeItem(line_item)
+                lines.pop(channel)
+                self.line_data.pop(channel, None)
 
 
 # TODO: This function really gets currently selected layer not image
