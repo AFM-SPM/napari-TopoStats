@@ -69,9 +69,14 @@ class CurveViewer(QWidget):
         self.info_label = QLabel("Hold 'Shift' and click a pixel to view its force curve.")
         self.layout().addWidget(self.info_label)
 
-        # Create and add the plot widget to the layout
-        self.plot_widget = pg.PlotWidget(title="F-D curve")
-        self.layout().addWidget(self.plot_widget)
+        # Create the graph area: a pg.GraphicsLayoutWidget() embedded in a horizontal layout
+        plot_layout = QHBoxLayout()
+        plot_layout.setContentsMargins(0, 0, 0, 0)
+        self.plot_graphics_widget = pg.GraphicsLayoutWidget()
+        self.plot_graphics_widget.setBackground(None)
+        self.plot_widget = self.plot_graphics_widget.addPlot(title="F-D curve")
+        plot_layout.addWidget(self.plot_graphics_widget)
+        self.layout().addLayout(plot_layout)
 
         self.available_channels = []
 

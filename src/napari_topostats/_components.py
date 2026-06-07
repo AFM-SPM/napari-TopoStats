@@ -361,15 +361,22 @@ class SelectionDropdown(QComboBox):
         ]
 
 
-class MultiPlotWidget(pg.PlotWidget):
+class MultiPlotWidget(QWidget):
     """A widget to display multiple plots in a grid layout"""
 
     def __init__(self, title: str, parent=None):
         """Initializes the MultiPlotWidget."""
-        super().__init__(title=title, parent=parent)
+        super().__init__(parent=parent)
+        self.setLayout(QHBoxLayout())
+        self.layout().setContentsMargins(0, 0, 0, 0)
+
+        # Create pg.GraphicsLayoutWidget embedded in the horizontal layout
+        self.graphics_widget = pg.GraphicsLayoutWidget()
+        self.graphics_widget.setBackground(None)
+        self.layout().addWidget(self.graphics_widget)
 
         # Get the primary plot item
-        self.p1 = self.plotItem
+        self.p1 = self.graphics_widget.addPlot(title=title)
         # self.p1.setLabels(left='Channel 1 (Low Intensity)', bottom='Frames')
 
         self.p2_view = pg.ViewBox()
