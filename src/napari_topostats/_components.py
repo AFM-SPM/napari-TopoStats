@@ -556,15 +556,19 @@ def get_selected_curves(viewer) -> list | None:
 
 
 def get_current_layer(viewer, requires_force_curves=False):
-    """Utility function to get the current active layer, excluding the Profile Line layer"""
+    """Utility function to get the current active layer, excluding helper shapes layers"""
     active = viewer.layers.selection.active
-    if active and active.name != "Profile Line" and (not requires_force_curves or "force_curves" in active.metadata):
+    if (
+        active
+        and active.name not in ("Profile Line", "Selected Curve")
+        and (not requires_force_curves or "force_curves" in active.metadata)
+    ):
         return active
 
     for layer in reversed(viewer.layers):
         if (
             layer.visible
-            and layer.name != "Profile Line"
+            and layer.name not in ("Profile Line", "Selected Curve")
             and (not requires_force_curves or "force_curves" in layer.metadata)
         ):
             return layer
