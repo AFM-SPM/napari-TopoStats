@@ -17,6 +17,7 @@ from qtpy.QtWidgets import (
     QLabel,
     QListWidget,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -369,6 +370,11 @@ class MultiPlotWidget(QWidget):
         super().__init__(parent=parent)
         self.setLayout(QHBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
+
+        # Set size policy to expanding to prevent the widget from collapsing in layouts
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Set a minimum height to ensure the plots are readable and don't flatten
+        self.setMinimumHeight(200)
 
         # Create pg.GraphicsLayoutWidget embedded in the horizontal layout
         self.graphics_widget = pg.GraphicsLayoutWidget()

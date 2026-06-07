@@ -313,7 +313,14 @@ class CurveViewer(QWidget):
             self.info_label.setText(f"Error plotting curve: {str(e)}")
 
     def set_available_channels(self, available_channels: list):
-        """Set the available channels for the curve plotter which updates the selector"""
+        """
+        Set the available channels for the curve plotter which updates the selector.
+
+        Parameters
+        ----------
+        available_channels : list
+            The list of available channels.
+        """
         self.available_channels = available_channels
         temp_x_channel = self.x_channel
         temp_y_channel = self.y_channel
