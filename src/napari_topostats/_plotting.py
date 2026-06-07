@@ -74,7 +74,7 @@ class CurveViewer(QWidget):
         plot_layout.setContentsMargins(0, 0, 0, 0)
         self.plot_graphics_widget = pg.GraphicsLayoutWidget()
         self.plot_graphics_widget.setBackground(None)
-        self.plot_widget = self.plot_graphics_widget.addPlot(title="F-D curve")
+        self.plot_widget = self.plot_graphics_widget.addPlot(title="Force Distance curve")
         plot_layout.addWidget(self.plot_graphics_widget)
         self.layout().addLayout(plot_layout)
 
