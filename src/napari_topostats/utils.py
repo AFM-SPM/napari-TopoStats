@@ -233,6 +233,35 @@ def remove_all_but_last(word: str, text: str) -> str:
     return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return
 
 
+def standardise_curve(curve: dict) -> dict:
+    """
+    Standardise the curve dictionary to ensure it has 'measuredHeight' and 'vDeflection' keys.
+
+    Parameters
+    ----------
+    curve : dict
+        The curve dictionary to standardise.
+
+    Returns
+    -------
+    dict
+        The standardised curve dictionary.
+    """
+    if "measuredHeight" not in curve:
+        measured_height_alternatives = ["Raw", "raw"]
+        for alt in measured_height_alternatives:
+            if alt in curve:
+                curve["measuredHeight"] = curve[alt]
+                break
+    if "vDeflection" not in curve:
+        v_deflection_alternatives = ["vDefl", "vDef", "Defl", "defl"]
+        for alt in v_deflection_alternatives:
+            if alt in curve:
+                curve["vDeflection"] = curve[alt]
+                break
+    return curve
+
+
 # pylint: disable=too-many-positional-arguments
 def _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig):
     """Worker function for parallel curve processing returning full value from function."""
@@ -325,6 +354,7 @@ def all_curves(
 
     # Try to get z_units from the first curve
     first_curve = curves[0, 0]
+    standardise_curve(first_curve)
     start_time = time.perf_counter()
     return_value = _all_curves_raw_worker(
         first_curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
@@ -347,7 +377,9 @@ def all_curves(
         # Use joblib.Parallel with a generator expression to keep it lazy.
         # batch_size=shape_x ensures we load one row of curves at a time per worker.
         results = Parallel(n_jobs=num_workers, batch_size=shape_x)(
-            delayed(_all_curves_worker)(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig)
+            delayed(_all_curves_worker)(
+                standardise_curve(curve), func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
+            )
             for curve in tqdm(curves, desc=f"Running {func.__name__} (Parallel)")
         )
 
@@ -361,6 +393,7 @@ def all_curves(
         for i, curve in enumerate(tqdm(curves, desc=f"Running {func.__name__} (Sequential)")):
             y = i // shape_x
             x = i % shape_x
+            standardise_curve(curve)
             point = _all_curves_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig)
             image_map[y][x] = point
     if isinstance(image_map[0][0], dict):

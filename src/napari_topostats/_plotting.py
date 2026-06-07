@@ -170,7 +170,7 @@ class CurveViewer(QWidget):
                 self.parameter_dialog = None
         self.parameter_dialog.populate_parameters(self.metadata)
 
-    def update_curve(self, selected_curve_dict=None):
+    def update_curve(self, selected_curve_dict: dict = None):
         """Updates the plot with the selected curve dict"""
         if selected_curve_dict:
             self.selected_curve_dict = selected_curve_dict
