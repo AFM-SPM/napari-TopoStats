@@ -152,6 +152,7 @@ EXTRA_FUNCTIONS = [
         path_to_data="return",
         function_to_run=find_trigger_point,
         tooltip=inspect.getdoc(find_trigger_point),
+        run_immediately=False,
     ),
     WidgetFunction(
         name="find_contact_point",
@@ -159,6 +160,7 @@ EXTRA_FUNCTIONS = [
         path_to_data="return",
         function_to_run=find_contact_point,
         tooltip=inspect.getdoc(find_contact_point),
+        run_immediately=False,
     ),
     WidgetFunction(
         name="create_3d_approach_map",
@@ -166,6 +168,7 @@ EXTRA_FUNCTIONS = [
         path_to_data="return",
         function_to_run=create_3d_approach_map,
         tooltip=inspect.getdoc(create_3d_approach_map),
+        run_immediately=False,
     ),
 ]
 
@@ -359,6 +362,7 @@ class TopoStatsRootWidget(RootWidget):
                     function_to_run=extra_topostats_functions,
                     tooltip="Functions loaded from external scripts that operate on images.",
                     function_manager=self.function_manager,
+                    run_immediately=False,  # Prevent immediate execution for loaded image functions
                 )
             )
         if extra_forcestats_functions:
@@ -368,6 +372,7 @@ class TopoStatsRootWidget(RootWidget):
                     function_to_run=extra_forcestats_functions,
                     tooltip="Functions loaded from external scripts that operate on curves.",
                     function_manager=self.function_manager,
+                    run_immediately=False,  # Prevent immediate execution for loaded curve functions
                 )
             )
 

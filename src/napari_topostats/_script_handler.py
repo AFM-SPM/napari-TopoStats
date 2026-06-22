@@ -47,6 +47,7 @@ def load_py_files(paths, viewer):
                 path_to_data="return",
                 function_to_run=func,
                 tooltip=inspect.getdoc(func),
+                run_immediately=False,  # Prevent immediate execution for loaded functions
             )
             topostats_widget = get_topostats_widget()
             if widget_function not in loaded_functions:
@@ -83,6 +84,7 @@ def fetch_saved_functions():
                     path_to_data="return",
                     function_to_run=func,
                     tooltip=inspect.getdoc(func),
+                    run_immediately=False,  # Prevent immediate execution for loaded functions
                 )
                 # Record the path
                 record_loaded_function_path(func_name, str(py_file))

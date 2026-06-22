@@ -39,8 +39,6 @@ from ._parallel_processing import ProcessWorker
 from ._state import WidgetManager, get_running_function, set_running_function
 from .utils import _eval, all_curves, calculate_contrast_limits, is_binary_image, remove_all_but_last
 
-RUN_IMMEDIATELY_EXEMPTIONS = set()
-
 
 def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
     """
@@ -232,6 +230,7 @@ class WidgetFunction:
         metadata_paths: dict = None,
         tooltip: str | None = None,
         overide_get_widget: bool = False,
+        run_immediately: bool = True,
         function_manager=None,
     ):
         self.name = name
@@ -245,6 +244,7 @@ class WidgetFunction:
             self.of_type = of_type
             self.metadata_paths = metadata_paths
         self.function_to_run = function_to_run
+        self.run_immediately = run_immediately
         if function_to_run is not None and isinstance(function_to_run, list):
             self.is_group = True
             self.group_functions = {f.name: f for f in function_to_run}
@@ -688,6 +688,9 @@ class WidgetFunction:
                     "curves_meta",
                 ]:
                     new_parameters.append(new_p)
+
+            if len(new_parameters) == 0:
+                self.run_immediately = True
             # Create a magicgui function with the wrapped function and the new parameters
             wrapped_func = CallableWithSignature(func, inspect.Signature(parameters=new_parameters))
             magicgui_function = magicgui()(wrapped_func)
@@ -941,8 +944,7 @@ class WidgetFunctionManager:
     # pylint: disable=too-many-branches
     def add_function_as_widget(self, func_name: str, function: WidgetFunction = None):
         """
-        Add the widget for a given function to the viewer and run the function if it is not in the
-        RUN_IMMEDIATELY_EXEMPTIONS list
+        Add the widget for a given function to the viewer and run the function
 
         Parameters
         ----------
@@ -982,8 +984,8 @@ class WidgetFunctionManager:
         if function.overide_get_widget:
             return
 
-        if func_name not in RUN_IMMEDIATELY_EXEMPTIONS and not function.is_group:
-            # If the function is not in the RUN_IMMEDIATELY_EXEMPTIONS list, run it with the appropriate parameters,
+        if not function.is_group and function.run_immediately:
+            # If the function is not in the , run it with the appropriate parameters,
             # using the selected image layer as the image parameter
             if hasattr(widget, "image") and widget.image.value is None:
                 selected_image = get_selected_image(self.viewer)
