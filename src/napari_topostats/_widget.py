@@ -38,6 +38,8 @@ if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() 
     loading_spinner.start()
     QApplication.processEvents()
 
+from forcestats.analysis import find_trigger_point
+from forcestats.contact import create_3d_approach_map, find_contact_point
 from napari.layers import Image, Labels
 from napari.viewer import Viewer
 from packaging.version import parse as parse_version
@@ -86,7 +88,7 @@ if parse_version(parse_version(topostats_version).base_version) < parse_version(
 # Attributes from the config can be dynamically inserted into path_to_data or metadata_paths using the syntax
 # <config_category.attribute> (this will reference config["config_category"]["attribute"]).
 
-TOPOSTATS_FUNCTIONS = [
+MAIN_FUNCTIONS = [
     WidgetFunction(
         name="load_config",
         tooltip="Load a configuration file to use with TopoStats functions.",
@@ -135,14 +137,35 @@ TOPOSTATS_FUNCTIONS = [
         function_to_run=batch_process,
         tooltip="Batch process multiple AFM images in a selected folder using the current configuration.",
     ),
-]
-
-FORCESTATS_FUNCTIONS = [
     WidgetFunction(
         name="view_curves",
         function_to_run=open_curve_viewer,
         tooltip="Open curve window for viewing AFM curves for each point of the image",
         overide_get_widget=True,
+    ),
+]
+
+EXTRA_FUNCTIONS = [
+    WidgetFunction(
+        name="find_trigger_point",
+        function_key="find_trigger_point",
+        path_to_data="return",
+        function_to_run=find_trigger_point,
+        tooltip=inspect.getdoc(find_trigger_point),
+    ),
+    WidgetFunction(
+        name="find_contact_point",
+        function_key="find_contact_point",
+        path_to_data="return",
+        function_to_run=find_contact_point,
+        tooltip=inspect.getdoc(find_contact_point),
+    ),
+    WidgetFunction(
+        name="create_3d_approach_map",
+        function_key="create_3d_approach_map",
+        path_to_data="return",
+        function_to_run=create_3d_approach_map,
+        tooltip=inspect.getdoc(create_3d_approach_map),
     ),
 ]
 
@@ -314,7 +337,7 @@ class TopoStatsRootWidget(RootWidget):
             The parent widget, by default None.
         """
         # Initialize the widget with a viewer
-        available_functions = TOPOSTATS_FUNCTIONS.copy() + FORCESTATS_FUNCTIONS.copy()
+        available_functions = MAIN_FUNCTIONS.copy()
         if parent:
             super().__init__(viewer=viewer, parent=parent, functions=available_functions)
         else:
@@ -322,7 +345,7 @@ class TopoStatsRootWidget(RootWidget):
         loaded_functions = get_loaded_functions()
         extra_topostats_functions = []
         extra_forcestats_functions = []
-        for func in loaded_functions:
+        for func in loaded_functions + EXTRA_FUNCTIONS:
             params = inspect.signature(func.function_to_run).parameters
             if func.name not in [f.name for f in available_functions]:
                 if "curve" in params or "curves" in params:
