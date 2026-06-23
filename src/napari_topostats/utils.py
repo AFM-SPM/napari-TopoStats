@@ -1,15 +1,19 @@
 """Contains functions surrounding utilities and cosmetics."""
 
+from __future__ import annotations
+
 import copy
 import inspect
 import multiprocessing
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from joblib import Parallel, delayed
-from napari.types import ImageData
 from tqdm import tqdm
+
+if TYPE_CHECKING:
+    from napari.types import ImageData
 
 
 # ------- Misc -------
@@ -275,15 +279,6 @@ def _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, h
     return func(curve=curve, **func_kwargs)
 
 
-# pylint: disable=too-many-positional-arguments
-def _all_curves_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig):
-    """Worker function for parallel curve processing."""
-    return_value = _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig)
-    if isinstance(return_value, tuple) and isinstance(return_value[1], str):
-        return return_value[0]
-    return return_value
-
-
 # pylint: disable=too-many-positional-arguments,too-many-arguments,too-many-locals
 def all_curves(
     curves,
@@ -354,7 +349,6 @@ def all_curves(
 
     # Try to get z_units from the first curve
     first_curve = curves[0, 0]
-    standardise_curve(first_curve)
     start_time = time.perf_counter()
     return_value = _all_curves_raw_worker(
         first_curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
@@ -374,13 +368,20 @@ def all_curves(
 
     if parallel and num_workers > 1:
 
+        # pylint: disable=too-many-positional-arguments
+        def _all_curves_worker(curve):
+            """Worker function for parallel curve processing."""
+            return_value = _all_curves_raw_worker(
+                standardise_curve(curve), func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
+            )
+            if isinstance(return_value, tuple) and isinstance(return_value[1], str):
+                return return_value[0]
+            return return_value
+
         # Use joblib.Parallel with a generator expression to keep it lazy.
         # batch_size=shape_x ensures we load one row of curves at a time per worker.
         results = Parallel(n_jobs=num_workers, batch_size=shape_x)(
-            delayed(_all_curves_worker)(
-                standardise_curve(curve), func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
-            )
-            for curve in tqdm(curves, desc=f"Running {func.__name__} (Parallel)")
+            delayed(_all_curves_worker)(curve) for curve in tqdm(curves, desc=f"Running {func.__name__} (Parallel)")
         )
 
         # Reshape results into the image map
