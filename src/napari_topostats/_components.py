@@ -3,6 +3,7 @@
 import dask.array as da
 import numpy as np
 import pyqtgraph as pg
+from AFMReader.data_classes import CurvesDataset
 from magicgui.widgets import Container, create_widget
 from napari import Viewer
 from napari.layers import Image, Labels
@@ -530,7 +531,7 @@ def get_selected_image(viewer, of_type: list = None) -> Image | None:
     return None
 
 
-def get_selected_curves(viewer) -> list | None:
+def get_selected_curves(viewer) -> CurvesDataset | None:
     """
     Get the currently selected curves from the viewer.
     This assumes that the curves are stored in the metadata of the selected layer under the key "force_curves".
@@ -542,7 +543,7 @@ def get_selected_curves(viewer) -> list | None:
 
     Returns
     -------
-    list | None
+    CurvesDataset | None
         The selected curves, or None if no layer is selected or if the selected layer does not have curves
         in its metadata.
     """
@@ -556,8 +557,6 @@ def get_selected_curves(viewer) -> list | None:
     if "force_curves" not in layer.metadata:
         show_error_dialog("Selected layer does not contain curves", raise_exception=True)
         return None
-
-    # TODO add the ability to load all the curves in one go here
 
     return layer.metadata["force_curves"]
 

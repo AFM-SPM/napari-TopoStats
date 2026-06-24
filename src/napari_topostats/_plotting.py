@@ -21,7 +21,13 @@ from qtpy.QtWidgets import (
 )
 from skimage.draw import line  # pylint: disable=no-name-in-module
 
-from napari_topostats._components import CollapsibleBox, MultiPlotWidget, SelectionDropdown, get_current_layer
+from napari_topostats._components import (
+    CollapsibleBox,
+    MultiPlotWidget,
+    SelectionDropdown,
+    get_current_layer,
+    get_selected_curves,
+)
 from napari_topostats._state import WidgetManager, get_widget_manager
 from napari_topostats.utils import unflatten_dict
 
@@ -64,10 +70,17 @@ class CurveViewer(QWidget):
 
         # Setup the layout to be arranged vertically
         self.setLayout(QVBoxLayout())
+        top_row_widget = QWidget()
+        top_row_layout = QHBoxLayout(top_row_widget)
+        top_row_layout.setContentsMargins(0, 0, 0, 0)
 
         # Create and add info label to the layout
         self.info_label = QLabel("Hold 'Shift' and click a pixel to view its force curve.")
-        self.layout().addWidget(self.info_label)
+        self.volume_selector = QComboBox()
+        self.volume_selector.currentTextChanged.connect(self.update_volume)
+        top_row_layout.addWidget(self.info_label)
+        top_row_layout.addWidget(self.volume_selector)
+        self.layout().addWidget(top_row_widget)
 
         # Create the graph area: a pg.GraphicsLayoutWidget() embedded in a horizontal layout
         plot_layout = QHBoxLayout()
@@ -199,6 +212,11 @@ class CurveViewer(QWidget):
             self.plot_widget.setLabel("left", self.y_channel, units=unit)
         self.update_curve()
 
+    def update_volume(self, volume_name: str):
+        """Updates the volume of the plot and refreshes curve to match"""
+        selected_curves = get_selected_curves(self.viewer)
+        self.update_curve(selected_curves.get_volume(volume_name)[self.y_coord, self.x_coord])
+
     def update_segments(self, approach: bool | None = None, retract: bool | None = None):
         """Updates the segments of the plot based on user checking boxes"""
         if approach is not None:
@@ -262,7 +280,15 @@ class CurveViewer(QWidget):
 
         curves_data = layer.metadata["force_curves"]
         raw_metadata = curves_data.metadata
-        current_volume = curves_data.get_default_volume()
+        if self.volume_selector.currentText() not in curves_data.volumes:
+            self.volume_selector.clear()
+            self.volume_selector.addItems(curves_data.volumes.keys())
+            self.volume_selector.setCurrentText(curves_data.get_default_volume().name)
+        current_volume = (
+            curves_data.get_volume(self.volume_selector.currentText())
+            if self.volume_selector.currentText()
+            else curves_data.get_default_volume()
+        )
         self.channels_units = current_volume.channel_units
         try:
             self.metadata = {
@@ -321,6 +347,8 @@ class CurveViewer(QWidget):
         available_channels : list
             The list of available channels.
         """
+        if self.available_channels == available_channels:
+            return
         self.available_channels = available_channels
         temp_x_channel = self.x_channel
         temp_y_channel = self.y_channel
