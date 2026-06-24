@@ -1,11 +1,12 @@
 """Module for containing custom and reusable gui components"""
 
-# pylint:disable=too-many-positional-arguments
-
 import dask.array as da
 import numpy as np
 import pyqtgraph as pg
+from magicgui.widgets import Container, create_widget
+from napari import Viewer
 from napari.layers import Image, Labels
+from napari_afmreader._reader import LoadedImage, get_loaded_image
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QStandardItem, QStandardItemModel
 from qtpy.QtWidgets import (
@@ -578,4 +579,89 @@ def get_current_layer(viewer, requires_force_curves=False):
             and (not requires_force_curves or "force_curves" in layer.metadata)
         ):
             return layer
+    return None
+
+
+def get_selected_loaded_image(viewer: Viewer) -> LoadedImage:
+    """
+    Get the currently selected loaded image from the viewer.
+
+    Returns
+    -------
+    LoadedImage | None
+        The selected loaded image, or None if no layer is selected or if the selected layer is not a LoadedImage.
+    """
+    selected_layer = get_current_layer(viewer)
+    loaded_image = get_loaded_image(selected_layer.metadata["afmreader_id"])
+    if loaded_image is not None:
+        return loaded_image
+    show_error_dialog("Selected layer was not loaded throught napari-AFMReader", raise_exception=True)
+    return None
+
+
+class DynamicParameterDialog(QDialog):
+    """A dialog that dynamically generates inputs based on parameters configuration using magicgui."""
+
+    def __init__(self, parameters: dict, title: str = "Parameters", warning_message: str = None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.layout = QVBoxLayout(self)
+
+        if warning_message:
+            warning_label = QLabel(warning_message)
+            warning_label.setWordWrap(True)
+            warning_label.setStyleSheet("font-weight: bold; color: #ffaa00; margin-bottom: 10px;")
+            self.layout.addWidget(warning_label)
+
+        self.container = Container()
+        self.widgets = {}
+
+        for param_name, config in parameters.items():
+            param_type = config.get("type")
+            default = config.get("default")
+            label_text = config.get("label", param_name)
+
+            if param_type is bool:
+                w = create_widget(value=default, annotation=bool, label=label_text, name=param_name)
+            elif isinstance(param_type, list):
+                w = create_widget(value=default, options={"choices": param_type}, label=label_text, name=param_name)
+            elif param_type is str:
+                w = create_widget(value=default, annotation=str, label=label_text, name=param_name)
+            else:
+                continue
+
+            self.container.append(w)
+            self.widgets[param_name] = w
+
+        self.layout.addWidget(self.container.native)
+
+        # OK / Cancel Buttons
+        button_layout = QHBoxLayout()
+        ok_button = QPushButton("OK")
+        ok_button.clicked.connect(self.accept)
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_button)
+        button_layout.addWidget(ok_button)
+        self.layout.addLayout(button_layout)
+
+    def get_values(self) -> dict:
+        """
+        Get the current values of all parameters.
+
+        Returns
+        -------
+        dict
+            Dictionary mapping parameter names to their current widget values.
+        """
+        return {name: w.value for name, w in self.widgets.items()}
+
+
+def show_parameter_dialog(
+    parameters: dict, title: str = "Parameters", warning_message: str = None, parent=None
+) -> dict | None:
+    """Helper function to show a DynamicParameterDialog and return values or None."""
+    dialog = DynamicParameterDialog(parameters, title, warning_message, parent)
+    if dialog.exec_() == QDialog.Accepted:
+        return dialog.get_values()
     return None

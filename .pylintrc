@@ -95,6 +95,7 @@ disable=C0103,
         use-symbolic-message-instead,
         too-few-public-methods,
         fixme,
+        too-many-positional-arguments,
 
 
 

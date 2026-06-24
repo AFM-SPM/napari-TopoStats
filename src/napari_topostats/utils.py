@@ -1,5 +1,7 @@
 """Contains functions surrounding utilities and cosmetics."""
 
+# pylint: disable=import-outside-toplevel,too-many-statements
+
 from __future__ import annotations
 
 import copy
@@ -279,7 +281,7 @@ def _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, h
     return func(curve=curve, **func_kwargs)
 
 
-# pylint: disable=too-many-positional-arguments,too-many-arguments,too-many-locals
+# pylint: disable=too-many-arguments,too-many-locals
 def all_curves(
     curves,
     func,
@@ -289,8 +291,10 @@ def all_curves(
     flip_image: bool = False,
     parallel: bool | None = None,
     num_workers: int | None = None,
+    h5file: Any | None = None,
+    new_volume_name: str | None = None,
     **kwargs,
-) -> np.ndarray:
+) -> np.ndarray | bool:
     """
     Apply a function to all curves in a list of curves, with optional parameters for shaping the output and handling
     classes. Should return a 2D array of the same shape as the input curves, where each element is the result of
@@ -298,8 +302,8 @@ def all_curves(
 
     Parameters
     ----------
-    curves : list
-        The list of curves to apply the function to.
+    curves : CurveVolume
+        The volume of curves to apply the function to.
     func : function
         The function to apply to each curve.
     shape_x : int, optional
@@ -353,6 +357,7 @@ def all_curves(
     return_value = _all_curves_raw_worker(
         first_curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
     )
+    curve_correcting = isinstance(return_value, dict)
     execution_time = time.perf_counter() - start_time
     if parallel is None:
         # Auto-detect based on execution time of first curve
@@ -362,43 +367,79 @@ def all_curves(
     else:
         z_units = "nm"
 
+    # pylint: disable=too-many-positional-arguments
+    def _all_curves_worker(curve):
+        """Worker function for parallel curve processing."""
+        return_value = _all_curves_raw_worker(
+            standardise_curve(curve), func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
+        )
+        if isinstance(return_value, tuple) and isinstance(return_value[1], str):
+            return return_value[0]
+        return return_value
+
+    if curve_correcting:
+        # AFMReader needs to be imported here to prevent it being imported for every worker process
+        from AFMReader.h5_jpk import CurvesH5Volume
+        from AFMReader.h5_saver import H5Saver
+
+        saver = H5Saver(h5file=h5file)
+        new_volume_name = f"{curves.name}_{func.__name__}" if new_volume_name is None else new_volume_name
+
+        processed_volume = CurvesH5Volume(
+            name=new_volume_name,
+            shape_x=curves.shape_x,
+            shape_y=curves.shape_y,
+            volume_data_group=curves.volume_data_group,
+            channel_units=curves.channel_units.copy(),  # .copy() prevents sharing this dictionary
+            flip_image=curves.flip_image,
+        )
+        processed_volume.volume_data_group = saver.setup_volume(processed_volume)
+
     if num_workers is None:
         # Default to all but 2 cores, minimum 1
         num_workers = max(1, multiprocessing.cpu_count() - 2)
 
     if parallel and num_workers > 1:
-
-        # pylint: disable=too-many-positional-arguments
-        def _all_curves_worker(curve):
-            """Worker function for parallel curve processing."""
-            return_value = _all_curves_raw_worker(
-                standardise_curve(curve), func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
-            )
-            if isinstance(return_value, tuple) and isinstance(return_value[1], str):
-                return return_value[0]
-            return return_value
-
         # Use joblib.Parallel with a generator expression to keep it lazy.
-        # batch_size=shape_x ensures we load one row of curves at a time per worker.
-        results = Parallel(n_jobs=num_workers, batch_size=shape_x)(
-            delayed(_all_curves_worker)(curve) for curve in tqdm(curves, desc=f"Running {func.__name__} (Parallel)")
-        )
-
-        # Reshape results into the image map
-        for i, point in enumerate(results):
-            y = i // shape_x
-            x = i % shape_x
-            image_map[y][x] = point
+        if curve_correcting:
+            processed_generator = Parallel(n_jobs=num_workers, return_as="generator")(
+                delayed(_all_curves_worker)(curve) for curve in tqdm(curves, desc=f"Running {func.__name__} (Parallel)")
+            )
+            for idx, curve_out in enumerate(processed_generator):
+                saver.save_curve(
+                    curve_data=curve_out,
+                    volume_name=new_volume_name,
+                    num_of_curves=len(processed_volume),
+                    curve_num=idx,
+                )
+        else:
+            results = Parallel(n_jobs=num_workers)(
+                delayed(_all_curves_worker)(curve) for curve in tqdm(curves, desc=f"Running {func.__name__} (Parallel)")
+            )
+            # Reshape results into the image map
+            for i, point in enumerate(results):
+                y = i // shape_x
+                x = i % shape_x
+                image_map[y][x] = point
 
     else:
         for i, curve in enumerate(tqdm(curves, desc=f"Running {func.__name__} (Sequential)")):
-            y = i // shape_x
-            x = i % shape_x
             standardise_curve(curve)
-            point = _all_curves_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig)
-            image_map[y][x] = point
-    if isinstance(image_map[0][0], dict):
-        return image_map
+            worker_result = _all_curves_worker(curve)
+            if curve_correcting:
+                saver.save_curve(
+                    curve_data=worker_result,
+                    volume_name=new_volume_name,
+                    num_of_curves=len(processed_volume),
+                    curve_num=i,
+                )
+            else:
+                y = i // shape_x
+                x = i % shape_x
+                image_map[y][x] = worker_result
+    if curve_correcting:
+        saver.complete_saving(volume=processed_volume)
+        return True
     image_map = np.array(image_map)
     if flip_image:
         image_map = np.flipud(image_map)

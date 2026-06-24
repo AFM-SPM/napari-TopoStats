@@ -1,4 +1,4 @@
-# pylint: disable=no-else-return,too-many-lines
+# pylint: disable=no-else-return,too-many-lines,too-many-locals,function-redefined
 """
 Module for dynamic widget generation from topostats functions including creating a window of options
 for those functions, running them and rendering the result.
@@ -8,7 +8,7 @@ import functools
 import inspect
 import re
 from collections.abc import Callable
-from typing import Any
+from typing import Any, get_origin, get_type_hints
 
 import numpy as np
 import pandas as pd
@@ -33,7 +33,13 @@ from topostats.classes import TopoStats
 
 from . import _io as io
 from ._alerts import LoadingWidget, attach_status_label, construct_error_args, show_error_dialog
-from ._components import SelectionDialog, get_selected_curves, get_selected_image
+from ._components import (
+    SelectionDialog,
+    get_selected_curves,
+    get_selected_image,
+    get_selected_loaded_image,
+    show_parameter_dialog,
+)
 from ._io import add_values_to_dict_from_config, fetch_saved_scripts, get_current_config, save_scripts, unsave_scripts
 from ._parallel_processing import ProcessWorker
 from ._state import WidgetManager, get_running_function, set_running_function
@@ -506,11 +512,87 @@ class WidgetFunction:
                             None  # Set to None as wrapping in all_curves will remove requirement for type_class
                         )
 
-                    # If the function is designed to take a single curve, wrap it in all_curves to apply
-                    # to all curves in the selected layer
-                    # pylint: disable=function-redefined
-                    def func_to_execute(**kwargs):
-                        return all_curves(func=self.function_to_run, **kwargs)
+                    return_type = get_type_hints(self.function_to_run).get("return")
+                    if return_type is dict or get_origin(return_type) is dict:
+                        loaded_image = get_selected_loaded_image(viewer)
+                        current_afm_load = loaded_image.get_current_load()
+                        print(f"Current AFM Load: {current_afm_load} loaded_image: {loaded_image}")
+                        if loaded_image.curves_data is None or current_afm_load is None:
+                            loading_widget.stop()
+                            show_error_dialog(
+                                "No curves found in the selected layer.",
+                                raise_exception=True,
+                            )
+                            return
+                        curves_data = loaded_image.curves_data
+                        default_volume = curves_data.get_default_volume()
+                        curves_name = default_volume.name if default_volume else "curves"
+                        volume_options = list(curves_data.volumes.keys())
+
+                        params_config = {
+                            "volume_name_to_operate_on": {
+                                "type": volume_options,
+                                "default": curves_name,
+                                "label": "Curves volume to operate on:",
+                            },
+                            "new_volume_name": {
+                                "type": str,
+                                "default": f"{curves_name}_{self.function_to_run.__name__}",
+                                "label": "New curves volume name:",
+                            },
+                        }
+
+                        is_afmreader = current_afm_load.metadata.get("created_by") == "AFMReader"
+                        if is_afmreader:
+                            params_config["add_to_current_file"] = {
+                                "type": bool,
+                                "default": True,
+                                "label": "Add processed curves to current file",
+                            }
+                            warning_msg = None
+                        else:
+                            warning_msg = (
+                                "This file was not created by AFMReader. "
+                                "A new file will be created. Click Cancel to abort."
+                            )
+
+                        user_params = show_parameter_dialog(
+                            parameters=params_config, title="Process Curves Options", warning_message=warning_msg
+                        )
+                        if user_params is None:
+                            loading_widget.stop()
+                            return
+
+                        add_to_current_file = user_params.get("add_to_current_file", False)
+
+                        selected_vol_name = user_params["volume_name_to_operate_on"]
+                        kwargs["curves"] = curves_data.volumes[selected_vol_name]
+                        if not add_to_current_file:
+
+                            def func_to_execute(**kwargs):
+                                current_channel = loaded_image.get_current_channel()
+                                loaded_image.loader.save_to_h5()
+                                loaded_image.init_from_loader(headless=True)
+                                loaded_image.add_channel_image(channel=current_channel)
+                                curves_data = loaded_image.curves_data
+                                kwargs["curves"] = curves_data.volumes[selected_vol_name]
+                                kwargs["h5file"] = curves_data.h5file
+                                kwargs["new_volume_name"] = user_params["new_volume_name"]
+                                return all_curves(func=self.function_to_run, **kwargs)
+
+                        else:
+
+                            def func_to_execute(**kwargs):
+                                kwargs["h5file"] = curves_data.h5file
+                                kwargs["new_volume_name"] = user_params["new_volume_name"]
+                                return all_curves(func=self.function_to_run, **kwargs)
+
+                    else:
+                        # If the function is designed to take a single curve, wrap it in all_curves to apply
+                        # to all curves in the selected layer
+                        # pylint: disable=function-redefined
+                        def func_to_execute(**kwargs):
+                            return all_curves(func=self.function_to_run, **kwargs)
 
                     new_param = inspect.Parameter(
                         name="curves",
@@ -553,6 +635,8 @@ class WidgetFunction:
                         )
                     kwargs["topostats_object"] = topostats_object
                 # Distribute arguments between method_args and class_args
+                # TODO do we need to forget about the check for in local_params because if handling curves
+                # it might be cleaner to add some kwargs which weren't there before
                 for key, value in kwargs.items():
                     if key in [p.name for p in local_params_function]:
                         method_args[key] = value

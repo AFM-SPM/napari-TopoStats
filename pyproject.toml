@@ -41,11 +41,13 @@ dependencies = [
   "napari[all]",
   "qtpy",
   "tox",
+  "joblib>=1.3.0",
   "pyqtgraph",
   "markdown",
   "topostats>=2.4.0",  # This should match MIN_TOPOSTATS_VERSION in src/napari_topostats/_state.py
   "napari-AFMReader @ git+https://github.com/AFM-SPM/napari-AFMReader.git@ahobbs7/params_and_units",
   "forcestats @ git+https://github.com/AFM-SPM/ForceStats.git@main",
+  "AFMReader @ git+https://github.com/AFM-SPM/AFMReader.git@ahobbs7/adjusting_curves",
 ]
 
 [project.optional-dependencies]
