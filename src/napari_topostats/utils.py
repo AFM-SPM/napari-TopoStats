@@ -404,9 +404,9 @@ def all_curves(
         if curve_correcting:
             processed_generator = Parallel(n_jobs=num_workers, return_as="generator")(
                 delayed(_all_curves_worker)(curve)
-                for curve in tqdm(curves.iter_curves(flip_image=False), desc=f"Running {func.__name__} (Parallel)")
+                for curve in curves.iter_curves(flip_image=False)
             )
-            for idx, curve_out in enumerate(processed_generator):
+            for idx, curve_out in enumerate(tqdm(processed_generator, total=len(curves), desc=f"Running {func.__name__} (Parallel)")):
                 saver.save_curve(
                     curve_data=curve_out,
                     volume_name=new_volume_name,
@@ -415,7 +415,7 @@ def all_curves(
                 )
         else:
             results = Parallel(n_jobs=num_workers)(
-                delayed(_all_curves_worker)(curve) for curve in tqdm(curves, desc=f"Running {func.__name__} (Parallel)")
+                delayed(_all_curves_worker)(curve) for curve in tqdm(curves, total=len(curves), desc=f"Running {func.__name__} (Parallel)")
             )
             # Reshape results into the image map
             for i, point in enumerate(results):
@@ -426,7 +426,7 @@ def all_curves(
     else:
         if curve_correcting:
             for i, curve in enumerate(
-                tqdm(curves.iter_curves(flip_image=False), desc=f"Running {func.__name__} (Sequential)")
+                tqdm(curves.iter_curves(flip_image=False), total=len(curves), desc=f"Running {func.__name__} (Sequential)")
             ):
                 standardise_curve(curve)
                 worker_result = _all_curves_worker(curve)
@@ -437,7 +437,7 @@ def all_curves(
                     curve_num=i,
                 )
         else:
-            for i, curve in enumerate(tqdm(curves, desc=f"Running {func.__name__} (Sequential)")):
+            for i, curve in enumerate(tqdm(curves, total=len(curves), desc=f"Running {func.__name__} (Sequential)")):
                 standardise_curve(curve)
                 worker_result = _all_curves_worker(curve)
                 y = i // shape_x
