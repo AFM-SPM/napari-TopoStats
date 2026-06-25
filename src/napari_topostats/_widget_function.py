@@ -522,7 +522,6 @@ class WidgetFunction:
                     if return_type is dict or get_origin(return_type) is dict:
                         loaded_image = get_selected_loaded_image(viewer)
                         current_afm_load = loaded_image.get_current_load()
-                        print(f"Current AFM Load: {current_afm_load} loaded_image: {loaded_image}")
                         if loaded_image.curves_data is None or current_afm_load is None:
                             loading_widget.stop()
                             show_error_dialog(
@@ -743,25 +742,31 @@ class WidgetFunction:
                         loading_widget.stop()
                         show_error_dialog(**result)
                         return
-                    viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
-                    return_value, metadata = result
-                    if isinstance(return_value, tuple) and len(return_value) == 2 and isinstance(return_value[1], str):
-                        return_value, z_units = return_value
-                    else:
-                        z_units = None
-                    if return_value is not None:
-                        self.render_return_value(
-                            return_value,
-                            viewer,
-                            selected_image,
-                            metadata=metadata,
-                            z_units=z_units,
-                        )
-                    else:
-                        show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
-                    loading_widget.stop()
-                    if self.name == get_running_function():
-                        set_running_function(None)
+                    try:
+                        viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
+                        return_value, metadata = result
+                        if (
+                            isinstance(return_value, tuple)
+                            and len(return_value) == 2
+                            and isinstance(return_value[1], str)
+                        ):
+                            return_value, z_units = return_value
+                        else:
+                            z_units = None
+                        if return_value is not None:
+                            self.render_return_value(
+                                return_value,
+                                viewer,
+                                selected_image,
+                                metadata=metadata,
+                                z_units=z_units,
+                            )
+                        else:
+                            show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
+                    finally:
+                        loading_widget.stop()
+                        if self.name == get_running_function():
+                            set_running_function(None)
 
                 set_running_function(self.name)
                 self.worker = ProcessWorker(_func)
