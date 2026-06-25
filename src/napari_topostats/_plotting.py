@@ -261,7 +261,9 @@ class CurveViewer(QWidget):
     def _process_event_coords(self, viewer, event):
         """The core logic to extract and plot the curve at the current mouse position."""
         layer = viewer.layers.selection.active
-        if layer is None or "force_curves" not in layer.metadata:
+        reader_id = layer.metadata.get("afmreader_id") if layer and layer.metadata else None
+        loaded_image = get_loaded_image(reader_id) if reader_id is not None else None
+        if loaded_image is None or loaded_image.curves_data is None:
             self.info_label.setText("No force curves found in active layer.")
             return
 
@@ -278,7 +280,7 @@ class CurveViewer(QWidget):
 
         curve_num = shape_x * self.y_coord + self.x_coord
 
-        curves_data = layer.metadata["force_curves"]
+        curves_data = loaded_image.curves_data
         raw_metadata = curves_data.metadata
         if self.volume_selector.currentText() not in curves_data.volumes:
             self.volume_selector.clear()

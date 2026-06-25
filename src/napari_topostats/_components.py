@@ -534,7 +534,7 @@ def get_selected_image(viewer, of_type: list = None) -> Image | None:
 def get_selected_curves(viewer) -> CurvesDataset | None:
     """
     Get the currently selected curves from the viewer.
-    This assumes that the curves are stored in the metadata of the selected layer under the key "force_curves".
+    This retrieves the curves from the LoadedImage object associated with the selected layer.
 
     Parameters
     ----------
@@ -544,8 +544,7 @@ def get_selected_curves(viewer) -> CurvesDataset | None:
     Returns
     -------
     CurvesDataset | None
-        The selected curves, or None if no layer is selected or if the selected layer does not have curves
-        in its metadata.
+        The selected curves, or None if no layer is selected or if the selected layer does not have curves.
     """
     selected = list(viewer.layers.selection)
 
@@ -554,20 +553,32 @@ def get_selected_curves(viewer) -> CurvesDataset | None:
         return None
     layer = selected[0]
 
-    if "force_curves" not in layer.metadata:
+    reader_id = layer.metadata.get("afmreader_id") if layer.metadata else None
+    loaded_image = get_loaded_image(reader_id) if reader_id is not None else None
+    if loaded_image is None or loaded_image.curves_data is None:
         show_error_dialog("Selected layer does not contain curves", raise_exception=True)
         return None
 
-    return layer.metadata["force_curves"]
+    return loaded_image.curves_data
 
 
 def get_current_layer(viewer, requires_force_curves=False):
     """Utility function to get the current active layer, excluding helper shapes layers"""
+
+    def has_force_curves(layer):
+        if not layer or not layer.metadata:
+            return False
+        reader_id = layer.metadata.get("afmreader_id")
+        if reader_id is None:
+            return False
+        loaded_image = get_loaded_image(reader_id)
+        return loaded_image is not None and loaded_image.curves_data is not None
+
     active = viewer.layers.selection.active
     if (
         active
         and active.name not in ("Profile Line", "Selected Curve")
-        and (not requires_force_curves or "force_curves" in active.metadata)
+        and (not requires_force_curves or has_force_curves(active))
     ):
         return active
 
@@ -575,7 +586,7 @@ def get_current_layer(viewer, requires_force_curves=False):
         if (
             layer.visible
             and layer.name not in ("Profile Line", "Selected Curve")
-            and (not requires_force_curves or "force_curves" in layer.metadata)
+            and (not requires_force_curves or has_force_curves(layer))
         ):
             return layer
     return None

@@ -573,6 +573,8 @@ class WidgetFunction:
 
                         selected_vol_name = user_params["volume_name_to_operate_on"]
                         kwargs["curves"] = curves_data.volumes[selected_vol_name]
+                        # TODO could be more efficient with these two functions by adding a channel image that hasn't
+                        # been added yet.
                         if not add_to_current_file:
 
                             def func_to_execute(**kwargs):
@@ -590,14 +592,25 @@ class WidgetFunction:
                                 kwargs["curves"] = curves_data.volumes[selected_vol_name]
                                 kwargs["h5file"] = curves_data.h5file
                                 kwargs["new_volume_name"] = user_params["new_volume_name"]
-                                return all_curves(func=self.function_to_run, **kwargs)
+                                result = all_curves(func=self.function_to_run, **kwargs)
+                                loaded_image.add_channel_image(channel=current_channel, headless=True)
+                                return result
 
                         else:
 
                             def func_to_execute(**kwargs):
                                 kwargs["h5file"] = curves_data.h5file
                                 kwargs["new_volume_name"] = user_params["new_volume_name"]
-                                return all_curves(func=self.function_to_run, **kwargs)
+                                result = all_curves(func=self.function_to_run, **kwargs)
+                                current_channel = loaded_image.get_current_channel()
+                                if current_channel not in loaded_image.get_available_channels():
+                                    current_channel = (
+                                        current_channel.lower()
+                                        if current_channel.lower() in loaded_image.get_available_channels()
+                                        else loaded_image.get_available_channels()[0]
+                                    )
+                                loaded_image.add_channel_image(channel=current_channel, headless=True)
+                                return result
 
                     else:
                         # If the function is designed to take a single curve, wrap it in all_curves to apply
