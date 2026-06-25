@@ -573,7 +573,7 @@ class WidgetFunction:
                                 current_channel = loaded_image.get_current_channel()
                                 loaded_image.loader.save_to_h5()
                                 loaded_image.init_from_loader(headless=True)
-                                loaded_image.add_channel_image(channel=current_channel)
+                                loaded_image.add_channel_image(channel=current_channel, headless=True)
                                 curves_data = loaded_image.curves_data
                                 kwargs["curves"] = curves_data.volumes[selected_vol_name]
                                 kwargs["h5file"] = curves_data.h5file
