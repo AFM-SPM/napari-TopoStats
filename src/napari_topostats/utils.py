@@ -366,17 +366,17 @@ def all_curves(
         # Default to all but 2 cores, minimum 1
         num_workers = max(1, multiprocessing.cpu_count() - 2)
 
-    if parallel and num_workers > 1:
+    # pylint: disable=too-many-positional-arguments
+    def _all_curves_worker(curve):
+        """Worker function for parallel curve processing."""
+        return_value = _all_curves_raw_worker(
+            standardise_curve(curve), func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
+        )
+        if isinstance(return_value, tuple) and isinstance(return_value[1], str):
+            return return_value[0]
+        return return_value
 
-        # pylint: disable=too-many-positional-arguments
-        def _all_curves_worker(curve):
-            """Worker function for parallel curve processing."""
-            return_value = _all_curves_raw_worker(
-                standardise_curve(curve), func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
-            )
-            if isinstance(return_value, tuple) and isinstance(return_value[1], str):
-                return return_value[0]
-            return return_value
+    if parallel and num_workers > 1:
 
         # Use joblib.Parallel with a generator expression to keep it lazy.
         # batch_size=shape_x ensures we load one row of curves at a time per worker.
@@ -395,7 +395,7 @@ def all_curves(
             y = i // shape_x
             x = i % shape_x
             standardise_curve(curve)
-            point = _all_curves_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig)
+            point = _all_curves_worker(curve)
             image_map[y][x] = point
     if isinstance(image_map[0][0], dict):
         return image_map
