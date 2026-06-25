@@ -375,9 +375,15 @@ class WidgetFunction:
         """
         if self.path_to_data is None:
             if isinstance(self.function_to_run, FunctionGui):
-                return self.function_to_run
+                widget = self.function_to_run
             elif callable(self.function_to_run):
-                return magicgui(self.function_to_run)
+                widget = magicgui(self.function_to_run)
+            else:
+                widget = None
+            if widget is not None and not hasattr(widget, "set_status_message"):
+                attach_status_label(widget)
+            self.function_gui = widget
+            return self.function_gui
         self.function_gui = self.get_widget()
         return self.function_gui
 
@@ -573,6 +579,12 @@ class WidgetFunction:
                                 current_channel = loaded_image.get_current_channel()
                                 loaded_image.loader.save_to_h5()
                                 loaded_image.init_from_loader(headless=True)
+                                if current_channel not in loaded_image.get_available_channels():
+                                    current_channel = (
+                                        current_channel.lower()
+                                        if current_channel.lower() in loaded_image.get_available_channels()
+                                        else loaded_image.get_available_channels()[0]
+                                    )
                                 loaded_image.add_channel_image(channel=current_channel, headless=True)
                                 curves_data = loaded_image.curves_data
                                 kwargs["curves"] = curves_data.volumes[selected_vol_name]
@@ -778,6 +790,7 @@ class WidgetFunction:
             # Create a magicgui function with the wrapped function and the new parameters
             wrapped_func = CallableWithSignature(func, inspect.Signature(parameters=new_parameters))
             magicgui_function = magicgui()(wrapped_func)
+            attach_status_label(magicgui_function)
             return magicgui_function
 
         except Exception as e:
@@ -817,8 +830,13 @@ class WidgetFunction:
         """
 
         # Check if the return value is a numpy array
-
-        if isinstance(return_value, np.ndarray):
+        if isinstance(return_value, bool) and return_value:
+            display_name = self.name.replace("_", " ").title()
+            message = f"✅ {display_name} successful."
+            if hasattr(self, "function_gui") and self.function_gui and hasattr(self.function_gui, "set_status_message"):
+                self.function_gui.set_status_message(message)
+            return
+        elif isinstance(return_value, np.ndarray):
             # Get the scale from the original layer; default to (1, 1) if not found
             current_scale = original.scale if original else (1, 1)
             # If the return value has a different number of dimensions to the original, use only existing dimensions
