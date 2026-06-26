@@ -29,6 +29,15 @@ from napari_topostats._components import (
     get_selected_curves,
 )
 from napari_topostats._state import WidgetManager, get_widget_manager
+from napari_topostats._styles import (
+    COLOR_APPROACH,
+    COLOR_PROFILE_LINE,
+    COLOR_RETRACT,
+    COLOR_SELECTED_CURVE,
+    CURVE_VIEWER_MARGIN,
+    CURVE_VIEWER_RIGHT_MARGIN,
+    PROFILE_VIEWER_MARGIN,
+)
 from napari_topostats.utils import unflatten_dict
 
 profile_viewer = None
@@ -70,6 +79,9 @@ class CurveViewer(QWidget):
 
         # Setup the layout to be arranged vertically
         self.setLayout(QVBoxLayout())
+        self.layout().setContentsMargins(
+            CURVE_VIEWER_MARGIN, CURVE_VIEWER_MARGIN, CURVE_VIEWER_RIGHT_MARGIN, CURVE_VIEWER_MARGIN
+        )
         top_row_widget = QWidget()
         top_row_layout = QHBoxLayout(top_row_widget)
         top_row_layout.setContentsMargins(0, 0, 0, 0)
@@ -87,6 +99,9 @@ class CurveViewer(QWidget):
         plot_layout.setContentsMargins(0, 0, 0, 0)
         self.plot_graphics_widget = pg.GraphicsLayoutWidget()
         self.plot_graphics_widget.setBackground(None)
+        self.plot_graphics_widget.ci.layout.setContentsMargins(
+            CURVE_VIEWER_MARGIN, CURVE_VIEWER_MARGIN, CURVE_VIEWER_RIGHT_MARGIN, CURVE_VIEWER_MARGIN
+        )
         self.plot_widget = self.plot_graphics_widget.addPlot(title="Force Distance curve")
         plot_layout.addWidget(self.plot_graphics_widget)
         self.layout().addLayout(plot_layout)
@@ -126,8 +141,8 @@ class CurveViewer(QWidget):
         self.retract_checkbox = QCheckBox("Show retract")
 
         # Set different colors for the approach and retract checkboxes to match the curve colors
-        self.approach_checkbox.setStyleSheet("color: yellow;")
-        self.retract_checkbox.setStyleSheet("color: red;")
+        self.approach_checkbox.setStyleSheet(f"color: {COLOR_APPROACH};")
+        self.retract_checkbox.setStyleSheet(f"color: {COLOR_RETRACT};")
         self.approach_checkbox.setChecked(True)
         self.retract_checkbox.setChecked(False)
 
@@ -162,10 +177,10 @@ class CurveViewer(QWidget):
 
         # Create the plots with empty data for approach and retract segments
         self.approach_line = self.plot_widget.plot(
-            [], [], pen="y", name="approach", available_channels=self.available_channels
+            [], [], pen=COLOR_APPROACH, name="approach", available_channels=self.available_channels
         )
         self.retract_line = self.plot_widget.plot(
-            [], [], pen="r", name="retract", available_channels=self.available_channels
+            [], [], pen=COLOR_RETRACT, name="retract", available_channels=self.available_channels
         )
 
     def open_experimental_parameters(self):
@@ -325,7 +340,7 @@ class CurveViewer(QWidget):
                     data=cross_data,
                     name="Selected Curve",
                     shape_type="line",
-                    edge_color="magenta",
+                    edge_color=COLOR_SELECTED_CURVE,
                     edge_width=max(y_scale, x_scale) * 0.5,
                 )
                 if active_layer is not None:
@@ -334,6 +349,7 @@ class CurveViewer(QWidget):
                 selected_curve_layer = viewer.layers["Selected Curve"]
                 selected_curve_layer.data = cross_data
                 selected_curve_layer.edge_width = max(y_scale, x_scale) * 0.5
+                selected_curve_layer.edge_color = COLOR_SELECTED_CURVE
         except IndexError:
             self.info_label.setText("Clicked outside the image bounds.")
         # pylint: disable=broad-exception-caught
@@ -376,6 +392,9 @@ class ProfileViewer(QWidget):
 
         # Setup the layout
         self.setLayout(QVBoxLayout())
+        self.layout().setContentsMargins(
+            PROFILE_VIEWER_MARGIN, PROFILE_VIEWER_MARGIN, PROFILE_VIEWER_MARGIN, PROFILE_VIEWER_MARGIN
+        )
         self.info_label = QLabel("Hold 'A' to draw a line profile.")
         self.layout().addWidget(self.info_label)
 
@@ -563,6 +582,7 @@ def start_drawing(viewer):
         shapes_layer = viewer.layers["Profile Line"]
         shapes_layer.data = []
         shapes_layer.edge_width = edge_width
+        shapes_layer.edge_color = COLOR_PROFILE_LINE
         current_index = viewer.layers.index(shapes_layer)
         if current_index < len(viewer.layers) - 1:
             viewer.layers.move(current_index, len(viewer.layers))
@@ -570,7 +590,7 @@ def start_drawing(viewer):
         shapes_layer = viewer.add_shapes(
             name="Profile Line",
             shape_type="line",
-            edge_color="cyan",
+            edge_color=COLOR_PROFILE_LINE,
             edge_width=edge_width,
         )
 

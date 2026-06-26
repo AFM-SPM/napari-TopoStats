@@ -25,18 +25,8 @@ from qtpy.QtWidgets import (
 )
 
 from ._alerts import show_error_dialog
+from ._styles import PROFILE_VIEWER_MARGIN, VIBRANT_PALETTE
 
-VIBRANT_PALETTE = [
-    "#FF00FF",  # Magenta
-    "#00FFFF",  # Cyan
-    "#FFFF00",  # Yellow
-    "#00FF00",  # Lime
-    "#FF8000",  # Orange
-    "#FF0000",  # Red
-    "#0080FF",  # Sky Blue
-    "#80FF00",  # Electric Lime
-    "#FF0080",  # Pink
-]
 channel_colours = {}
 colour_idx = 0
 
@@ -381,6 +371,9 @@ class MultiPlotWidget(QWidget):
         # Create pg.GraphicsLayoutWidget embedded in the horizontal layout
         self.graphics_widget = pg.GraphicsLayoutWidget()
         self.graphics_widget.setBackground(None)
+        self.graphics_widget.ci.layout.setContentsMargins(
+            PROFILE_VIEWER_MARGIN, PROFILE_VIEWER_MARGIN, PROFILE_VIEWER_MARGIN, PROFILE_VIEWER_MARGIN
+        )
         self.layout().addWidget(self.graphics_widget)
 
         # Get the primary plot item
