@@ -9,7 +9,7 @@ from napari import Viewer
 from napari.layers import Image, Labels
 from napari_afmreader._reader import LoadedImage, get_loaded_image
 from qtpy.QtCore import Qt
-from qtpy.QtGui import QStandardItem, QStandardItemModel
+from qtpy.QtGui import QColor, QStandardItem, QStandardItemModel
 from qtpy.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -25,10 +25,8 @@ from qtpy.QtWidgets import (
 )
 
 from ._alerts import show_error_dialog
-from ._styles import PROFILE_VIEWER_MARGIN, VIBRANT_PALETTE
-
-channel_colours = {}
-colour_idx = 0
+from ._state import get_channel_colours
+from ._styles import PROFILE_VIEWER_MARGIN
 
 
 class CollapsibleBox(QWidget):
@@ -260,6 +258,7 @@ class SelectionDropdown(QComboBox):
         type_text: str = "items",
         starting_items: list = None,
         on_change: callable = None,
+        item_colors: dict = None,
     ):
         """
         Initializes the SelectionDropdown.
@@ -276,6 +275,8 @@ class SelectionDropdown(QComboBox):
             The list of items that should be initially checked (default is None).
         on_change : callable, optional
             A callback function to be called when the selection changes (default is None).
+        item_colors : dict, optional
+            A dictionary mapping items to their colors (default is None).
         """
 
         super().__init__(parent)
@@ -292,11 +293,11 @@ class SelectionDropdown(QComboBox):
         self.setModel(self.model)
 
         # Add checkable items
-        self.set_items(items, starting_items)
+        self.set_items(items, starting_items, item_colors)
         # Update the text when a box is checked/unchecked
         self.model.itemChanged.connect(self.on_selection_change)
 
-    def set_items(self, items: list, starting_items: list = None):
+    def set_items(self, items: list, starting_items: list = None, item_colors: dict = None):
         """
         Set the items in the dropdown and their checked state.
 
@@ -307,13 +308,17 @@ class SelectionDropdown(QComboBox):
         starting_items : list, optional
             The list of items that should be initially checked (default is None).
         """
+        self.model.blockSignals(True)
         self.model.clear()
         starting_items = starting_items or []
         for text in items:
             item = QStandardItem(text)
             item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             item.setData(Qt.Checked if text in starting_items else Qt.Unchecked, Qt.CheckStateRole)
+            if item_colors and text in item_colors:
+                item.setForeground(QColor(item_colors[text]))
             self.model.appendRow(item)
+        self.model.blockSignals(False)
         self.update_text()
 
     def on_selection_change(self):
@@ -401,7 +406,7 @@ class MultiPlotWidget(QWidget):
         self.p2_view.setGeometry(self.p1.vb.sceneBoundingRect())
         self.p2_view.linkedViewChanged(self.p1.vb, self.p2_view.XAxis)
 
-    def plot(self, xdata: np.ndarray, ydata: np.ndarray, channel: str, available_channels: list, unit: str = "m"):
+    def plot(self, xdata: np.ndarray, ydata: np.ndarray, channel: str, unit: str = "m"):
         """
         Plots the given data on the appropriate axis based on the unit.
 
@@ -427,16 +432,8 @@ class MultiPlotWidget(QWidget):
             self.profile_lines[unit] = {}
 
         if unit not in self.profile_lines or (channel not in self.profile_lines[unit]):
-            if channel not in channel_colours:
-                if len(channel_colours) >= len(VIBRANT_PALETTE):
-                    for key in channel_colours:
-                        if key not in available_channels:
-                            channel_colours.pop(key)
-                            break
-                channel_colours[channel] = VIBRANT_PALETTE[colour_idx % len(VIBRANT_PALETTE)]
-                colour_idx += 1
             self.profile_lines[unit][channel] = self.p1.plot(
-                [], [], pen=channel_colours[channel], name=channel, unit=unit
+                [], [], pen=get_channel_colours()[channel], name=channel, unit=unit
             )
             self.p1.setLabel("left", channel, units=unit)
         # TODO does this need to be split into unit so it matches structure of profile_lines?

@@ -28,7 +28,12 @@ from napari_topostats._components import (
     get_current_layer,
     get_selected_curves,
 )
-from napari_topostats._state import WidgetManager, get_widget_manager
+from napari_topostats._state import (
+    WidgetManager,
+    add_colour_for_channel,
+    get_channel_colours,
+    get_widget_manager,
+)
 from napari_topostats._styles import (
     COLOR_APPROACH,
     COLOR_PROFILE_LINE,
@@ -37,6 +42,7 @@ from napari_topostats._styles import (
     CURVE_VIEWER_MARGIN,
     CURVE_VIEWER_RIGHT_MARGIN,
     PROFILE_VIEWER_MARGIN,
+    VIBRANT_PALETTE,
 )
 from napari_topostats.utils import unflatten_dict
 
@@ -407,11 +413,13 @@ class ProfileViewer(QWidget):
         )
         self.loaded_image = get_loaded_image(reader_id) if reader_id is not None else None
         self.available_channels = self.loaded_image.get_available_channels() if self.loaded_image else []
+        self.assign_colours()
         self.channel_selector = SelectionDropdown(
             items=self.available_channels,
             type_text="channels",
             on_change=self.update_profile_from_channels,
             starting_items=[self.loaded_image.get_current_channel()] if self.loaded_image else [],
+            item_colors=get_channel_colours(),
         )
         self.settings_layout.addWidget(self.channel_displayed_label)
         self.settings_layout.addWidget(self.channel_selector)
@@ -422,6 +430,13 @@ class ProfileViewer(QWidget):
 
         self.layout().addWidget(self.plot_widget)
         self.layout().addWidget(self.settings_widget)
+
+    def assign_colours(self):
+        """Assign colours to the channel selector and plot widget"""
+        colours = get_channel_colours()
+        for channel in self.available_channels:
+            if channel not in colours:
+                add_colour_for_channel(channel, self.available_channels, VIBRANT_PALETTE)
 
     def on_selection_change(self, event=None):
         """Called when the user changes the active layer to update the available channels"""
@@ -436,9 +451,11 @@ class ProfileViewer(QWidget):
             reader_id = self.active_layer.metadata.get("afmreader_id") if self.active_layer.metadata else None
             self.loaded_image = get_loaded_image(reader_id) if reader_id is not None else None
             self.available_channels = self.loaded_image.get_available_channels() if self.loaded_image else []
+            self.assign_colours()
             self.channel_selector.set_items(
                 self.available_channels,
                 starting_items=[self.loaded_image.get_current_channel()] if self.loaded_image else [],
+                item_colors=get_channel_colours(),
             )
         else:
             self.available_channels = []
@@ -537,7 +554,6 @@ class ProfileViewer(QWidget):
                         np.array(np.arange(len(values))) * float(px2nm),
                         values,
                         channel,
-                        available_channels=self.available_channels,
                         unit=z_units,
                     )
                     self.info_label.setText(f"Profile: {len(values)} points.")

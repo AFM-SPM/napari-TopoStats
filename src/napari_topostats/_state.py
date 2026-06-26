@@ -15,6 +15,12 @@ current_error_dialog = None
 MIN_TOPOSTATS_VERSION = "2.4.0"  # Oldest compatible version of topostats, should match pyproject.toml
 running_function = None  # Currently running function (None if no function is running)
 widget_manager = None  # Global instance of WidgetManager
+# Dictionary mapping channel names to their assigned colors (maintained between profile viewers)
+channel_colours = {}
+colour_idx = 0
+
+# Dictionary mapping loaded function names to their source python file path
+loaded_function_paths = {}
 
 
 def get_widget_manager():
@@ -229,8 +235,21 @@ def get_topostats_widget():
     return topostats_widget
 
 
-# Dictionary mapping loaded function names to their source python file path
-loaded_function_paths = {}
+def add_colour_for_channel(channel_name: str, current_channels: list[str], palette: list[str]):
+    """Add a colour for a specific channel"""
+    global colour_idx  # pylint:disable=global-statement
+    if len(channel_colours) >= len(palette):
+        for key in channel_colours:
+            if key not in current_channels:
+                channel_colours.pop(key)
+                break
+    channel_colours[channel_name] = palette[colour_idx % len(palette)]
+    colour_idx += 1
+
+
+def get_channel_colours() -> dict[str, str]:
+    """Get the current channel colours"""
+    return channel_colours
 
 
 def record_loaded_function_path(func_name: str, file_path: str):
