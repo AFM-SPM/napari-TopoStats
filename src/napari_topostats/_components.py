@@ -308,7 +308,6 @@ class SelectionDropdown(QComboBox):
         starting_items : list, optional
             The list of items that should be initially checked (default is None).
         """
-        self.model.blockSignals(True)
         self.model.clear()
         starting_items = starting_items or []
         for text in items:
@@ -318,7 +317,6 @@ class SelectionDropdown(QComboBox):
             if item_colors and text in item_colors:
                 item.setForeground(QColor(item_colors[text]))
             self.model.appendRow(item)
-        self.model.blockSignals(False)
         self.update_text()
 
     def on_selection_change(self):
