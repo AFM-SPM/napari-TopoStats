@@ -356,6 +356,32 @@ class SelectionDropdown(QComboBox):
             if self.model.item(i).checkState() == Qt.Checked
         ]
 
+    def set_checked_items(self, checked_items: list):
+        """
+        Manually set which items in the dropdown are checked.
+
+        Parameters
+        ----------
+        checked_items : list
+            The list of items that should be checked.
+        """
+
+        # Temporarily disable the on_change callback to avoid triggering it during updates
+        temp_on_change = self.on_change
+        self.on_change = None
+
+        # Update the check state of each item based on the provided list
+        for i in range(self.model.rowCount()):
+            item = self.model.item(i)
+            state = Qt.Checked if item.text() in checked_items else Qt.Unchecked
+            item.setData(state, Qt.CheckStateRole)
+
+        # Restore the on_change callback
+        self.on_change = temp_on_change
+
+        # Update the displayed text to reflect the new selection
+        self.update_text()
+
 
 class MultiPlotWidget(QWidget):
     """A widget to display multiple plots in a grid layout"""
@@ -371,7 +397,7 @@ class MultiPlotWidget(QWidget):
         # Set a minimum height to ensure the plots are readable and don't flatten
         self.setMinimumHeight(200)
 
-        # Create pg.GraphicsLayoutWidget embedded in the horizontal layout
+        # Create the main plot widget container
         self.graphics_widget = pg.GraphicsLayoutWidget()
         self.graphics_widget.setBackground(None)
         self.graphics_widget.ci.layout.setContentsMargins(
@@ -379,32 +405,32 @@ class MultiPlotWidget(QWidget):
         )
         self.layout().addWidget(self.graphics_widget)
 
-        # Get the primary plot item
-        self.p1 = self.graphics_widget.addPlot(title=title)
-        # self.p1.setLabels(left='Channel 1 (Low Intensity)', bottom='Frames')
+        # Add the first plot
+        self.p1: pg.PlotItem = self.graphics_widget.addPlot(title=title)
 
+        # Create the secondary plot
         self.p2_view = pg.ViewBox()
-        self.p1.showAxis("right")
-        self.p2 = pg.PlotItem(viewBox=self.p2_view)
+        self.p2: pg.PlotItem = pg.PlotItem(viewBox=self.p2_view)
+
+        # Add the secondary plot to the graph and link their axes
         self.p1.scene().addItem(self.p2_view)
+        self.p1.showAxis("right")
         self.p1.getAxis("right").linkToView(self.p2_view)
         self.p2_view.setXLink(self.p1)
-
-        # self.p1.getAxis('right').setLabel('Channel 2 (High Intensity)', color='#00ff00')
-        # self.p1.getAxis('right').setPen('#00ff00')
-
         self.p1.vb.sigResized.connect(self.update_views)
-        self.profile_lines = {}
+
+        # Initialize data structures to keep track of plotted lines and their data
+        self.profile_lines: dict[str, dict[str, pg.PlotDataItem]] = {}
         self.current_unit = None
         self.previous_unit = None
-        self.line_data = {}
+        self.line_data: dict[tuple[str, str], tuple[np.ndarray, np.ndarray]] = {}
 
     def update_views(self):
         """Forces the secondary ViewBox to match the primary's geometry."""
         self.p2_view.setGeometry(self.p1.vb.sceneBoundingRect())
         self.p2_view.linkedViewChanged(self.p1.vb, self.p2_view.XAxis)
 
-    def plot(self, xdata: np.ndarray, ydata: np.ndarray, channel: str, unit: str = "m"):
+    def plot(self, channel: str, xdata: np.ndarray, ydata: np.ndarray, unit: str = "m"):
         """
         Plots the given data on the appropriate axis based on the unit.
 
@@ -419,24 +445,34 @@ class MultiPlotWidget(QWidget):
         unit : str, optional
             The unit of the data, by default "m".
         """
-        # pylint:disable=too-many-branches
-        global channel_colours, colour_idx  # pylint: disable=global-variable-not-assigned
-
-        if unit == "nm":
-            unit = "m"
-            ydata = np.array(ydata) / 1e9
-
-        if self.profile_lines.get(unit) is None:
+        if unit not in self.profile_lines:
             self.profile_lines[unit] = {}
 
+        line_key = (unit, channel)
+        cached_data = self.line_data.get(line_key)
+
+        # If the channel has not been plotted yet, create a new line for it
         if unit not in self.profile_lines or (channel not in self.profile_lines[unit]):
             self.profile_lines[unit][channel] = self.p1.plot(
-                [], [], pen=get_channel_colours()[channel], name=channel, unit=unit
+                xdata, ydata, pen=get_channel_colours()[channel], name=channel, unit=unit
             )
+            self.line_data[line_key] = (xdata, ydata)
+
+            # Update the axis labels to reflect the current unit and channel
             self.p1.setLabel("left", channel, units=unit)
+
+        # If the channel already exists, check if the data has changed before updating
+        elif cached_data is None or not (
+            np.array_equal(xdata, cached_data[0]) and np.array_equal(ydata, cached_data[1])
+        ):
+            self.profile_lines[unit][channel].setData(xdata, ydata)
+            self.line_data[line_key] = (xdata, ydata)
+
+        # If the data is the same, do nothing
+        else:
+            return
+
         # TODO does this need to be split into unit so it matches structure of profile_lines?
-        self.line_data[channel] = (xdata, ydata)
-        self.profile_lines[unit][channel].setData(xdata, ydata)
         if unit != self.current_unit:
             self.previous_unit = self.current_unit
             self.current_unit = unit
@@ -448,7 +484,8 @@ class MultiPlotWidget(QWidget):
                         self.p1.removeItem(line_item)
                     if line_item not in self.p2.items:
                         self.p2.addItem(line_item)
-                    line_item.setData(self.line_data[line_channel][0], self.line_data[line_channel][1])
+                    line_data = self.line_data[(self.previous_unit, line_channel)]
+                    line_item.setData(line_data[0], line_data[1])
                 self.p1.setLabel("right", "", units=self.previous_unit)
 
                 for line_channel in self.profile_lines[self.current_unit]:
@@ -457,28 +494,41 @@ class MultiPlotWidget(QWidget):
                         self.p2.removeItem(line_item)
                     if line_item not in self.p1.items:
                         self.p1.addItem(line_item)
-                    line_item.setData(self.line_data[line_channel][0], self.line_data[line_channel][1])
-                self.p1.setLabel("left", "", units=self.current_unit)
+                    line_data = self.line_data[(self.current_unit, line_channel)]
+                    line_item.setData(line_data[0], line_data[1])
 
-        if None not in [self.current_unit, self.previous_unit]:
-            for u, lines in self.profile_lines.items():
-                for _, line in lines.items():
-                    line.setVisible(u in [self.current_unit, self.previous_unit])
+    def remove_unshown_lines(self):
+        """Remove plotted profile lines that are not shown on either axis."""
+        removed = []
+        for profile_unit, lines in list(self.profile_lines.items()):
+            if profile_unit not in [self.current_unit, self.previous_unit]:
+                for line_channel, line_item in list(lines.items()):
+                    if line_item in self.p1.items:
+                        self.p1.removeItem(line_item)
+                    if line_item in self.p2.items:
+                        self.p2.removeItem(line_item)
+                    lines.pop(line_channel, None)
+                    self.line_data.pop((profile_unit, line_channel), None)
+                    removed.append(line_channel)
+                if not lines:
+                    self.profile_lines.pop(profile_unit, None)
+        return removed
 
     def get_profile_lines(self):
         """Returns the current profile lines."""
         return self.profile_lines
 
-    def remove_profile_line(self, channel: str):
+    def remove_profile_line(self, channel: str, unit: str):
         """Removes the profile line for the given channel."""
-        for _, lines in self.profile_lines.items():
-            if channel in lines:
-                line_item = lines[channel]
-
-                self.p1.removeItem(line_item)
+        if unit in self.profile_lines and channel in self.profile_lines[unit]:
+            line_item = self.profile_lines[unit].pop(channel)
+            if line_item in self.p2.items:
                 self.p2.removeItem(line_item)
-                lines.pop(channel)
-                self.line_data.pop(channel, None)
+            if line_item in self.p1.items:
+                self.p1.removeItem(line_item)
+            self.line_data.pop((unit, channel), None)
+            if not self.profile_lines[unit]:
+                self.profile_lines.pop(unit, None)
 
 
 # TODO: This function really gets currently selected layer not image
