@@ -430,6 +430,12 @@ class MultiPlotWidget(QWidget):
         self.p2_view.setGeometry(self.p1.vb.sceneBoundingRect())
         self.p2_view.linkedViewChanged(self.p1.vb, self.p2_view.XAxis)
 
+    def reset_view(self):
+        """Reset the primary and secondary profile plot axes to automatic scaling."""
+        self.update_views()
+        self.p1.vb.enableAutoRange(axis=self.p1.vb.XYAxes)
+        self.p2_view.enableAutoRange(axis=self.p2_view.YAxis)
+
     def plot(self, channel: str, xdata: np.ndarray, ydata: np.ndarray, unit: str = "m"):
         """
         Plots the given data on the appropriate axis based on the unit.

@@ -428,6 +428,10 @@ class ProfileViewer(QWidget):
         # Create a settings widget to hold channel selector and label
         self.settings_widget = QWidget()
         self.settings_layout = QHBoxLayout(self.settings_widget)
+        self.reset_view_button = QPushButton("Reset view")
+        self.reset_view_button.setToolTip("Reset profile plot axes")
+        self.reset_view_button.setFixedWidth(self.reset_view_button.sizeHint().width())
+        self.reset_view_button.clicked.connect(self.plot_widget.reset_view)
         self.channel_displayed_label = QLabel("Selected channels: ")
 
         # Assign colours for the available channels (colours are defined in _styles.py and maintained in _state.py)
@@ -443,6 +447,7 @@ class ProfileViewer(QWidget):
         )
 
         # Add the settings widget to the main layout
+        self.settings_layout.addWidget(self.reset_view_button)
         self.settings_layout.addWidget(self.channel_displayed_label)
         self.settings_layout.addWidget(self.channel_selector)
         self.layout().addWidget(self.settings_widget)
