@@ -6,9 +6,11 @@
 
 import numpy as np
 import pyqtgraph as pg
+from AFMReader.data_classes import CurvesDataset
 from napari import Viewer
 from napari.layers import Shapes
 from napari_afmreader._reader import get_loaded_image
+from qtpy.QtGui import QPainterPath, QTransform
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -31,7 +33,9 @@ from napari_topostats._components import (
 )
 from napari_topostats._state import (
     WidgetManager,
+    add_colour_for_analysis_result,
     add_colour_for_channel,
+    get_analysis_result_colours,
     get_channel_colours,
     get_widget_manager,
 )
@@ -48,6 +52,14 @@ from napari_topostats._styles import (
 from napari_topostats.utils import unflatten_dict
 
 profile_viewer = None
+
+
+def _filled_cross_symbol() -> QPainterPath:
+    """Create a filled cross symbol for analysis result markers."""
+    path = QPainterPath()
+    path.addRect(-0.5, -0.1, 1.0, 0.2)
+    path.addRect(-0.1, -0.5, 0.2, 1.0)
+    return QTransform().rotate(45).map(path)
 
 
 def open_curve_viewer(viewer):
@@ -161,18 +173,28 @@ class CurveViewer(QWidget):
         self.left_layout.addWidget(self.approach_checkbox)
         self.right_layout.addWidget(self.retract_checkbox)
 
-        # Add the left and right widgets to the settings layout, then add the settings widget to the main layout
-        self.settings_layout.addWidget(self.left_widget)
-        self.settings_layout.addWidget(self.right_widget)
-        self.layout().addWidget(self.settings_widget)
-
         self.parameter_dialog = None
         self.metadata = {}
 
         # Create and add the button to open the experimental parameters dialog
         self.open_dialog_button = QPushButton("View experimental parameters")
         self.open_dialog_button.clicked.connect(self.open_experimental_parameters)
-        self.layout().addWidget(self.open_dialog_button)
+        self.left_layout.addWidget(self.open_dialog_button)
+
+        # Create a selection dropdown for analysis results and add it to the right layout
+        self.analysis_results_selector = SelectionDropdown(
+            items=[],
+            type_text="metrics",
+            starting_items=[],
+            on_change=self.update_analysis_results,
+            item_colors=get_analysis_result_colours(),
+        )
+        self.right_layout.addWidget(self.analysis_results_selector)
+
+        # Add the left and right widgets to the settings layout, then add the settings widget to the main layout
+        self.settings_layout.addWidget(self.left_widget)
+        self.settings_layout.addWidget(self.right_widget)
+        self.layout().addWidget(self.settings_widget)
 
         # Initialize coordinates, channels and dicts
         self.x_coord = 0
@@ -181,6 +203,8 @@ class CurveViewer(QWidget):
         self.y_channel = "vDeflection"
         self.selected_curve_dict = None
         self.channels_units = None
+        self.current_analysis_results = {}
+        self.active_analysis_markers = {}
 
         # Create the plots with empty data for approach and retract segments
         self.approach_line = self.plot_widget.plot(
@@ -233,11 +257,15 @@ class CurveViewer(QWidget):
             unit = self.channels_units.get(self.y_channel, "N")
             self.plot_widget.setLabel("left", self.y_channel, units=unit)
         self.update_curve()
+        self.update_analysis_results()
 
     def update_volume(self, volume_name: str):
         """Updates the volume of the plot and refreshes curve to match"""
         selected_curves = get_selected_curves(self.viewer)
         self.update_curve(selected_curves.get_volume(volume_name)[self.y_coord, self.x_coord])
+        self.update_analysis_results(
+            selected_curves.get_volume(volume_name).get_analysis_results(self.y_coord, self.x_coord)
+        )
 
     def update_segments(self, approach: bool | None = None, retract: bool | None = None):
         """Updates the segments of the plot based on user checking boxes"""
@@ -246,6 +274,75 @@ class CurveViewer(QWidget):
         if retract is not None:
             self.show_retract = retract
         self.update_curve()
+
+    def update_analysis_results(self, analysis_results=None):
+        """Update visible analysis result markers for the current curve."""
+        if isinstance(analysis_results, dict):
+            previous_result_names = set(self.current_analysis_results.keys())
+            current_result_names = set(analysis_results.keys())
+            self.current_analysis_results = analysis_results
+
+            if previous_result_names != current_result_names:
+                self.assign_colours(analysis_results)
+
+                self.analysis_results_selector.set_items(
+                    items=list(analysis_results.keys()),
+                    starting_items=[name for name in self.active_analysis_markers if name in analysis_results],
+                    item_colors=get_analysis_result_colours(),
+                )
+        selected_analysis_names = self.analysis_results_selector.get_checked_items()
+
+        selected_analysis_results = {
+            name: self.current_analysis_results[name]
+            for name in selected_analysis_names
+            if name in self.current_analysis_results
+        }
+
+        if self.selected_curve_dict is None:
+            for active_analysis_marker in self.active_analysis_markers.values():
+                self.plot_widget.removeItem(active_analysis_marker)
+            self.active_analysis_markers.clear()
+            return
+
+        for result_name in list(self.active_analysis_markers.keys()):
+            active_analysis_marker = self.active_analysis_markers[result_name]
+            if result_name in selected_analysis_results:
+                result_value = selected_analysis_results[result_name]
+                result_value_x = self.selected_curve_dict[self.x_channel]["Segment_0"][result_value]
+                result_value_y = self.selected_curve_dict[self.y_channel]["Segment_0"][result_value]
+                active_analysis_marker.setData(x=[result_value_x], y=[result_value_y])
+            else:
+                self.plot_widget.removeItem(active_analysis_marker)
+                self.active_analysis_markers.pop(result_name)
+        analysis_result_colours = get_analysis_result_colours()
+        for result_name, result_value in selected_analysis_results.items():
+            if result_name not in self.active_analysis_markers:
+                result_colour = analysis_result_colours.get(result_name, "r")
+                result_value_x = self.selected_curve_dict[self.x_channel]["Segment_0"][result_value]
+                result_value_y = self.selected_curve_dict[self.y_channel]["Segment_0"][result_value]
+
+                def result_tip(x, y, data, result_name=result_name):
+                    x_unit = self.channels_units.get(self.x_channel, "")
+                    y_unit = self.channels_units.get(self.y_channel, "")
+                    return (
+                        f"{result_name.title().replace('_', ' ')}\n"
+                        f"{self.x_channel}: {x:.3f} {x_unit}\n"
+                        f"{self.y_channel}: {y:.3f} {y_unit}"
+                    )
+
+                marker = pg.ScatterPlotItem(
+                    x=[result_value_x],
+                    y=[result_value_y],
+                    size=15,
+                    symbol=_filled_cross_symbol(),
+                    pen=pg.mkPen(result_colour, width=0),
+                    brush=pg.mkBrush(result_colour),
+                    hoverable=True,
+                    hoverPen=pg.mkPen("y", width=3),
+                    tip=result_tip,
+                )
+                self.active_analysis_markers[result_name] = marker
+                self.plot_widget.addItem(marker)
 
     def showEvent(self, event):
         """Register the mouse callback when the widget is shown."""
@@ -280,6 +377,13 @@ class CurveViewer(QWidget):
             self._process_event_coords(viewer, event)
             yield
 
+    def assign_colours(self, analysis_results: dict):
+        """Assign colours to the channel selector and plot widget"""
+        colours = get_analysis_result_colours()
+        for result in analysis_results:
+            if result not in colours:
+                add_colour_for_analysis_result(result, list(analysis_results.keys()), VIBRANT_PALETTE)
+
     def _process_event_coords(self, viewer, event):
         """The core logic to extract and plot the curve at the current mouse position."""
         layer = viewer.layers.selection.active
@@ -302,7 +406,7 @@ class CurveViewer(QWidget):
 
         curve_num = shape_x * self.y_coord + self.x_coord
 
-        curves_data = loaded_image.curves_data
+        curves_data: CurvesDataset = loaded_image.curves_data
         raw_metadata = curves_data.metadata
         if self.volume_selector.currentText() not in curves_data.volumes:
             self.volume_selector.clear()
@@ -313,6 +417,8 @@ class CurveViewer(QWidget):
             if self.volume_selector.currentText()
             else curves_data.get_default_volume()
         )
+        analysis_results = current_volume.get_analysis_results(self.y_coord, self.x_coord)
+
         self.channels_units = current_volume.channel_units
         try:
             self.metadata = {
@@ -324,8 +430,10 @@ class CurveViewer(QWidget):
             if self.parameter_dialog is not None:
                 self.parameter_dialog.populate_parameters(self.metadata)
             curve_dict = current_volume[self.y_coord, self.x_coord]
+
             self.set_available_channels(curve_dict.keys())
             self.update_curve(curve_dict)
+            self.update_analysis_results(analysis_results)
 
             # Update the cross on the viewer at the selected pixel position
             selected_position = layer.data_to_world(coords)
@@ -357,8 +465,10 @@ class CurveViewer(QWidget):
                 selected_curve_layer.data = cross_data
                 selected_curve_layer.edge_width = max(y_scale, x_scale) * 0.5
                 selected_curve_layer.edge_color = COLOR_SELECTED_CURVE
-        except IndexError:
+        except IndexError as e:
             self.info_label.setText("Clicked outside the image bounds.")
+            raise e
+
         # pylint: disable=broad-exception-caught
         except Exception as e:  # noqa: BLE001
             self.info_label.setText(f"Error plotting curve: {str(e)}")

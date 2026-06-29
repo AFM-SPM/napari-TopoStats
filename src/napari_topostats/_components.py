@@ -280,6 +280,7 @@ class SelectionDropdown(QComboBox):
         """
 
         super().__init__(parent)
+        self.selector_items = items
         self.type_text = type_text
         self.on_change = on_change
         starting_items = starting_items or []
@@ -307,7 +308,10 @@ class SelectionDropdown(QComboBox):
             The list of items to display in the dropdown.
         starting_items : list, optional
             The list of items that should be initially checked (default is None).
+        block_signals : bool, optional
+            Whether to block signals while setting items (default is False).
         """
+        self.selector_items = items
         self.model.clear()
         starting_items = starting_items or []
         for text in items:
@@ -323,23 +327,26 @@ class SelectionDropdown(QComboBox):
         """
         Handle changes in selection and update the displayed text accordingly.
         """
+        print("Selection changed")
+        self.update_text()
         if self.on_change:
             self.on_change(self.get_checked_items())
-        self.update_text()
 
     def update_text(self):
         """
         Update the text displayed in the line edit based on the current selection.
         """
         checked = self.get_checked_items()
-        if len(checked) == 0:
-            self.lineEdit().setText(f"No {self.type_text} selected")
+        if len(self.selector_items) == 0:
+            new_text = f"No {self.type_text} available"
+        elif len(checked) == 0:
+            new_text = f"No {self.type_text} selected"
         elif len(checked) < 4:
-            self.lineEdit().setText(f"{', '.join(checked)}")
+            new_text = f"{', '.join(checked)}"
         else:
-            self.lineEdit().setText(
-                f"{len(checked)} {self.type_text} selected" if checked else f"No {self.type_text} selected"
-            )
+            new_text = f"{len(checked)} {self.type_text} selected" if checked else f"No {self.type_text} selected"
+        self.setCurrentIndex(-1)
+        self.lineEdit().setText(new_text)
 
     def get_checked_items(self):
         """

@@ -1,6 +1,6 @@
 """Contains functions surrounding utilities and cosmetics."""
 
-# pylint: disable=import-outside-toplevel,too-many-statements
+# pylint: disable=import-outside-toplevel,too-many-nested-blocks,too-many-positional-arguments,too-many-statements
 
 from __future__ import annotations
 
@@ -288,7 +288,6 @@ def all_curves(
     shape_x: int | None = None,
     shape_y: int | None = None,
     type_class=None,
-    flip_image: bool = False,
     parallel: bool | None = None,
     num_workers: int | None = None,
     h5file: Any | None = None,
@@ -333,7 +332,7 @@ def all_curves(
         else:
             raise ValueError("Curves must be of the CurvesDataset type defined by AFMReader.")
 
-    image_map = [[None for _ in range(shape_x)] for _ in range(shape_y)]
+    image_map = np.empty((shape_y, shape_x), dtype=float)  # Use object dtype to accommodate any return type
 
     # Prepare keyword arguments for class and function
     class_kwargs = {}
@@ -364,6 +363,9 @@ def all_curves(
         parallel = execution_time > 0.001  # Threshold of 0.001 seconds for deciding to parallelize
     if isinstance(return_value, tuple) and len(return_value) > 1 and isinstance(return_value[1], str):
         z_units = return_value[1]
+        if len(return_value) > 2 and isinstance(return_value[2], dict):
+            for key, value in return_value[2].items():
+                curves.analysis_results[key] = np.empty((shape_y, shape_x), dtype=type(value))
     else:
         z_units = "nm"
 
@@ -373,8 +375,6 @@ def all_curves(
         return_value = _all_curves_raw_worker(
             standardise_curve(curve), func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
         )
-        if isinstance(return_value, tuple) and isinstance(return_value[1], str):
-            return return_value[0]
         return return_value
 
     if curve_correcting:
@@ -403,10 +403,11 @@ def all_curves(
         # Use joblib.Parallel with a generator expression to keep it lazy.
         if curve_correcting:
             processed_generator = Parallel(n_jobs=num_workers, return_as="generator")(
-                delayed(_all_curves_worker)(curve)
-                for curve in curves.iter_curves(flip_image=False)
+                delayed(_all_curves_worker)(curve) for curve in curves.iter_curves(flip_image=False)
             )
-            for idx, curve_out in enumerate(tqdm(processed_generator, total=len(curves), desc=f"Running {func.__name__} (Parallel)")):
+            for idx, curve_out in enumerate(
+                tqdm(processed_generator, total=len(curves), desc=f"Running {func.__name__} (Parallel)")
+            ):
                 saver.save_curve(
                     curve_data=curve_out,
                     volume_name=new_volume_name,
@@ -415,18 +416,31 @@ def all_curves(
                 )
         else:
             results = Parallel(n_jobs=num_workers)(
-                delayed(_all_curves_worker)(curve) for curve in tqdm(curves, total=len(curves), desc=f"Running {func.__name__} (Parallel)")
+                delayed(_all_curves_worker)(curve)
+                for curve in tqdm(
+                    curves.iter_curves(flip_image=False), total=len(curves), desc=f"Running {func.__name__} (Parallel)"
+                )
             )
             # Reshape results into the image map
-            for i, point in enumerate(results):
+            for i, result in enumerate(results):
                 y = i // shape_x
                 x = i % shape_x
-                image_map[y][x] = point
+                if isinstance(result, tuple) and len(result) > 1:
+                    image_map[y][x] = result[0]
+                    if len(result) > 2 and isinstance(result[2], dict):
+                        for key, value in result[2].items():
+                            curves.analysis_results[key][y][x] = value
+                else:
+                    image_map[y][x] = result
 
     else:
         if curve_correcting:
             for i, curve in enumerate(
-                tqdm(curves.iter_curves(flip_image=False), total=len(curves), desc=f"Running {func.__name__} (Sequential)")
+                tqdm(
+                    curves.iter_curves(flip_image=False),
+                    total=len(curves),
+                    desc=f"Running {func.__name__} (Sequential)",
+                )
             ):
                 standardise_curve(curve)
                 worker_result = _all_curves_worker(curve)
@@ -437,16 +451,29 @@ def all_curves(
                     curve_num=i,
                 )
         else:
-            for i, curve in enumerate(tqdm(curves, total=len(curves), desc=f"Running {func.__name__} (Sequential)")):
+            for i, curve in enumerate(
+                tqdm(
+                    curves.iter_curves(flip_image=False),
+                    total=len(curves),
+                    desc=f"Running {func.__name__} (Sequential)",
+                )
+            ):
                 standardise_curve(curve)
                 worker_result = _all_curves_worker(curve)
                 y = i // shape_x
                 x = i % shape_x
-                image_map[y][x] = worker_result
+                if isinstance(worker_result, tuple) and len(worker_result) > 1:
+                    image_map[y][x] = worker_result[0]
+                    if len(worker_result) > 2 and isinstance(worker_result[2], dict):
+                        for key, value in worker_result[2].items():
+                            curves.analysis_results[key][y][x] = value
+                else:
+                    image_map[y][x] = worker_result
+
     if curve_correcting:
         saver.complete_saving(volume=processed_volume)
         return True
     image_map = np.array(image_map)
-    if flip_image:
+    if curves.flip_image:
         image_map = np.flipud(image_map)
     return image_map, z_units

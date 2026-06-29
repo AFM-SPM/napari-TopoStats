@@ -17,7 +17,11 @@ running_function = None  # Currently running function (None if no function is ru
 widget_manager = None  # Global instance of WidgetManager
 # Dictionary mapping channel names to their assigned colors (maintained between profile viewers)
 channel_colours = {}
-colour_idx = 0
+channel_colour_idx = 0
+analysis_result_colours = (
+    {}
+)  # Dictionary mapping analysis result names to their assigned colors (maintained between profile viewers)
+analysis_result_colour_idx = 0
 
 # Dictionary mapping loaded function names to their source python file path
 loaded_function_paths = {}
@@ -237,19 +241,36 @@ def get_topostats_widget():
 
 def add_colour_for_channel(channel_name: str, current_channels: list[str], palette: list[str]):
     """Add a colour for a specific channel"""
-    global colour_idx  # pylint:disable=global-statement
+    global channel_colour_idx  # pylint:disable=global-statement
     if len(channel_colours) >= len(palette):
         for key in channel_colours:
             if key not in current_channels:
                 channel_colours.pop(key)
                 break
-    channel_colours[channel_name] = palette[colour_idx % len(palette)]
-    colour_idx += 1
+    channel_colours[channel_name] = palette[channel_colour_idx % len(palette)]
+    channel_colour_idx += 1
+
+
+def add_colour_for_analysis_result(result_name: str, current_results: list[str], palette: list[str]):
+    """Add a colour for a specific analysis result"""
+    global analysis_result_colour_idx  # pylint:disable=global-statement
+    if len(analysis_result_colours) >= len(palette):
+        for key in analysis_result_colours:
+            if key not in current_results:
+                analysis_result_colours.pop(key)
+                break
+    analysis_result_colours[result_name] = palette[analysis_result_colour_idx % len(palette)]
+    analysis_result_colour_idx += 1
 
 
 def get_channel_colours() -> dict[str, str]:
     """Get the current channel colours"""
     return channel_colours
+
+
+def get_analysis_result_colours() -> dict[str, str]:
+    """Get the current analysis result colours"""
+    return analysis_result_colours
 
 
 def record_loaded_function_path(func_name: str, file_path: str):
