@@ -469,306 +469,330 @@ class WidgetFunction:
 
             # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught, attribute-defined-outside-init
             def func(**kwargs):
-                selected_curves_volume_name = kwargs.pop(CURVES_VOLUME_PARAM, None)
-                local_params_function = including_config_params_from_function.copy()
-                local_params_from_class = (
-                    including_config_params_from_class.copy() if self.type_class is not None else []
-                )
-                func_to_execute = self.function_to_run
                 viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
                 loading_widget = LoadingWidget(viewer)
                 loading_widget.start(
                     self.name.replace("_", " ").replace("run", "running").replace("make", "making").title()
                 )
 
-                method_args = {}
-                class_args = {}
-                # Determine all relevant parameters
-                all_params = local_params_function + (local_params_from_class if self.type_class else [])
-
-                uses_topostats_object = "topostats_object" in [p.name for p in all_params]
-
-                # Handle image selection if required
-                selected_image = get_selected_image(
-                    kwargs.get("viewer", current_viewer()),
-                    of_type=self.of_type,
-                )
-                if selected_image is None:
+                def _cleanup():
+                    if self.name == get_running_function():
+                        set_running_function(None)
                     loading_widget.stop()
-                    return
-                if "image" in [p.name for p in all_params]:
-                    kwargs["image"] = selected_image
 
-                # Handle pixel_to_nm_scaling if required
-                if (
-                    "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs
-                ) or uses_topostats_object:
-                    px2nm = selected_image.metadata.get("px2nm", 1.0)
-                if "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs:
-                    kwargs["pixel_to_nm_scaling"] = px2nm
-
-                # Get the filename from the image layer if required
-                if ("filename" in [p.name for p in all_params] and "filename" not in kwargs) or uses_topostats_object:
-                    filename = "image"
-                if "filename" in [p.name for p in all_params] and "filename" not in kwargs:
-                    kwargs["filename"] = filename
-
-                if "curve" in [p.name for p in all_params] and "curve" not in kwargs:
-                    # Add the type class to kwargs so the function can be wrapped in all_curves if needed
-                    if self.type_class:
-                        kwargs["type_class"] = self.type_class
-                        self.type_class = (
-                            None  # Set to None as wrapping in all_curves will remove requirement for type_class
-                        )
-
-                    return_type = get_type_hints(self.function_to_run).get("return")
-                    if return_type is dict or get_origin(return_type) is dict:
-                        loaded_image = get_selected_loaded_image(viewer)
-                        current_afm_load = loaded_image.get_current_load()
-                        if loaded_image.curves_data is None or current_afm_load is None:
-                            loading_widget.stop()
-                            show_error_dialog(
-                                "No curves found in the selected layer.",
-                                raise_exception=True,
-                            )
-                            return
-                        curves_data = loaded_image.curves_data
-                        default_volume_name = curves_data.default_volume_name
-
-                        params_config = {
-                            "new_volume_name": {
-                                "type": str,
-                                "default": f"{default_volume_name}_{self.function_to_run.__name__}",
-                                "label": "New curves volume name:",
-                            },
-                        }
-
-                        is_afmreader = current_afm_load.metadata.get("created_by") == "AFMReader"
-                        if is_afmreader:
-                            params_config["add_to_current_file"] = {
-                                "type": bool,
-                                "default": True,
-                                "label": "Add processed curves to current file",
-                            }
-                            warning_msg = None
-                        else:
-                            warning_msg = (
-                                "This file was not created by AFMReader. "
-                                "A new file will be created. Click Cancel to abort."
-                            )
-
-                        user_params = show_parameter_dialog(
-                            parameters=params_config, title="Process Curves Options", warning_message=warning_msg
-                        )
-                        if user_params is None:
-                            loading_widget.stop()
-                            return
-
-                        add_to_current_file = user_params.get("add_to_current_file", False)
-
-                        # TODO could be more efficient with these two functions by adding a channel image that hasn't
-                        # been added yet.
-                        if not add_to_current_file:
-
-                            def func_to_execute(**kwargs):
-                                current_channel = loaded_image.get_current_channel()
-                                loaded_image.loader.save_to_h5()
-                                loaded_image.init_from_loader(headless=True)
-                                if current_channel not in loaded_image.get_available_channels():
-                                    current_channel = (
-                                        current_channel.lower()
-                                        if current_channel.lower() in loaded_image.get_available_channels()
-                                        else loaded_image.get_available_channels()[0]
-                                    )
-                                loaded_image.add_channel_image(channel=current_channel, headless=True)
-                                curves_data = loaded_image.curves_data
-                                kwargs["h5file"] = curves_data.h5file
-                                kwargs["new_volume_name"] = user_params["new_volume_name"]
-                                result = all_curves(func=self.function_to_run, **kwargs)
-                                loaded_image.add_channel_image(channel=current_channel, headless=True)
-                                return result
-
-                        else:
-
-                            def func_to_execute(**kwargs):
-                                kwargs["h5file"] = curves_data.h5file
-                                kwargs["new_volume_name"] = user_params["new_volume_name"]
-                                result = all_curves(func=self.function_to_run, **kwargs)
-                                current_channel = loaded_image.get_current_channel()
-                                if current_channel not in loaded_image.get_available_channels():
-                                    current_channel = (
-                                        current_channel.lower()
-                                        if current_channel.lower() in loaded_image.get_available_channels()
-                                        else loaded_image.get_available_channels()[0]
-                                    )
-                                loaded_image.add_channel_image(channel=current_channel, headless=True)
-                                return result
-
-                    else:
-                        # If the function is designed to take a single curve, wrap it in all_curves to apply
-                        # to all curves in the selected layer
-                        # pylint: disable=function-redefined
-                        def func_to_execute(**kwargs):
-                            return all_curves(func=self.function_to_run, **kwargs)
-
-                    new_param = inspect.Parameter(
-                        name="curves",
-                        kind=inspect.Parameter.KEYWORD_ONLY,
-                        default=None,
-                        annotation=Any,
+                try:
+                    selected_curves_volume_name = kwargs.pop(CURVES_VOLUME_PARAM, None)
+                    local_params_function = including_config_params_from_function.copy()
+                    local_params_from_class = (
+                        including_config_params_from_class.copy() if self.type_class is not None else []
                     )
-                    all_params = [p if p.name != "curve" else new_param for p in all_params]
-                    local_params_function = [p if p.name != "curve" else new_param for p in local_params_function]
-                    local_params_from_class = [p if p.name != "curve" else new_param for p in local_params_from_class]
+                    func_to_execute = self.function_to_run
 
-                if "curves" in [p.name for p in all_params] and "curves" not in kwargs:
+                    method_args = {}
+                    class_args = {}
+                    # Determine all relevant parameters
+                    all_params = local_params_function + (local_params_from_class if self.type_class else [])
 
-                    curves_data = get_selected_curves(
+                    uses_topostats_object = "topostats_object" in [p.name for p in all_params]
+
+                    # Handle image selection if required
+                    selected_image = get_selected_image(
                         kwargs.get("viewer", current_viewer()),
+                        of_type=self.of_type,
                     )
-                    selected_volume = (
-                        curves_data.get_volume(selected_curves_volume_name)
-                        if selected_curves_volume_name in curves_data.volumes
-                        else curves_data.get_default_volume()
-                    )
-                    kwargs["curves"] = selected_volume
-                    if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
-                        kwargs["channel_units"] = selected_volume.channel_units
-                    if "curves_meta" in [p.name for p in all_params] and "curves_meta" not in kwargs:
-                        kwargs["curves_meta"] = curves_data.metadata
-                else:
-                    if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
-                        kwargs["channel_units"] = {}
-                    if "curves_meta" in [p.name for p in all_params] and "curves_meta" not in kwargs:
-                        kwargs["curves_meta"] = {}
+                    if selected_image is None:
+                        _cleanup()
+                        return
+                    if "image" in [p.name for p in all_params]:
+                        kwargs["image"] = selected_image
 
-                if uses_topostats_object:
-                    # Create TopoStats object and add to kwargs
-                    if selected_image.metadata.get("topostats_object") is not None:
-                        topostats_object = selected_image.metadata["topostats_object"]
-                    else:
-                        topostats_object = TopoStats(
-                            image_original=selected_image.data,
-                            image=selected_image.data,
-                            pixel_to_nm_scaling=px2nm,
-                            filename=filename,
-                            config=get_current_config(),
+                    # Handle pixel_to_nm_scaling if required
+                    if (
+                        "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs
+                    ) or uses_topostats_object:
+                        px2nm = selected_image.metadata.get("px2nm", 1.0)
+                    if "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs:
+                        kwargs["pixel_to_nm_scaling"] = px2nm
+
+                    # Get the filename from the image layer if required
+                    if (
+                        "filename" in [p.name for p in all_params] and "filename" not in kwargs
+                    ) or uses_topostats_object:
+                        filename = "image"
+                    if "filename" in [p.name for p in all_params] and "filename" not in kwargs:
+                        kwargs["filename"] = filename
+
+                    if "curve" in [p.name for p in all_params] and "curve" not in kwargs:
+                        # Add the type class to kwargs so the function can be wrapped in all_curves if needed
+                        if self.type_class:
+                            kwargs["type_class"] = self.type_class
+                            self.type_class = (
+                                None  # Set to None as wrapping in all_curves will remove requirement for type_class
+                            )
+
+                        return_type = get_type_hints(self.function_to_run).get("return")
+                        if return_type is dict or get_origin(return_type) is dict:
+                            loaded_image = get_selected_loaded_image(viewer)
+                            current_afm_load = loaded_image.get_current_load()
+                            if loaded_image.curves_data is None or current_afm_load is None:
+                                _cleanup()
+                                show_error_dialog(
+                                    "No curves found in the selected layer.",
+                                    raise_exception=True,
+                                )
+                                return
+                            curves_data = loaded_image.curves_data
+                            default_volume_name = curves_data.default_volume_name
+
+                            params_config = {
+                                "new_volume_name": {
+                                    "type": str,
+                                    "default": f"{default_volume_name}_{self.function_to_run.__name__}",
+                                    "label": "New curves volume name:",
+                                },
+                            }
+
+                            is_afmreader = current_afm_load.metadata.get("created_by") == "AFMReader"
+                            if is_afmreader:
+                                params_config["add_to_current_file"] = {
+                                    "type": bool,
+                                    "default": True,
+                                    "label": "Add processed curves to current file",
+                                }
+                                warning_msg = None
+                            else:
+                                warning_msg = (
+                                    "This file was not created by AFMReader. "
+                                    "A new file will be created. Click Cancel to abort."
+                                )
+
+                            user_params = show_parameter_dialog(
+                                parameters=params_config, title="Process Curves Options", warning_message=warning_msg
+                            )
+                            if user_params is None:
+                                _cleanup()
+                                return
+
+                            add_to_current_file = user_params.get("add_to_current_file", False)
+
+                            # TODO could be more efficient with these two functions by adding a channel image
+                            # that hasn't been added yet.
+                            if not add_to_current_file:
+
+                                def func_to_execute(**kwargs):
+                                    current_channel = loaded_image.get_current_channel()
+                                    loaded_image.loader.save_to_h5()
+                                    loaded_image.init_from_loader(headless=True)
+                                    if current_channel not in loaded_image.get_available_channels():
+                                        current_channel = (
+                                            current_channel.lower()
+                                            if current_channel.lower() in loaded_image.get_available_channels()
+                                            else loaded_image.get_available_channels()[0]
+                                        )
+                                    loaded_image.add_channel_image(channel=current_channel, headless=True)
+                                    curves_data = loaded_image.curves_data
+                                    kwargs["h5file"] = curves_data.h5file
+                                    kwargs["new_volume_name"] = user_params["new_volume_name"]
+                                    result = all_curves(func=self.function_to_run, **kwargs)
+                                    loaded_image.add_channel_image(channel=current_channel, headless=True)
+                                    return result
+
+                            else:
+
+                                def func_to_execute(**kwargs):
+                                    kwargs["h5file"] = curves_data.h5file
+                                    kwargs["new_volume_name"] = user_params["new_volume_name"]
+                                    result = all_curves(func=self.function_to_run, **kwargs)
+                                    current_channel = loaded_image.get_current_channel()
+                                    if current_channel not in loaded_image.get_available_channels():
+                                        current_channel = (
+                                            current_channel.lower()
+                                            if current_channel.lower() in loaded_image.get_available_channels()
+                                            else loaded_image.get_available_channels()[0]
+                                        )
+                                    loaded_image.add_channel_image(channel=current_channel, headless=True)
+                                    return result
+
+                        else:
+                            # If the function is designed to take a single curve, wrap it in all_curves to apply
+                            # to all curves in the selected layer
+                            # pylint: disable=function-redefined
+                            def func_to_execute(**kwargs):
+                                return all_curves(func=self.function_to_run, **kwargs)
+
+                        new_param = inspect.Parameter(
+                            name="curves",
+                            kind=inspect.Parameter.KEYWORD_ONLY,
+                            default=None,
+                            annotation=Any,
                         )
-                    kwargs["topostats_object"] = topostats_object
-                # Distribute arguments between method_args and class_args
-                # TODO do we need to forget about the check for in local_params because if handling curves
-                # it might be cleaner to add some kwargs which weren't there before
-                for key, value in kwargs.items():
-                    if key in [p.name for p in local_params_function]:
-                        method_args[key] = value
-                    elif self.type_class and key in [p.name for p in local_params_from_class]:
-                        class_args[key] = value
+                        all_params = [p if p.name != "curve" else new_param for p in all_params]
+                        local_params_function = [p if p.name != "curve" else new_param for p in local_params_function]
+                        local_params_from_class = [
+                            p if p.name != "curve" else new_param for p in local_params_from_class
+                        ]
 
-                # Add config values if needed
-                if self.uses_config:
-                    method_args = add_values_to_dict_from_config(
-                        config,
-                        io.config_wrapper,
-                        self.function_key,
-                        method_args,
-                        local_params_function,
-                    )
-                    if self.type_class:
-                        class_args = add_values_to_dict_from_config(
+                    if "curves" in [p.name for p in all_params] and "curves" not in kwargs:
+
+                        curves_data = get_selected_curves(
+                            kwargs.get("viewer", current_viewer()),
+                        )
+                        selected_volume = (
+                            curves_data.get_volume(selected_curves_volume_name)
+                            if selected_curves_volume_name in curves_data.volumes
+                            else curves_data.get_default_volume()
+                        )
+                        kwargs["curves"] = selected_volume
+                        if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
+                            kwargs["channel_units"] = selected_volume.channel_units
+                        if "curves_meta" in [p.name for p in all_params] and "curves_meta" not in kwargs:
+                            kwargs["curves_meta"] = curves_data.metadata
+                    else:
+                        if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
+                            kwargs["channel_units"] = {}
+                        if "curves_meta" in [p.name for p in all_params] and "curves_meta" not in kwargs:
+                            kwargs["curves_meta"] = {}
+
+                    if uses_topostats_object:
+                        # Create TopoStats object and add to kwargs
+                        if selected_image.metadata.get("topostats_object") is not None:
+                            topostats_object = selected_image.metadata["topostats_object"]
+                        else:
+                            topostats_object = TopoStats(
+                                image_original=selected_image.data,
+                                image=selected_image.data,
+                                pixel_to_nm_scaling=px2nm,
+                                filename=filename,
+                                config=get_current_config(),
+                            )
+                        kwargs["topostats_object"] = topostats_object
+                    # Distribute arguments between method_args and class_args
+                    # TODO do we need to forget about the check for in local_params because if handling curves
+                    # it might be cleaner to add some kwargs which weren't there before
+                    for key, value in kwargs.items():
+                        if key in [p.name for p in local_params_function]:
+                            method_args[key] = value
+                        elif self.type_class and key in [p.name for p in local_params_from_class]:
+                            class_args[key] = value
+
+                    # Add config values if needed
+                    if self.uses_config:
+                        method_args = add_values_to_dict_from_config(
                             config,
                             io.config_wrapper,
                             self.function_key,
-                            class_args,
-                            local_params_from_class,
+                            method_args,
+                            local_params_function,
                         )
-
-                # Enforce defaults
-                method_args = enforce_defaults(method_args, local_params_function)
-                if self.type_class:
-                    class_args = enforce_defaults(class_args, local_params_from_class)
-
-                # Execute function or method
-                # pylint: disable=too-many-return-statements
-                def _func():
-                    # ruff: noqa: BLE001
-                    try:
                         if self.type_class:
-                            instance = self.type_class(**class_args)
-                            method = getattr(instance, self.function_to_run.__name__, None)
-                            if method:
-                                return_value = method(**method_args)
-                            else:
-                                return construct_error_args(
-                                    message=f"Method {self.function_to_run.__name__} not found on instance."
-                                )
-                        else:
-                            return_value = func_to_execute(**method_args)
-                        # Evaluate path_to_data
-                        metadata = {}
-                        if self.metadata_paths is not None:
-                            for key in self.metadata_paths:
-                                if self.metadata_paths[key] == "config":
-                                    metadata[key] = full_current_config
+                            class_args = add_values_to_dict_from_config(
+                                config,
+                                io.config_wrapper,
+                                self.function_key,
+                                class_args,
+                                local_params_from_class,
+                            )
+
+                    # Enforce defaults
+                    method_args = enforce_defaults(method_args, local_params_function)
+                    if self.type_class:
+                        class_args = enforce_defaults(class_args, local_params_from_class)
+
+                    # Execute function or method
+                    # pylint: disable=too-many-return-statements
+                    def _func():
+                        # ruff: noqa: BLE001
+                        try:
+                            if self.type_class:
+                                instance = self.type_class(**class_args)
+                                method = getattr(instance, self.function_to_run.__name__, None)
+                                if method:
+                                    return_value = method(**method_args)
                                 else:
-                                    metadata[key] = evaluate_path_to_data(
-                                        self.metadata_paths[key],
-                                        return_value,
-                                        instance if self.type_class else None,
-                                        self.type_class,
+                                    return construct_error_args(
+                                        message=f"Method {self.function_to_run.__name__} not found on instance."
                                     )
-                        if self.type_class and hasattr(instance, "topostats_object"):
-                            metadata["topostats_object"] = instance.topostats_object
+                            else:
+                                return_value = func_to_execute(**method_args)
+                            # Evaluate path_to_data
+                            metadata = {}
+                            if self.metadata_paths is not None:
+                                for key in self.metadata_paths:
+                                    if self.metadata_paths[key] == "config":
+                                        metadata[key] = full_current_config
+                                    else:
+                                        metadata[key] = evaluate_path_to_data(
+                                            self.metadata_paths[key],
+                                            return_value,
+                                            instance if self.type_class else None,
+                                            self.type_class,
+                                        )
+                            if self.type_class and hasattr(instance, "topostats_object"):
+                                metadata["topostats_object"] = instance.topostats_object
 
-                        if self.type_class:
-                            result = evaluate_path_to_data(
-                                self.path_to_data,
-                                return_value,
-                                instance,
-                                self.type_class,
+                            if self.type_class:
+                                result = evaluate_path_to_data(
+                                    self.path_to_data,
+                                    return_value,
+                                    instance,
+                                    self.type_class,
+                                )
+                            else:
+                                result = evaluate_path_to_data(self.path_to_data, return_value)
+                        except Exception as e:
+                            return construct_error_args(
+                                exception=e, raise_exception=True, topostats_error=True, type_class=self.type_class
                             )
-                        else:
-                            result = evaluate_path_to_data(self.path_to_data, return_value)
-                    except Exception as e:
-                        return construct_error_args(
-                            exception=e, raise_exception=True, topostats_error=True, type_class=self.type_class
+                        return (result, metadata)
+
+                    def _handle_result(result):
+                        if isinstance(result, dict) and "message" in result:
+                            _cleanup()
+                            show_error_dialog(**result)
+                            return
+                        try:
+                            viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
+                            return_value, metadata = result
+                            if (
+                                isinstance(return_value, tuple)
+                                and len(return_value) == 2
+                                and isinstance(return_value[1], str)
+                            ):
+                                return_value, z_units = return_value
+                            else:
+                                z_units = None
+                            if return_value is not None:
+                                self.render_return_value(
+                                    return_value,
+                                    viewer,
+                                    selected_image,
+                                    metadata=metadata,
+                                    z_units=z_units,
+                                )
+                            else:
+                                show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
+                        finally:
+                            _cleanup()
+
+                    def _handle_error(exception):
+                        _cleanup()
+                        show_error_dialog(
+                            f"Error executing function {self.function_to_run.__name__}: {str(exception)}",
+                            raise_exception=True,
                         )
-                    return (result, metadata)
 
-                def _handle_result(result):
-                    if isinstance(result, dict) and "message" in result:
-                        loading_widget.stop()
-                        show_error_dialog(**result)
-                        return
-                    try:
-                        viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
-                        return_value, metadata = result
-                        if (
-                            isinstance(return_value, tuple)
-                            and len(return_value) == 2
-                            and isinstance(return_value[1], str)
-                        ):
-                            return_value, z_units = return_value
-                        else:
-                            z_units = None
-                        if return_value is not None:
-                            self.render_return_value(
-                                return_value,
-                                viewer,
-                                selected_image,
-                                metadata=metadata,
-                                z_units=z_units,
-                            )
-                        else:
-                            show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
-                    finally:
-                        loading_widget.stop()
-                        if self.name == get_running_function():
-                            set_running_function(None)
-
-                set_running_function(self.name)
-                self.worker = ProcessWorker(_func)
-                self.worker.start()
-                self.worker.result_ready.connect(_handle_result)
+                    set_running_function(self.name)
+                    self.worker = ProcessWorker(_func)
+                    self.worker.result_ready.connect(_handle_result)
+                    self.worker.error_signal.connect(_handle_error)
+                    self.worker.start()
+                except Exception as e:
+                    _cleanup()
+                    show_error_dialog(
+                        f"Error preparing to run function {self.function_to_run.__name__}: {str(e)}",
+                        raise_exception=True,
+                    )
+                    return
 
             # Collect the parameters for the function and ensure defaults are set (these defaults are shown in the GUI)
 

@@ -105,8 +105,6 @@ def show_error_dialog(
     raise_exception : bool, optional
         If True, raise a ValueError after showing the dialog. Used for errors that should halt execution.
     """
-    if exception is not None:
-        raise exception
     if topostats_error:
         message += (
             f"\nThis error is potentially caused in the TopoStats package rather than in the Napari "
