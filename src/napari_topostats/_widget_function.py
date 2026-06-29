@@ -533,19 +533,12 @@ class WidgetFunction:
                             )
                             return
                         curves_data = loaded_image.curves_data
-                        default_volume = curves_data.get_default_volume()
-                        curves_name = default_volume.name if default_volume else "curves"
-                        volume_options = list(curves_data.volumes.keys())
+                        default_volume_name = curves_data.default_volume_name
 
                         params_config = {
-                            "volume_name_to_operate_on": {
-                                "type": volume_options,
-                                "default": curves_name,
-                                "label": "Curves volume to operate on:",
-                            },
                             "new_volume_name": {
                                 "type": str,
-                                "default": f"{curves_name}_{self.function_to_run.__name__}",
+                                "default": f"{default_volume_name}_{self.function_to_run.__name__}",
                                 "label": "New curves volume name:",
                             },
                         }
@@ -573,8 +566,6 @@ class WidgetFunction:
 
                         add_to_current_file = user_params.get("add_to_current_file", False)
 
-                        selected_vol_name = user_params["volume_name_to_operate_on"]
-                        kwargs["curves"] = curves_data.volumes[selected_vol_name]
                         # TODO could be more efficient with these two functions by adding a channel image that hasn't
                         # been added yet.
                         if not add_to_current_file:
@@ -591,7 +582,6 @@ class WidgetFunction:
                                     )
                                 loaded_image.add_channel_image(channel=current_channel, headless=True)
                                 curves_data = loaded_image.curves_data
-                                kwargs["curves"] = curves_data.volumes[selected_vol_name]
                                 kwargs["h5file"] = curves_data.h5file
                                 kwargs["new_volume_name"] = user_params["new_volume_name"]
                                 result = all_curves(func=self.function_to_run, **kwargs)
