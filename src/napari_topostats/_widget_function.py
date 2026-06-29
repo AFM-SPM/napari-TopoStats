@@ -45,6 +45,8 @@ from ._parallel_processing import ProcessWorker
 from ._state import WidgetManager, get_running_function, set_running_function
 from .utils import _eval, all_curves, calculate_contrast_limits, is_binary_image, remove_all_but_last
 
+CURVES_VOLUME_PARAM = "curves_volume_to_operate_on"
+
 
 def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
     """
@@ -467,6 +469,7 @@ class WidgetFunction:
 
             # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught, attribute-defined-outside-init
             def func(**kwargs):
+                selected_curves_volume_name = kwargs.pop(CURVES_VOLUME_PARAM, None)
                 local_params_function = including_config_params_from_function.copy()
                 local_params_from_class = (
                     including_config_params_from_class.copy() if self.type_class is not None else []
@@ -633,10 +636,14 @@ class WidgetFunction:
                     curves_data = get_selected_curves(
                         kwargs.get("viewer", current_viewer()),
                     )
-                    default_volume = curves_data.get_default_volume()
-                    kwargs["curves"] = default_volume
+                    selected_volume = (
+                        curves_data.get_volume(selected_curves_volume_name)
+                        if selected_curves_volume_name in curves_data.volumes
+                        else curves_data.get_default_volume()
+                    )
+                    kwargs["curves"] = selected_volume
                     if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
-                        kwargs["channel_units"] = default_volume.channel_units
+                        kwargs["channel_units"] = selected_volume.channel_units
                     if "curves_meta" in [p.name for p in all_params] and "curves_meta" not in kwargs:
                         kwargs["curves_meta"] = curves_data.metadata
                 else:
@@ -803,11 +810,75 @@ class WidgetFunction:
                 ]:
                     new_parameters.append(new_p)
 
-            if len(new_parameters) == 0:
+            has_curves_parameter = "curves" in [p.name for p in all_parameters] or "curve" in [
+                p.name for p in all_parameters
+            ]
+
+            if len(new_parameters) == 0 and not has_curves_parameter:
                 self.run_immediately = True
             # Create a magicgui function with the wrapped function and the new parameters
             wrapped_func = CallableWithSignature(func, inspect.Signature(parameters=new_parameters))
-            magicgui_function = magicgui()(wrapped_func)
+            param_options = {}
+            if has_curves_parameter:
+
+                def get_available_curves_volumes(_event=None):
+                    curves_data = get_selected_curves(
+                        self.overide_viewer or current_viewer(),
+                        suppress_errors=True,
+                    )
+                    if curves_data is None:
+                        return []
+                    volume_names = list(curves_data.volumes.keys())
+                    return volume_names or []
+
+                def get_default_curves_volume_name():
+                    curves_data = get_selected_curves(
+                        self.overide_viewer or current_viewer(),
+                        suppress_errors=True,
+                    )
+                    if curves_data is None:
+                        return ""
+                    return curves_data.default_volume_name
+
+                curves_volume_param = inspect.Parameter(
+                    name=CURVES_VOLUME_PARAM,
+                    kind=inspect.Parameter.KEYWORD_ONLY,
+                    default=get_default_curves_volume_name(),
+                    annotation=str,
+                )
+                new_parameters.append(curves_volume_param)
+                wrapped_func = CallableWithSignature(func, inspect.Signature(parameters=new_parameters))
+                param_options[CURVES_VOLUME_PARAM] = {
+                    "widget_type": "ComboBox",
+                    "choices": get_available_curves_volumes,
+                    "label": "curves volume to operate on:",
+                }
+
+                def refresh_curves_volume_widget(_event=None):
+                    if not has_curves_parameter:
+                        return
+                    volume_widget = magicgui_function[CURVES_VOLUME_PARAM]
+                    previous_value = volume_widget.value
+                    curves_data = get_selected_curves(
+                        self.overide_viewer or current_viewer(),
+                        suppress_errors=True,
+                    )
+                    available_volumes = curves_data.get_volume_names() if curves_data else []
+                    volume_widget.reset_choices()
+                    volume_widget.enabled = bool(available_volumes)
+                    if previous_value in available_volumes:
+                        volume_widget.value = previous_value
+                        return
+                    default_volume_name = curves_data.default_volume_name if curves_data else None
+                    if default_volume_name in available_volumes:
+                        volume_widget.value = default_volume_name
+
+            magicgui_function = magicgui(**param_options)(wrapped_func)
+
+            if has_curves_parameter:
+                refresh_curves_volume_widget()
+                viewer = self.overide_viewer or current_viewer()
+                viewer.layers.selection.events.changed.connect(refresh_curves_volume_widget)
             attach_status_label(magicgui_function)
             return magicgui_function
 

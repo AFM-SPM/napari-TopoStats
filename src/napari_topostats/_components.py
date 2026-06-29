@@ -575,7 +575,7 @@ def get_selected_image(viewer, of_type: list = None) -> Image | None:
     return None
 
 
-def get_selected_curves(viewer) -> CurvesDataset | None:
+def get_selected_curves(viewer, suppress_errors=False) -> CurvesDataset | None:
     """
     Get the currently selected curves from the viewer.
     This retrieves the curves from the LoadedImage object associated with the selected layer.
@@ -593,14 +593,16 @@ def get_selected_curves(viewer) -> CurvesDataset | None:
     selected = list(viewer.layers.selection)
 
     if not selected:
-        show_error_dialog("No layer selected. Select a layer ")
+        if not suppress_errors:
+            show_error_dialog("No layer selected. Select a layer ")
         return None
     layer = selected[0]
 
     reader_id = layer.metadata.get("afmreader_id") if layer.metadata else None
     loaded_image = get_loaded_image(reader_id) if reader_id is not None else None
     if loaded_image is None or loaded_image.curves_data is None:
-        show_error_dialog("Selected layer does not contain curves", raise_exception=True)
+        if not suppress_errors:
+            show_error_dialog("Selected layer does not contain curves", raise_exception=True)
         return None
 
     return loaded_image.curves_data
