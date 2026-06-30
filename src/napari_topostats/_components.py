@@ -327,7 +327,6 @@ class SelectionDropdown(QComboBox):
         """
         Handle changes in selection and update the displayed text accordingly.
         """
-        print("Selection changed")
         self.update_text()
         if self.on_change:
             self.on_change(self.get_checked_items())

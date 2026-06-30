@@ -244,11 +244,16 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
     def update_volume(self, volume_name: str):
         """Updates the volume of the plot and refreshes curve to match"""
+        if not volume_name:
+            return
+
         selected_curves = get_selected_curves(self.viewer)
-        self.update_curve(selected_curves.get_volume(volume_name)[self.y_coord, self.x_coord])
-        self.update_analysis_results(
-            selected_curves.get_volume(volume_name).get_analysis_results(self.y_coord, self.x_coord)
-        )
+        selected_volume = selected_curves.get_volume(volume_name)
+        if selected_volume is None:
+            return
+
+        self.update_curve(selected_volume[self.y_coord, self.x_coord])
+        self.update_analysis_results(selected_volume.get_analysis_results(self.y_coord, self.x_coord))
 
     def update_segments(self, approach: bool | None = None, retract: bool | None = None):
         """Updates the segments of the plot based on user checking boxes"""
@@ -434,7 +439,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
             if "Selected Curve" not in viewer.layers:
                 active_layer = viewer.layers.selection.active
-                viewer.add_shapes(
+                selected_curve_layer = viewer.add_shapes(
                     data=cross_data,
                     name="Selected Curve",
                     shape_type="line",
@@ -448,6 +453,10 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 selected_curve_layer.data = cross_data
                 selected_curve_layer.edge_width = max(y_scale, x_scale) * 0.5
                 selected_curve_layer.edge_color = COLOR_SELECTED_CURVE
+
+            current_index = viewer.layers.index(selected_curve_layer)
+            if current_index < len(viewer.layers) - 1:
+                viewer.layers.move(current_index, len(viewer.layers))
         except IndexError:
             self.info_label.setText("Clicked outside the image bounds.")
 
