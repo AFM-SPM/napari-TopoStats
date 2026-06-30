@@ -345,8 +345,6 @@ def all_curves(
         else:
             raise ValueError("Curves must be of the CurvesDataset type defined by AFMReader.")
 
-    image_map = np.empty((shape_y, shape_x), dtype=float)  # Use object dtype to accommodate any return type
-
     # Prepare keyword arguments for class and function
     class_kwargs = {}
     if type_class is not None:
@@ -374,16 +372,32 @@ def all_curves(
     if curve_correcting:
         return_value = _move_created_standard_channels_to_originals(return_value, created_channels)
     execution_time = time.perf_counter() - start_time
+    z_units = "nm"
     if parallel is None:
         # Auto-detect based on execution time of first curve
         parallel = execution_time > 0.002  # Threshold of 0.002 seconds for deciding to parallelize
-    if isinstance(return_value, tuple) and len(return_value) > 1 and isinstance(return_value[1], str):
-        z_units = return_value[1]
-        if len(return_value) > 2 and isinstance(return_value[2], dict):
-            for key, value in return_value[2].items():
-                curves.analysis_results[key] = np.empty((shape_y, shape_x), dtype=type(value))
+    if isinstance(return_value, tuple):
+        actual_value = return_value[0]
+        if len(return_value) > 1 and isinstance(return_value[1], str):
+            z_units = return_value[1]
+            if len(return_value) > 2 and isinstance(return_value[2], dict):
+                for key, value in return_value[2].items():
+                    curves.analysis_results[key] = np.empty((shape_y, shape_x), dtype=type(value))
     else:
-        z_units = "nm"
+        actual_value = return_value
+    first_result_array = np.asarray(actual_value)
+    result_is_array = first_result_array.ndim > 0
+    if result_is_array:
+        image_map = np.empty(
+            (
+                first_result_array.shape[0],
+                shape_y,
+                shape_x,
+            ),
+            dtype=float,
+        )
+    else:
+        image_map = np.empty((shape_y, shape_x), dtype=type(actual_value))
 
     # pylint: disable=too-many-positional-arguments
     def _all_curves_worker(curve):
@@ -443,12 +457,16 @@ def all_curves(
                 y = i // shape_x
                 x = i % shape_x
                 if isinstance(result, tuple) and len(result) > 1:
-                    image_map[y][x] = result[0]
+                    extracted_result = result[0]
                     if len(result) > 2 and isinstance(result[2], dict):
                         for key, value in result[2].items():
                             curves.analysis_results[key][y][x] = value
                 else:
-                    image_map[y][x] = result
+                    extracted_result = result
+                if result_is_array:
+                    image_map[:, y, x] = extracted_result
+                else:
+                    image_map[y][x] = extracted_result
 
     else:
         if curve_correcting:
@@ -478,17 +496,21 @@ def all_curves(
                 y = i // shape_x
                 x = i % shape_x
                 if isinstance(worker_result, tuple) and len(worker_result) > 1:
-                    image_map[y][x] = worker_result[0]
                     if len(worker_result) > 2 and isinstance(worker_result[2], dict):
                         for key, value in worker_result[2].items():
                             curves.analysis_results[key][y][x] = value
+                    extracted_result = worker_result[0]
                 else:
-                    image_map[y][x] = worker_result
+                    extracted_result = worker_result
+                if result_is_array:
+                    image_map[:, y, x] = extracted_result
+                else:
+                    image_map[y][x] = extracted_result
 
     if curve_correcting:
         saver.complete_saving(volume=processed_volume)
         return True
     image_map = np.array(image_map)
     if curves.flip_image:
-        image_map = np.flipud(image_map)
+        image_map = np.flip(image_map, axis=-2)
     return image_map, z_units
