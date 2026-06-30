@@ -56,6 +56,7 @@ if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() 
 from napari_topostats._alerts import show_error_dialog
 from napari_topostats._batch_process import batch_process
 from napari_topostats._button_grid import ButtonGrid
+from napari_topostats._curves import open_curve_viewer
 from napari_topostats._grainstats import grainstats
 from napari_topostats._guide import check_guide, show_guide
 from napari_topostats._io import (
@@ -63,7 +64,7 @@ from napari_topostats._io import (
     load_config_impl,
     write_new_default_config,
 )
-from napari_topostats._plotting import open_curve_viewer, start_drawing
+from napari_topostats._profile_viewer import start_drawing
 from napari_topostats._script_handler import get_loaded_functions
 from napari_topostats._state import MIN_TOPOSTATS_VERSION, WidgetManager, get_running_function, set_topostats_widget
 from napari_topostats._widget_function import WidgetFunction, WidgetFunctionManager
