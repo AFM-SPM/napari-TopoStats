@@ -18,7 +18,21 @@ if TYPE_CHECKING:
     from napari.types import ImageData
 
 
-# ------- Misc -------
+vertical_deflection_names = [
+    "vDeflection",
+    "vDefl",
+    "vDef",
+    "Defl",
+    "defl",
+]
+
+measured_height_names = [
+    "measuredHeight",
+    "Raw",
+    "raw",
+]
+
+
 def afm2stack(
     image: ImageData,
     by_slices: bool = True,
@@ -254,14 +268,12 @@ def standardise_curve(curve: dict) -> dict:
         The standardised curve dictionary.
     """
     if "measuredHeight" not in curve:
-        measured_height_alternatives = ["Raw", "raw"]
-        for alt in measured_height_alternatives:
+        for alt in measured_height_names:
             if alt in curve:
                 curve["measuredHeight"] = curve[alt]
                 break
     if "vDeflection" not in curve:
-        v_deflection_alternatives = ["vDefl", "vDef", "Defl", "defl"]
-        for alt in v_deflection_alternatives:
+        for alt in vertical_deflection_names:
             if alt in curve:
                 curve["vDeflection"] = curve[alt]
                 break
@@ -353,6 +365,7 @@ def all_curves(
     # Try to get z_units from the first curve
     first_curve = curves[0, 0]
     start_time = time.perf_counter()
+    standardise_curve(first_curve)
     return_value = _all_curves_raw_worker(
         first_curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
     )
@@ -360,7 +373,7 @@ def all_curves(
     execution_time = time.perf_counter() - start_time
     if parallel is None:
         # Auto-detect based on execution time of first curve
-        parallel = execution_time > 0.001  # Threshold of 0.001 seconds for deciding to parallelize
+        parallel = execution_time > 0.002  # Threshold of 0.002 seconds for deciding to parallelize
     if isinstance(return_value, tuple) and len(return_value) > 1 and isinstance(return_value[1], str):
         z_units = return_value[1]
         if len(return_value) > 2 and isinstance(return_value[2], dict):

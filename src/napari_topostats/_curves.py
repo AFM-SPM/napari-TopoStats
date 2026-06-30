@@ -30,7 +30,7 @@ from napari_topostats._styles import (
     CURVE_VIEWER_RIGHT_MARGIN,
     VIBRANT_PALETTE,
 )
-from napari_topostats.utils import unflatten_dict
+from napari_topostats.utils import measured_height_names, unflatten_dict, vertical_deflection_names
 
 
 def _filled_cross_symbol() -> QPainterPath:
@@ -213,6 +213,10 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         if selected_curve_dict:
             self.selected_curve_dict = selected_curve_dict
         if self.selected_curve_dict is None:
+            return
+        self.set_default_channels()
+        if self.x_channel not in self.selected_curve_dict or self.y_channel not in self.selected_curve_dict:
+            self.info_label.setText("Could not find channels to plot for this curve.")
             return
         approach_x, approach_y, retract_x, retract_y = [], [], [], []
         if self.show_approach:
@@ -461,19 +465,55 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         available_channels : list
             The list of available channels.
         """
+        available_channels = list(available_channels)
         if self.available_channels == available_channels:
+            self.set_default_channels()
             return
         self.available_channels = available_channels
         temp_x_channel = self.x_channel
         temp_y_channel = self.y_channel
+
         self.x_channel_selector.clear()
         self.y_channel_selector.clear()
         self.x_channel_selector.addItems(self.available_channels)
         self.y_channel_selector.addItems(self.available_channels)
+
         if temp_x_channel in available_channels:
-            self.x_channel_selector.setCurrentText(temp_x_channel)
+            self.x_channel = temp_x_channel
+        else:
+            self.x_channel = None
         if temp_y_channel in available_channels:
-            self.y_channel_selector.setCurrentText(temp_y_channel)
+            self.y_channel = temp_y_channel
+        else:
+            self.y_channel = None
+        self.set_default_channels()
+        if self.x_channel is not None:
+            unit = (self.channels_units or {}).get(self.x_channel, "m")
+            self.plot_widget.setLabel("bottom", self.x_channel, units=unit)
+        if self.y_channel is not None:
+            unit = (self.channels_units or {}).get(self.y_channel, "N")
+            self.plot_widget.setLabel("left", self.y_channel, units=unit)
+
+    def set_default_channels(self):
+        """Select usable default x and y channels when the current selection is unavailable."""
+        if None not in (self.x_channel, self.y_channel) or not self.available_channels:
+            return
+        if self.x_channel is None and self.available_channels:
+            for default_x in measured_height_names:
+                if default_x in self.available_channels:
+                    self.x_channel = default_x
+                    break
+        if self.y_channel is None and self.available_channels:
+            for default_y in vertical_deflection_names:
+                if default_y in self.available_channels:
+                    self.y_channel = default_y
+                    break
+        if self.x_channel is None:
+            self.x_channel = self.available_channels[0]
+        if self.y_channel is None:
+            self.y_channel = self.available_channels[0]
+        self.y_channel_selector.setCurrentText(self.y_channel)
+        self.x_channel_selector.setCurrentText(self.x_channel)
 
 
 class ParameterDialog(QDialog):

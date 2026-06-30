@@ -15,12 +15,13 @@ current_error_dialog = None
 MIN_TOPOSTATS_VERSION = "2.4.0"  # Oldest compatible version of topostats, should match pyproject.toml
 running_function = None  # Currently running function (None if no function is running)
 widget_manager = None  # Global instance of WidgetManager
+
 # Dictionary mapping channel names to their assigned colors (maintained between profile viewers)
 channel_colours = {}
 channel_colour_idx = 0
-analysis_result_colours = (
-    {}
-)  # Dictionary mapping analysis result names to their assigned colors (maintained between profile viewers)
+
+# Dictionary mapping analysis result names to their assigned colors (maintained between curve viewers)
+analysis_result_colours = {}
 analysis_result_colour_idx = 0
 
 # Dictionary mapping loaded function names to their source python file path
