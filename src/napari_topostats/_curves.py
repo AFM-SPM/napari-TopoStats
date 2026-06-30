@@ -448,9 +448,8 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 selected_curve_layer.data = cross_data
                 selected_curve_layer.edge_width = max(y_scale, x_scale) * 0.5
                 selected_curve_layer.edge_color = COLOR_SELECTED_CURVE
-        except IndexError as e:
+        except IndexError:
             self.info_label.setText("Clicked outside the image bounds.")
-            raise e
 
         # pylint: disable=broad-exception-caught
         except Exception as e:  # noqa: BLE001
