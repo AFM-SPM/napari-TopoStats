@@ -591,6 +591,16 @@ class WidgetFunction:
                                         )
                                     loaded_image.add_channel_image(channel=current_channel, headless=True)
                                     curves_data = loaded_image.curves_data
+                                    selected_volume = (
+                                        curves_data.get_volume(selected_curves_volume_name)
+                                        if selected_curves_volume_name in curves_data.volumes
+                                        else curves_data.get_default_volume()
+                                    )
+                                    kwargs["curves"] = selected_volume
+                                    if "channel_units" in kwargs:
+                                        kwargs["channel_units"] = selected_volume.channel_units
+                                    if "curves_meta" in kwargs:
+                                        kwargs["curves_meta"] = curves_data.metadata
                                     kwargs["h5file"] = curves_data.h5file
                                     kwargs["new_volume_name"] = user_params["new_volume_name"]
                                     result = all_curves(func=self.function_to_run, **kwargs)
