@@ -32,6 +32,11 @@ measured_height_names = [
     "raw",
 ]
 
+standardised_curve_channels = {
+    "measuredHeight": measured_height_names,
+    "vDeflection": vertical_deflection_names,
+}
+
 
 def afm2stack(
     image: ImageData,
@@ -253,30 +258,26 @@ def remove_all_but_last(word: str, text: str) -> str:
     return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return
 
 
-def standardise_curve(curve: dict) -> dict:
-    """
-    Standardise the curve dictionary to ensure it has 'measuredHeight' and 'vDeflection' keys.
-
-    Parameters
-    ----------
-    curve : dict
-        The curve dictionary to standardise.
-
-    Returns
-    -------
-    dict
-        The standardised curve dictionary.
-    """
-    if "measuredHeight" not in curve:
-        for alt in measured_height_names:
-            if alt in curve:
-                curve["measuredHeight"] = curve[alt]
+def _standardise_curve_with_original_channels(curve: dict) -> tuple[dict, dict[str, str]]:
+    """Standardise curve channel names and track aliases created from existing channels."""
+    created_channels = {}
+    for standard_channel, alternative_channels in standardised_curve_channels.items():
+        if standard_channel in curve:
+            continue
+        for alternative_channel in alternative_channels:
+            if alternative_channel in curve:
+                curve[standard_channel] = curve[alternative_channel]
+                created_channels[standard_channel] = alternative_channel
                 break
-    if "vDeflection" not in curve:
-        for alt in vertical_deflection_names:
-            if alt in curve:
-                curve["vDeflection"] = curve[alt]
-                break
+    return curve, created_channels
+
+
+def _move_created_standard_channels_to_originals(curve: dict, created_channels: dict[str, str]) -> dict:
+    """Move edited standardised aliases back to the channels they were copied from."""
+    for standard_channel, original_channel in created_channels.items():
+        if standard_channel in curve:
+            curve[original_channel] = curve[standard_channel]
+            curve.pop(standard_channel, None)
     return curve
 
 
@@ -363,13 +364,15 @@ def all_curves(
     has_curve_in_func_sig = "curve" in func_sig.parameters
 
     # Try to get z_units from the first curve
-    first_curve = curves[0, 0]
+    first_curve = dict(curves[0, 0])
     start_time = time.perf_counter()
-    standardise_curve(first_curve)
+    first_curve, created_channels = _standardise_curve_with_original_channels(first_curve)
     return_value = _all_curves_raw_worker(
         first_curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
     )
     curve_correcting = isinstance(return_value, dict)
+    if curve_correcting:
+        return_value = _move_created_standard_channels_to_originals(return_value, created_channels)
     execution_time = time.perf_counter() - start_time
     if parallel is None:
         # Auto-detect based on execution time of first curve
@@ -385,9 +388,10 @@ def all_curves(
     # pylint: disable=too-many-positional-arguments
     def _all_curves_worker(curve):
         """Worker function for parallel curve processing."""
-        return_value = _all_curves_raw_worker(
-            standardise_curve(curve), func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
-        )
+        curve, created_channels = _standardise_curve_with_original_channels(curve)
+        return_value = _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig)
+        if curve_correcting:
+            return _move_created_standard_channels_to_originals(return_value, created_channels)
         return return_value
 
     if curve_correcting:
@@ -455,7 +459,6 @@ def all_curves(
                     desc=f"Running {func.__name__} (Sequential)",
                 )
             ):
-                standardise_curve(curve)
                 worker_result = _all_curves_worker(curve)
                 saver.save_curve(
                     curve_data=worker_result,
@@ -471,7 +474,6 @@ def all_curves(
                     desc=f"Running {func.__name__} (Sequential)",
                 )
             ):
-                standardise_curve(curve)
                 worker_result = _all_curves_worker(curve)
                 y = i // shape_x
                 x = i % shape_x
