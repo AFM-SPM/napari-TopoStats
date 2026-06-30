@@ -170,10 +170,12 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         )
         self.right_layout.addWidget(self.analysis_results_selector)
 
-        # Add the left and right widgets to the settings layout, then add the settings widget to the main layout
+        # Add the left and right widgets to a collapsible settings section at the bottom of the viewer
         self.settings_layout.addWidget(self.left_widget)
         self.settings_layout.addWidget(self.right_widget)
-        self.layout().addWidget(self.settings_widget)
+        self.settings_box = CollapsibleBox(title="Settings", start_open=True, subtle=True)
+        self.settings_box.add_widget(self.settings_widget)
+        self.layout().addWidget(self.settings_box)
 
         # Initialize coordinates, channels and dicts
         self.x_coord = 0

@@ -18,6 +18,7 @@ from qtpy.QtWidgets import (
 from skimage.draw import line  # pylint: disable=no-name-in-module
 
 from napari_topostats._components import (
+    CollapsibleBox,
     MultiPlotWidget,
     SelectionDropdown,
     get_current_layer,
@@ -96,11 +97,13 @@ class ProfileViewer(QWidget):
             item_colors=get_channel_colours(),
         )
 
-        # Add the settings widget to the main layout
+        # Add the settings widget to a collapsible section at the bottom of the viewer
         self.settings_layout.addWidget(self.reset_view_button)
         self.settings_layout.addWidget(self.channel_displayed_label)
         self.settings_layout.addWidget(self.channel_selector)
-        self.layout().addWidget(self.settings_widget)
+        self.settings_box = CollapsibleBox(title="Settings", start_open=True, subtle=True)
+        self.settings_box.add_widget(self.settings_widget)
+        self.layout().addWidget(self.settings_box)
 
         # Whenever a new channel is selected, the profile widget should be updated
         viewer.layers.selection.events.changed.connect(self.on_selection_change)

@@ -35,7 +35,12 @@ class CollapsibleBox(QWidget):
     """
 
     def __init__(
-        self, title: str = "", parent: QWidget | None = None, start_open: bool = False, cut_off_title: int = 0
+        self,
+        title: str = "",
+        parent: QWidget | None = None,
+        start_open: bool = False,
+        cut_off_title: int = 0,
+        subtle: bool = False,
     ):
         """
         Initializes the CollapsibleBox.
@@ -48,6 +53,8 @@ class CollapsibleBox(QWidget):
             The parent widget, by default None
         start_open : bool, optional
             Whether the box should start open, by default False
+        subtle : bool, optional
+            Whether to use a quieter header style without a visible button bar, by default False
         """
         super().__init__(parent)
 
@@ -60,17 +67,34 @@ class CollapsibleBox(QWidget):
         self.toggle_button = QPushButton(f"   {title}")
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(start_open)
-        self.toggle_button.setStyleSheet(
-            "QPushButton { text-align: left; font-weight: bold; padding: 0.5em; border: none; }"
-            "QPushButton:hover { background-color: #555d68; }"
-        )
+        self.toggle_button.setFlat(subtle)
+        if subtle:
+            self.toggle_button.setStyleSheet(
+                "QPushButton {"
+                " text-align: left;"
+                " font-weight: bold;"
+                " padding: 0.15em 0;"
+                " border: none;"
+                " background: transparent;"
+                "}"
+                "QPushButton:hover { background: transparent; text-decoration: underline; }"
+            )
+        else:
+            self.toggle_button.setStyleSheet(
+                "QPushButton { text-align: left; font-weight: bold; padding: 0.5em; border: none; }"
+                "QPushButton:hover { background-color: #555d68; }"
+            )
         self.toggle_button.toggled.connect(self.on_toggle)
         self.layout.addWidget(self.toggle_button)
 
         # Content Area
         self.content_area = QFrame()
+        self.content_area.setFrameShape(QFrame.NoFrame)
         self.content_layout = QVBoxLayout(self.content_area)
-        self.content_layout.setContentsMargins(10, 10, 10, 10)
+        if subtle:
+            self.content_layout.setContentsMargins(0, 5, 0, 0)
+        else:
+            self.content_layout.setContentsMargins(10, 10, 10, 10)
         self.layout.addWidget(self.content_area)
 
         self.widgets_dict = {}
