@@ -581,14 +581,14 @@ def get_selected_image(viewer, of_type: list = None) -> Image | None:
     return None
 
 
-def get_selected_curves(viewer, suppress_errors=False) -> CurvesDataset | None:
+def get_selected_curves(viewer: Viewer | None, suppress_errors=False) -> CurvesDataset | None:
     """
     Get the currently selected curves from the viewer.
     This retrieves the curves from the LoadedImage object associated with the selected layer.
 
     Parameters
     ----------
-    viewer : Viewer
+    viewer : Viewer | None
         The napari viewer instance from which to get the selected curves.
 
     Returns
@@ -596,6 +596,11 @@ def get_selected_curves(viewer, suppress_errors=False) -> CurvesDataset | None:
     CurvesDataset | None
         The selected curves, or None if no layer is selected or if the selected layer does not have curves.
     """
+    if viewer is None:
+        if not suppress_errors:
+            show_error_dialog("No viewer available. Select a layer ")
+        return None
+
     selected = list(viewer.layers.selection)
 
     if not selected:
