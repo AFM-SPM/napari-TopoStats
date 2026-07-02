@@ -781,6 +781,7 @@ class WidgetFunction:
                                 )
                             else:
                                 show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
+                            self.refresh_curve_viewer()
                         finally:
                             _cleanup()
 
@@ -1146,6 +1147,18 @@ class WidgetFunction:
                 topostats_error=True,
             )
 
+    def refresh_curve_viewer(self):
+        """Refresh the curve viewer if it is currently docked."""
+        if self.function_manager is None:
+            print("Function manager is None, cannot refresh curve viewer.")
+            return
+        print(f"Function manager docked functions: {self.function_manager.docked_functions.keys()}")
+        curve_viewer = self.function_manager.get_docked_function("View Curves")
+        if curve_viewer is None:
+            curve_viewer = self.function_manager.get_docked_function("view_curves")
+        if curve_viewer is not None and hasattr(curve_viewer, "refresh_volumes"):
+            curve_viewer.refresh_volumes()
+
 
 class WidgetFunctionManager:
     """Class to manage the widget functions and their corresponding widgets in the napari viewer."""
@@ -1155,6 +1168,12 @@ class WidgetFunctionManager:
         self.functions: dict = functions
         self.viewer = viewer
         self.widget_manager = widget_manager
+        for function in self.functions.values():
+            if isinstance(function, WidgetFunction):
+                function.function_manager = self
+                if function.is_group:
+                    for group_function in function.group_functions.values():
+                        group_function.function_manager = self
 
     # pylint: disable=too-many-branches
     def add_function_as_widget(self, func_name: str, function: WidgetFunction = None):
@@ -1171,6 +1190,11 @@ class WidgetFunctionManager:
         self.widget_manager.ensure_valid(func_name)
 
         function = function or self.functions.get(func_name)
+        if isinstance(function, WidgetFunction):
+            function.function_manager = self
+            if function.is_group:
+                for group_function in function.group_functions.values():
+                    group_function.function_manager = self
         # Check if the widget is already docked and add it if not
         if func_name not in self.widget_manager.get_docked_widgets():
             if function.overide_get_widget:

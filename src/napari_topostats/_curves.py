@@ -257,6 +257,24 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         self.update_curve(selected_volume[self.y_coord, self.x_coord])
         self.update_analysis_results(selected_volume.get_analysis_results(self.y_coord, self.x_coord))
 
+    def refresh_volumes(self):
+        """Refresh available curve volumes and update the currently plotted curve."""
+        selected_curves = get_selected_curves(self.viewer, suppress_errors=True)
+        if selected_curves is None:
+            return
+
+        previous_volume_name = self.volume_selector.currentText()
+        volume_names = list(selected_curves.volumes.keys())
+        if not volume_names:
+            return
+
+        self.volume_selector.clear()
+        self.volume_selector.addItems(volume_names)
+        if previous_volume_name in selected_curves.volumes:
+            self.volume_selector.setCurrentText(previous_volume_name)
+        else:
+            self.volume_selector.setCurrentText(selected_curves.default_volume_name)
+
     def update_segments(self, approach: bool | None = None, retract: bool | None = None):
         """Updates the segments of the plot based on user checking boxes"""
         if approach is not None:

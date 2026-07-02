@@ -296,6 +296,7 @@ class RootWidget(QWidget):
 
     def add_function(self, function_to_add: WidgetFunction, to_group: bool = False):
         """Add a function to the button grid (designed for retrospective use, after loading widget)"""
+        function_to_add.function_manager = self.function_manager
         function_name = function_to_add.name
         display_name = function_name.replace("_", " ").title()
         self._functions[display_name] = function_to_add
