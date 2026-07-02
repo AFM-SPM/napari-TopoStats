@@ -368,9 +368,6 @@ def all_curves(
     return_value = _all_curves_raw_worker(
         first_curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
     )
-    curve_correcting = isinstance(return_value, dict)
-    if curve_correcting:
-        return_value = _move_created_standard_channels_to_originals(return_value, created_channels)
     execution_time = time.perf_counter() - start_time
     z_units = "nm"
     if parallel is None:
@@ -385,19 +382,23 @@ def all_curves(
                     curves.analysis_results[key] = np.empty((shape_y, shape_x), dtype=type(value))
     else:
         actual_value = return_value
-    first_result_array = np.asarray(actual_value)
-    result_is_array = first_result_array.ndim > 0
-    if result_is_array:
-        image_map = np.empty(
-            (
-                first_result_array.shape[0],
-                shape_y,
-                shape_x,
-            ),
-            dtype=float,
-        )
+    curve_correcting = isinstance(actual_value, dict)
+    if curve_correcting:
+        return_value = _move_created_standard_channels_to_originals(return_value, created_channels)
     else:
-        image_map = np.empty((shape_y, shape_x), dtype=type(actual_value))
+        first_result_array = np.asarray(actual_value)
+        result_is_array = first_result_array.ndim > 0
+        if result_is_array:
+            image_map = np.empty(
+                (
+                    first_result_array.shape[0],
+                    shape_y,
+                    shape_x,
+                ),
+                dtype=float,
+            )
+        else:
+            image_map = np.empty((shape_y, shape_x), dtype=type(actual_value))
 
     # pylint: disable=too-many-positional-arguments
     def _all_curves_worker(curve):
