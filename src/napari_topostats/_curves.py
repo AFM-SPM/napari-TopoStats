@@ -311,14 +311,8 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 result_value_x = self.selected_curve_dict[self.x_channel]["Segment_0"][result_value]
                 result_value_y = self.selected_curve_dict[self.y_channel]["Segment_0"][result_value]
 
-                def result_tip(x, y, _data, result_name=result_name):
-                    x_unit = self.channels_units.get(self.x_channel, "")
-                    y_unit = self.channels_units.get(self.y_channel, "")
-                    return (
-                        f"{result_name.title().replace('_', ' ')}\n"
-                        f"{self.x_channel}: {x:.3f} {x_unit}\n"
-                        f"{self.y_channel}: {y:.3f} {y_unit}"
-                    )
+                def result_tip(x, y, data=None, result_name=result_name):  # pylint: disable=unused-argument
+                    return f"{result_name.title().replace('_', ' ')}"
 
                 marker = pg.ScatterPlotItem(
                     x=[result_value_x],
