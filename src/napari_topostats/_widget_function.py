@@ -599,8 +599,8 @@ class WidgetFunction:
                                     kwargs["curves"] = selected_volume
                                     if "channel_units" in kwargs:
                                         kwargs["channel_units"] = selected_volume.channel_units
-                                    if "curves_meta" in kwargs:
-                                        kwargs["curves_meta"] = curves_data.metadata
+                                    if "experimental_config" in kwargs:
+                                        kwargs["experimental_config"] = curves_data.metadata.essential_global_metadata
                                     kwargs["h5file"] = curves_data.h5file
                                     kwargs["new_volume_name"] = user_params["new_volume_name"]
                                     result = all_curves(func=self.function_to_run, **kwargs)
@@ -655,13 +655,19 @@ class WidgetFunction:
                         kwargs["curves"] = selected_volume
                         if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
                             kwargs["channel_units"] = selected_volume.channel_units
-                        if "curves_meta" in [p.name for p in all_params] and "curves_meta" not in kwargs:
-                            kwargs["curves_meta"] = curves_data.metadata
+                        if (
+                            "experimental_config" in [p.name for p in all_params]
+                            and "experimental_config" not in kwargs
+                        ):
+                            kwargs["experimental_config"] = curves_data.metadata.essential_global_metadata
                     else:
                         if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
                             kwargs["channel_units"] = {}
-                        if "curves_meta" in [p.name for p in all_params] and "curves_meta" not in kwargs:
-                            kwargs["curves_meta"] = {}
+                        if (
+                            "experimental_config" in [p.name for p in all_params]
+                            and "experimental_config" not in kwargs
+                        ):
+                            kwargs["experimental_config"] = {}
 
                     if uses_topostats_object:
                         # Create TopoStats object and add to kwargs
@@ -831,7 +837,7 @@ class WidgetFunction:
                     "curve",
                     "curves",
                     "channel_units",
-                    "curves_meta",
+                    "experimental_config",
                 ]:
                     new_parameters.append(new_p)
 
@@ -1150,9 +1156,7 @@ class WidgetFunction:
     def refresh_curve_viewer(self):
         """Refresh the curve viewer if it is currently docked."""
         if self.function_manager is None:
-            print("Function manager is None, cannot refresh curve viewer.")
             return
-        print(f"Function manager docked functions: {self.function_manager.docked_functions.keys()}")
         curve_viewer = self.function_manager.get_docked_function("View Curves")
         if curve_viewer is None:
             curve_viewer = self.function_manager.get_docked_function("view_curves")

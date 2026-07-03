@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import copy
 import inspect
+import json
 import multiprocessing
 import time
 from typing import TYPE_CHECKING, Any
@@ -344,6 +345,11 @@ def all_curves(
             shape_x = curves.dims[1] if len(curves.dims) > 1 else 1
         else:
             raise ValueError("Curves must be of the CurvesDataset type defined by AFMReader.")
+
+    if "experimental_config" in kwargs:
+        # pretty print the experimental config for debugging using json
+        print("Experimental Config:")
+        print(json.dumps(kwargs["experimental_config"], indent=4))
 
     # Prepare keyword arguments for class and function
     class_kwargs = {}

@@ -424,7 +424,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         self.channels_units = current_volume.channel_units
         try:
             self.metadata = {
-                "global": raw_metadata.toplevel,
+                "global": raw_metadata.all_global_metadata,
                 f"curve_{curve_num}": raw_metadata[self.y_coord, self.x_coord],
                 f"curve_{curve_num}_approach": raw_metadata[self.y_coord, self.x_coord, 0],
                 f"curve_{curve_num}_retract": raw_metadata[self.y_coord, self.x_coord, 1],
