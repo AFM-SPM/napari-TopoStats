@@ -40,7 +40,7 @@ if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() 
 
 from forcestats.analysis import find_trigger_point
 from forcestats.contact import create_3d_approach_map, find_contact_point
-from forcestats.curve_correction import correct_baseline_linear
+from forcestats.curve_correction import correct_curve
 from napari.layers import Image, Labels
 from napari.viewer import Viewer
 from packaging.version import parse as parse_version
@@ -173,11 +173,11 @@ EXTRA_FUNCTIONS = [
         run_immediately=False,
     ),
     WidgetFunction(
-        name="correct_baseline_linear",
-        function_key="correct_baseline_linear",
+        name="correct_curve",
+        function_key="correct_curve",
         path_to_data="return",
-        function_to_run=correct_baseline_linear,
-        tooltip=inspect.getdoc(correct_baseline_linear),
+        function_to_run=correct_curve,
+        tooltip=inspect.getdoc(correct_curve),
         run_immediately=False,
     ),
 ]
