@@ -318,7 +318,11 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 result_value = selected_analysis_results[result_name]
                 result_value_x = self.selected_curve_dict[self.x_channel]["Segment_0"][result_value]
                 result_value_y = self.selected_curve_dict[self.y_channel]["Segment_0"][result_value]
-                active_analysis_marker.setData(x=[result_value_x], y=[result_value_y])
+                active_analysis_marker.setData(
+                    x=[result_value_x],
+                    y=[result_value_y],
+                    data=[{"index": result_value}],
+                )
             else:
                 self.plot_widget.removeItem(active_analysis_marker)
                 self.active_analysis_markers.pop(result_name)
@@ -330,7 +334,8 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 result_value_y = self.selected_curve_dict[self.y_channel]["Segment_0"][result_value]
 
                 def result_tip(x, y, data=None, result_name=result_name):  # pylint: disable=unused-argument
-                    return f"{result_name.title().replace('_', ' ')}"
+                    idx = data.get("index", "") if data is not None else ""
+                    return f"{result_name.title().replace('_', ' ')}: {idx}"
 
                 marker = pg.ScatterPlotItem(
                     x=[result_value_x],
@@ -341,6 +346,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                     brush=pg.mkBrush(result_colour),
                     hoverable=True,
                     hoverPen=pg.mkPen("y", width=3),
+                    data=[{"index": result_value}],
                     tip=result_tip,
                 )
                 self.active_analysis_markers[result_name] = marker
