@@ -425,10 +425,10 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             if self.volume_selector.currentText()
             else curves_data.get_default_volume()
         )
-        analysis_results = current_volume.get_analysis_results(self.y_coord, self.x_coord)
 
         self.channels_units = current_volume.channel_units
         try:
+            analysis_results = current_volume.get_analysis_results(self.y_coord, self.x_coord)
             self.metadata = {
                 "global": raw_metadata.all_global_metadata,
                 f"curve_{curve_num}": raw_metadata[self.y_coord, self.x_coord],
