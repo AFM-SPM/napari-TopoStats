@@ -59,6 +59,18 @@ current_config_path = None
 updated_values = {}
 
 
+def _format_config_label(key: str) -> str:
+    """Format a config key for display without changing the stored key."""
+    return key.replace("_", " ")
+
+
+def _format_config_tooltip(key: str, description: str = "") -> str:
+    """Build a tooltip that keeps the original config key visible."""
+    if description:
+        return f"{key}\n\n{description}"
+    return key
+
+
 class ConfigWrapper:
     """
     A wrapper for configuration dictionaries to provide a flat view and unflattening functionality.
@@ -202,9 +214,9 @@ def build_dynamic_widget(
         config_to_display[MISC_TITLE] = misc_config
 
     else:
-        title = running_reference.split(".")[-1].replace("_", " ").upper()
+        title = _format_config_label(running_reference.split(".")[-1]).title()
 
-        container = CollapsibleBox(title=title, start_open=running_reference in START_OPEN)
+        container = CollapsibleBox(title=title, start_open=running_reference in START_OPEN, subtle=True)
 
     for key, value in config_to_display.items():
 
@@ -228,34 +240,34 @@ def build_dynamic_widget(
             continue
 
         w = None
-        name = key.replace("_", " ")
         if isinstance(value, bool):
             w = create_widget(name="", widget_type="CheckBox", value=value)
         elif isinstance(value, int):
-            w = create_widget(name=name, widget_type="SpinBox", value=value)
+            w = create_widget(name="", widget_type="SpinBox", value=value)
         elif isinstance(value, float):
             if should_use_line_edit_for_float(value):
-                w = create_widget(name=name, widget_type="LineEdit", value=repr(value))
+                w = create_widget(name="", widget_type="LineEdit", value=repr(value))
             else:
-                w = create_widget(name=name, widget_type="FloatSpinBox", value=value)
+                w = create_widget(name="", widget_type="FloatSpinBox", value=value)
         elif isinstance(value, (str, list)) or value is None:
-            w = create_widget(name=name, widget_type="LineEdit", value=str(value))
+            w = create_widget(name="", widget_type="LineEdit", value=str(value))
 
         if w is None:
             continue
         w.changed.connect(lambda val, k=key: on_config_value_changed(f"{running_reference}.{k}", val))
-        if desc_text:
-            w.native.setToolTip(desc_text)
+        tooltip_text = _format_config_tooltip(key, desc_text)
+        w.native.setToolTip(tooltip_text)
 
         # Create Row for Widgets
         row_widget = QWidget()
         row_layout = QHBoxLayout(row_widget)
         row_layout.setContentsMargins(0, 5, 0, 5)
-        label_widget = QLabel(key)
+        label_widget = QLabel(_format_config_label(key))
         label_widget.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        label_widget.setToolTip(desc_text)
+        label_widget.setToolTip(tooltip_text)
         row_layout.addWidget(label_widget)
         row_layout.addWidget(w.native)
+        row_layout.setStretch(1, 1)
         if desc_text != "":
             row_layout.addWidget(create_info_icon(desc_text))
 
@@ -591,7 +603,6 @@ def open_config_editor():
     fresh_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     dialog = QDialog()
-    dialog.setStyleSheet("font-size: 9pt;")
     dialog.setWindowTitle("Edit Config")
     dialog.setMinimumWidth(550)
     screen_height = QGuiApplication.primaryScreen().availableGeometry().height()
@@ -600,7 +611,9 @@ def open_config_editor():
     main_layout = QVBoxLayout(dialog)
     main_layout.addWidget(fresh_container)
 
-    button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+    button_box = QDialogButtonBox()
+    button_box.addButton(QDialogButtonBox.Ok)
+    button_box.addButton(QDialogButtonBox.Cancel)
     save_button = QPushButton("Save Config to File")
     button_box.addButton(save_button, QDialogButtonBox.ActionRole)
 
