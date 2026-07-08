@@ -706,6 +706,7 @@ class DynamicParameterDialog(QDialog):
 
         self.container = Container()
         self.widgets = {}
+        self.visibility_rules = {}
 
         for param_name, config in parameters.items():
             param_type = config.get("type")
@@ -723,6 +724,12 @@ class DynamicParameterDialog(QDialog):
 
             self.container.append(w)
             self.widgets[param_name] = w
+            if config.get("visible_if") is not None:
+                self.visibility_rules[param_name] = config["visible_if"]
+
+        self._update_visibility()
+        for widget in self.widgets.values():
+            widget.changed.connect(self._update_visibility)
 
         self.layout.addWidget(self.container.native)
 
@@ -735,6 +742,21 @@ class DynamicParameterDialog(QDialog):
         button_layout.addWidget(cancel_button)
         button_layout.addWidget(ok_button)
         self.layout.addLayout(button_layout)
+
+    def _update_visibility(self, *_args):
+        """Update conditional widget visibility from current dialog values."""
+        values = self.get_values()
+        for param_name, rule in self.visibility_rules.items():
+            widget = self.widgets[param_name]
+            self._set_widget_visible(widget, bool(rule(values)))
+
+    @staticmethod
+    def _set_widget_visible(widget, visible: bool):
+        """Set visibility on the magicgui row so both label and control are hidden."""
+        labeled_widget_getter = getattr(widget, "_labeled_widget", None)
+        labeled_widget = labeled_widget_getter() if callable(labeled_widget_getter) else None
+        native = labeled_widget.native if labeled_widget is not None else widget.native
+        native.setVisible(visible)
 
     def get_values(self) -> dict:
         """

@@ -6,12 +6,17 @@ for those functions, running them and rendering the result.
 
 import functools
 import inspect
+import os
 import re
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, get_origin, get_type_hints
 
+import h5py
 import numpy as np
 import pandas as pd
+from AFMReader.h5_jpk import copy_h5_file
+from AFMReader.h5_saver import H5Saver, find_unused_filename
 from magicgui import magicgui
 from magicgui.widgets import Container, FunctionGui, PushButton
 from napari import current_viewer  # pylint: disable=no-name-in-module
@@ -169,6 +174,29 @@ def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=
             raise ValueError(f"Invalid path_to_data: {path_to_data} - 'obj' requires type_class")
 
     raise ValueError(f"Invalid path_to_data: {path_to_data}")
+
+
+def make_h5file_inheritable_state(h5file: h5py.File, inheritable: bool = False):
+    """
+    Set whether the operating system file handle for an HDF5 file is inheritable.
+
+    This is to prevent a file handle from persisting in child processes after closing open files, which cannot
+    exist if the file needs to be renamed or deleted on windows.
+
+    Parameters
+    ----------
+    h5file : h5py.File
+        Open HDF5 file whose underlying handle should be updated.
+    inheritable : bool
+        Whether child processes should inherit the handle.
+    """
+    if h5file is None:
+        return
+    try:
+        handle = h5file.id.get_vfd_handle()
+        os.set_inheritable(handle, inheritable)
+    except (AttributeError, OSError, TypeError, ValueError):
+        pass
 
 
 # Class representation of each function in the button grid.
@@ -543,6 +571,12 @@ class WidgetFunction:
                                 return
                             curves_data = loaded_image.curves_data
                             default_volume_name = curves_data.default_volume_name
+                            volume_names = list(curves_data.get_volume_names())
+                            default_replacement_volume_name = (
+                                selected_curves_volume_name
+                                if selected_curves_volume_name in volume_names
+                                else default_volume_name
+                            )
 
                             params_config = {
                                 "new_volume_name": {
@@ -554,11 +588,26 @@ class WidgetFunction:
 
                             is_afmreader = current_afm_load.metadata.get("created_by") == "AFMReader"
                             if is_afmreader:
-                                params_config["add_to_current_file"] = {
-                                    "type": bool,
-                                    "default": True,
-                                    "label": "Add processed curves to current file",
+                                new_params_config = {
+                                    "add_to_current_file": {
+                                        "type": bool,
+                                        "default": True,
+                                        "label": "Add processed curves to current file",
+                                    },
+                                    "replace_volume": {
+                                        "type": bool,
+                                        "default": False,
+                                        "label": "Replace existing curves volume",
+                                        "visible_if": lambda values: values.get("add_to_current_file", False),
+                                    },
+                                    "replacement_volume_name": {
+                                        "type": volume_names,
+                                        "default": default_replacement_volume_name,
+                                        "label": "Volume to replace:",
+                                        "visible_if": lambda values: values.get("replace_volume", False),
+                                    },
                                 }
+                                params_config.update(new_params_config)
                                 warning_msg = None
                             else:
                                 warning_msg = (
@@ -590,6 +639,7 @@ class WidgetFunction:
                                             else loaded_image.get_available_channels()[0]
                                         )
                                     loaded_image.add_channel_image(channel=current_channel, headless=True)
+                                    loaded_image.select_channel_image(current_channel, headless=True)
                                     curves_data = loaded_image.curves_data
                                     selected_volume = (
                                         curves_data.get_volume(selected_curves_volume_name)
@@ -608,12 +658,41 @@ class WidgetFunction:
                                     return result
 
                             else:
+                                replace_volume = user_params.get("replace_volume", False)
+                                replacement_volume_name = user_params.get("replacement_volume_name", None)
 
                                 def func_to_execute(**kwargs):
-                                    kwargs["h5file"] = curves_data.h5file
+                                    current_channel = loaded_image.get_current_channel()
+                                    if replace_volume and replacement_volume_name:
+                                        make_h5file_inheritable_state(curves_data.h5file, inheritable=False)
+                                        temp_new_path = find_unused_filename(
+                                            Path(curves_data.h5file.filename), temp=True
+                                        )
+
+                                        copy_h5_file(
+                                            src_path=curves_data.h5file,
+                                            dest_path=temp_new_path,
+                                            without=[f"Curve_Data/{replacement_volume_name}_VOLM"],
+                                        )
+                                        h5_saver = H5Saver(temp_new_path)
+                                        new_h5_file = h5_saver.create_file(
+                                            source=Path(curves_data.h5file.filename).suffix
+                                        )
+                                        make_h5file_inheritable_state(new_h5_file, inheritable=False)
+                                    else:
+                                        h5_saver = curves_data.h5file
+
+                                    kwargs["h5file"] = h5_saver
                                     kwargs["new_volume_name"] = user_params["new_volume_name"]
                                     result = all_curves(func=self.function_to_run, **kwargs)
-                                    current_channel = loaded_image.get_current_channel()
+                                    if replace_volume and replacement_volume_name:
+                                        original_filepath = Path(curves_data.h5file.filename)
+                                        curves_data.close()
+                                        h5_saver.close_file()
+
+                                        temp_new_path.replace(original_filepath)
+                                        loaded_image.loader.reinitialise(original_filepath)
+                                        loaded_image.init_from_loader(headless=True)
                                     if current_channel not in loaded_image.get_available_channels():
                                         current_channel = (
                                             current_channel.lower()
@@ -621,6 +700,7 @@ class WidgetFunction:
                                             else loaded_image.get_available_channels()[0]
                                         )
                                     loaded_image.add_channel_image(channel=current_channel, headless=True)
+                                    loaded_image.select_channel_image(current_channel, headless=True)
                                     return result
 
                         else:

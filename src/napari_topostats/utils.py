@@ -420,7 +420,7 @@ def all_curves(
         from AFMReader.h5_jpk import CurvesH5Volume
         from AFMReader.h5_saver import H5Saver
 
-        saver = H5Saver(h5file=h5file)
+        saver = h5file if isinstance(h5file, H5Saver) else H5Saver(h5file=h5file)
         new_volume_name = f"{curves.name}_{func.__name__}" if new_volume_name is None else new_volume_name
 
         processed_volume = CurvesH5Volume(
