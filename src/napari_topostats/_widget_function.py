@@ -648,9 +648,9 @@ class WidgetFunction:
                                     )
                                     kwargs["curves"] = selected_volume
                                     if "channel_units" in kwargs:
-                                        kwargs["channel_units"] = selected_volume.channel_units
+                                        kwargs["channel_units"] = selected_volume.metadata.channel_units
                                     if "experimental_config" in kwargs:
-                                        kwargs["experimental_config"] = curves_data.metadata.essential_global_metadata
+                                        kwargs["experimental_config"] = curves_data.essential_metadata
                                     kwargs["h5file"] = curves_data.h5file
                                     kwargs["new_volume_name"] = user_params["new_volume_name"]
                                     result = all_curves(func=self.function_to_run, **kwargs)
@@ -734,12 +734,12 @@ class WidgetFunction:
                         )
                         kwargs["curves"] = selected_volume
                         if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
-                            kwargs["channel_units"] = selected_volume.channel_units
+                            kwargs["channel_units"] = selected_volume.metadata.channel_units
                         if (
                             "experimental_config" in [p.name for p in all_params]
                             and "experimental_config" not in kwargs
                         ):
-                            kwargs["experimental_config"] = curves_data.metadata.essential_global_metadata
+                            kwargs["experimental_config"] = curves_data.essential_metadata
                     else:
                         if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
                             kwargs["channel_units"] = {}

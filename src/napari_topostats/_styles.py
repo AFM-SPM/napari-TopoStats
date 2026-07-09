@@ -1,9 +1,5 @@
 """Centralized module for design tokens, color palettes, and layout styles."""
 
-# Plot curve colors (CurveViewer)
-COLOR_APPROACH = "#87CEFA"
-COLOR_RETRACT = "#1E90FF"
-
 # Image viewer shape overlay colors (e.g. selected pixel marker and profile line)
 COLOR_SELECTED_CURVE = "#FFC107"
 COLOR_PROFILE_LINE = "#FF7043"
@@ -12,6 +8,11 @@ COLOR_PROFILE_LINE = "#FF7043"
 CURVE_VIEWER_MARGIN = 2
 CURVE_VIEWER_RIGHT_MARGIN = 5
 PROFILE_VIEWER_MARGIN = 2
+
+SEGMENT_COLOURS = [
+    "#87CEFA",
+    "#1E90FF",
+]
 
 # Color palette for multi-channel plotting (MultiPlotWidget)
 VIBRANT_PALETTE = [

@@ -33,11 +33,10 @@ from qtpy.QtWidgets import (
 )
 from topostats import __version__ as topostats_version
 
+from napari_topostats._alerts import attach_status_label, show_error_dialog
+from napari_topostats._components import CollapsibleBox
+from napari_topostats._state import MIN_TOPOSTATS_VERSION, get_loaded_function_path, get_widget_manager
 from napari_topostats.utils import unflatten_dict
-
-from ._alerts import attach_status_label, show_error_dialog
-from ._components import CollapsibleBox
-from ._state import MIN_TOPOSTATS_VERSION, get_loaded_function_path, get_widget_manager
 
 # pylint: disable=ungrouped-imports
 try:

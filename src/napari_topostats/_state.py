@@ -24,6 +24,10 @@ channel_colour_idx = 0
 analysis_result_colours = {}
 analysis_result_colour_idx = 0
 
+# Dictionary mapping curve segment names to their assigned colors (maintained between curve viewers)
+curve_segment_colours = {}
+curve_segment_colour_idx = 0
+
 # Dictionary mapping loaded function names to their source python file path
 loaded_function_paths = {}
 
@@ -264,6 +268,18 @@ def add_colour_for_analysis_result(result_name: str, current_results: list[str],
     analysis_result_colour_idx += 1
 
 
+def add_colour_for_curve_segment(segment_name: str, current_segments: list[str], palette: list[str]):
+    """Add a colour for a specific curve segment"""
+    global curve_segment_colour_idx  # pylint:disable=global-statement
+    if len(curve_segment_colours) >= len(palette):
+        for key in curve_segment_colours:
+            if key not in current_segments:
+                curve_segment_colours.pop(key)
+                break
+    curve_segment_colours[segment_name] = palette[curve_segment_colour_idx % len(palette)]
+    curve_segment_colour_idx += 1
+
+
 def get_channel_colours() -> dict[str, str]:
     """Get the current channel colours"""
     return channel_colours
@@ -272,6 +288,11 @@ def get_channel_colours() -> dict[str, str]:
 def get_analysis_result_colours() -> dict[str, str]:
     """Get the current analysis result colours"""
     return analysis_result_colours
+
+
+def get_curve_segment_colours() -> dict[str, str]:
+    """Get the current curve segment colours"""
+    return curve_segment_colours
 
 
 def record_loaded_function_path(func_name: str, file_path: str):

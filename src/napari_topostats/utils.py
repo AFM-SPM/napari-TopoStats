@@ -340,9 +340,9 @@ def all_curves(
         A 2D array of the results of applying the function to each curve.
     """
     if None in (shape_x, shape_y):
-        if hasattr(curves, "dims"):
-            shape_y = curves.dims[0]
-            shape_x = curves.dims[1] if len(curves.dims) > 1 else 1
+        if hasattr(curves, "shape"):
+            shape_y = curves.shape[0]
+            shape_x = curves.shape[1] if len(curves.shape) > 1 else 1
         else:
             raise ValueError("Curves must be of the CurvesDataset type defined by AFMReader.")
 
@@ -406,7 +406,6 @@ def all_curves(
         else:
             image_map = np.empty((shape_y, shape_x), dtype=type(actual_value))
 
-    # pylint: disable=too-many-positional-arguments
     def _all_curves_worker(curve):
         """Worker function for parallel curve processing."""
         curve, created_channels = _standardise_curve_with_original_channels(curve)
@@ -417,18 +416,24 @@ def all_curves(
 
     if curve_correcting:
         # AFMReader needs to be imported here to prevent it being imported for every worker process
+        from AFMReader.data_classes import CurvesVolumeMetadata
         from AFMReader.h5_jpk import CurvesH5Volume
         from AFMReader.h5_saver import H5Saver
 
         saver = h5file if isinstance(h5file, H5Saver) else H5Saver(h5file=h5file)
         new_volume_name = f"{curves.name}_{func.__name__}" if new_volume_name is None else new_volume_name
+        processed_metadata = CurvesVolumeMetadata(
+            shape=curves.shape,
+            channel_units=curves.metadata.channel_units.copy(),  # .copy() prevents sharing this dictionary
+            segment_names=curves.metadata.segment_names.copy(),
+            flip_image=curves.flip_image,
+        )
 
         processed_volume = CurvesH5Volume(
             name=new_volume_name,
-            shape_x=curves.shape_x,
-            shape_y=curves.shape_y,
+            shape=curves.shape,
             volume_data_group=curves.volume_data_group,
-            channel_units=curves.channel_units.copy(),  # .copy() prevents sharing this dictionary
+            metadata=processed_metadata,
             flip_image=curves.flip_image,
         )
         processed_volume.volume_data_group = saver.setup_volume(processed_volume)
@@ -451,6 +456,7 @@ def all_curves(
                     volume_name=new_volume_name,
                     num_of_curves=len(processed_volume),
                     curve_num=idx,
+                    segment_names=processed_volume.metadata.segment_names,
                 )
         else:
             results = Parallel(n_jobs=num_workers)(
@@ -490,6 +496,7 @@ def all_curves(
                     volume_name=new_volume_name,
                     num_of_curves=len(processed_volume),
                     curve_num=i,
+                    segment_names=processed_volume.metadata.segment_names,
                 )
         else:
             for i, curve in enumerate(

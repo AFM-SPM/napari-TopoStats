@@ -6,7 +6,6 @@ from AFMReader.data_classes import CurvesDataset
 from napari_afmreader._reader import get_loaded_image
 from qtpy.QtGui import QPainterPath, QTransform
 from qtpy.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QDialog,
     QHBoxLayout,
@@ -20,14 +19,15 @@ from qtpy.QtWidgets import (
 from napari_topostats._components import CollapsibleBox, SelectionDropdown, get_selected_curves
 from napari_topostats._state import (
     add_colour_for_analysis_result,
+    add_colour_for_curve_segment,
     get_analysis_result_colours,
+    get_curve_segment_colours,
 )
 from napari_topostats._styles import (
-    COLOR_APPROACH,
-    COLOR_RETRACT,
     COLOR_SELECTED_CURVE,
     CURVE_VIEWER_MARGIN,
     CURVE_VIEWER_RIGHT_MARGIN,
+    SEGMENT_COLOURS,
     VIBRANT_PALETTE,
 )
 from napari_topostats.utils import measured_height_names, unflatten_dict, vertical_deflection_names
@@ -100,7 +100,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         self.plot_graphics_widget.ci.layout.setContentsMargins(
             CURVE_VIEWER_MARGIN, CURVE_VIEWER_MARGIN, CURVE_VIEWER_RIGHT_MARGIN, CURVE_VIEWER_MARGIN
         )
-        self.plot_widget = self.plot_graphics_widget.addPlot(title="Force Distance curve")
+        self.plot_widget: pg.PlotItem = self.plot_graphics_widget.addPlot(title="Force Distance curve")
         plot_layout.addWidget(self.plot_graphics_widget)
         self.layout().addLayout(plot_layout)
 
@@ -132,25 +132,18 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         self.left_layout.addWidget(self.x_channel_selector)
         self.right_layout.addWidget(self.y_channel_selector)
 
-        # Create checkboxes for showing approach and retract segments
-        self.show_approach = True
-        self.show_retract = False
-        self.approach_checkbox = QCheckBox("Show approach")
-        self.retract_checkbox = QCheckBox("Show retract")
+        self.segment_selector = SelectionDropdown(
+            items=[],
+            type_text="segments",
+            starting_items=[],
+            on_change=self.update_segments,
+            item_colors=get_curve_segment_colours(),
+        )
+        # Add a label for the segment selector and add it to the left layout
+        segment_selector_label = QLabel("Select segment")
+        self.left_layout.addWidget(segment_selector_label)
 
-        # Set different colors for the approach and retract checkboxes to match the curve colors
-        self.approach_checkbox.setStyleSheet(f"color: {COLOR_APPROACH};")
-        self.retract_checkbox.setStyleSheet(f"color: {COLOR_RETRACT};")
-        self.approach_checkbox.setChecked(True)
-        self.retract_checkbox.setChecked(False)
-
-        # Make the approach and retract checkboxes update the plot when toggled
-        self.approach_checkbox.toggled.connect(lambda checked: self.update_segments(approach=checked))
-        self.retract_checkbox.toggled.connect(lambda checked: self.update_segments(retract=checked))
-
-        # Add the segment checkboxes to the left and right layouts
-        self.left_layout.addWidget(self.approach_checkbox)
-        self.right_layout.addWidget(self.retract_checkbox)
+        self.right_layout.addWidget(self.segment_selector)
 
         self.parameter_dialog = None
         self.metadata = {}
@@ -184,16 +177,12 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         self.y_channel = None
         self.selected_curve_dict = None
         self.channels_units = None
+        self.current_reader_id = None
         self.current_analysis_results = {}
         self.active_analysis_markers = {}
 
         # Create the plots with empty data for approach and retract segments
-        self.approach_line = self.plot_widget.plot(
-            [], [], pen=COLOR_APPROACH, name="approach", available_channels=self.available_channels
-        )
-        self.retract_line = self.plot_widget.plot(
-            [], [], pen=COLOR_RETRACT, name="retract", available_channels=self.available_channels
-        )
+        self.segment_lines = {}
 
     def open_experimental_parameters(self):
         """Open the experimental parameters dialog"""
@@ -220,15 +209,11 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         if self.x_channel not in self.selected_curve_dict or self.y_channel not in self.selected_curve_dict:
             self.info_label.setText("Could not find channels to plot for this curve.")
             return
-        approach_x, approach_y, retract_x, retract_y = [], [], [], []
-        if self.show_approach:
-            approach_x = self.selected_curve_dict[self.x_channel]["Segment_0"]
-            approach_y = self.selected_curve_dict[self.y_channel]["Segment_0"]
-        if self.show_retract:
-            retract_x = self.selected_curve_dict[self.x_channel]["Segment_1"]
-            retract_y = self.selected_curve_dict[self.y_channel]["Segment_1"]
-        self.approach_line.setData(approach_x, approach_y)
-        self.retract_line.setData(retract_x, retract_y)
+        for selected_segment in self.segment_selector.get_checked_items():
+            self.ensure_segment_line(selected_segment)
+            x_data = self.selected_curve_dict[self.x_channel][selected_segment]
+            y_data = self.selected_curve_dict[self.y_channel][selected_segment]
+            self.segment_lines[selected_segment].setData(x_data, y_data)
         self.info_label.setText(f"Plotting curve for pixel (x={self.x_coord}, y={self.y_coord}).")
 
     def update_channels(self, x_channel=None, y_channel=None):
@@ -246,6 +231,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
     def update_volume(self, volume_name: str):
         """Updates the volume of the plot and refreshes curve to match"""
+        print(f"Updating volume to: {volume_name}")
         if not volume_name:
             return
 
@@ -253,8 +239,25 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         selected_volume = selected_curves.get_volume(volume_name)
         if selected_volume is None:
             return
+        self.assign_segment_colours(selected_volume.metadata.segment_names)
+        if self.segment_selector.selector_items:
+            starting_segments = [
+                name
+                for name in self.segment_selector.get_checked_items()
+                if name in selected_volume.metadata.segment_names
+            ]
+        else:
+            starting_segments = selected_volume.metadata.segment_names
+        if not starting_segments:
+            starting_segments = selected_volume.metadata.segment_names
+        self.segment_selector.set_items(
+            selected_volume.metadata.segment_names,
+            starting_items=starting_segments,
+            item_colors=get_curve_segment_colours(),
+        )
+        self.selected_curve_dict = selected_volume[self.y_coord, self.x_coord]
 
-        self.update_curve(selected_volume[self.y_coord, self.x_coord])
+        self.update_segments(self.segment_selector.get_checked_items())
         self.update_analysis_results(selected_volume.get_analysis_results(self.y_coord, self.x_coord))
 
     def refresh_volumes(self):
@@ -275,12 +278,15 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         else:
             self.volume_selector.setCurrentText(selected_curves.default_volume_name)
 
-    def update_segments(self, approach: bool | None = None, retract: bool | None = None):
+    def update_segments(self, selected_segments: list[str]):
         """Updates the segments of the plot based on user checking boxes"""
-        if approach is not None:
-            self.show_approach = approach
-        if retract is not None:
-            self.show_retract = retract
+        for segment_name in selected_segments:
+            self.ensure_segment_line(segment_name)
+
+        for segment_name in list(self.segment_lines.keys()):
+            if segment_name not in selected_segments:
+                self.plot_widget.removeItem(self.segment_lines[segment_name])
+                del self.segment_lines[segment_name]
         self.update_curve()
 
     def update_analysis_results(self, analysis_results=None):
@@ -306,18 +312,24 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             if name in self.current_analysis_results
         }
 
-        if self.selected_curve_dict is None:
+        if (
+            self.selected_curve_dict is None
+            or self.x_channel not in self.selected_curve_dict
+            or self.y_channel not in self.selected_curve_dict
+        ):
             for active_analysis_marker in self.active_analysis_markers.values():
                 self.plot_widget.removeItem(active_analysis_marker)
             self.active_analysis_markers.clear()
             return
 
+        marker_segment = next(iter(self.selected_curve_dict[self.x_channel]))
+
         for result_name in list(self.active_analysis_markers.keys()):
             active_analysis_marker = self.active_analysis_markers[result_name]
             if result_name in selected_analysis_results:
                 result_value = selected_analysis_results[result_name]
-                result_value_x = self.selected_curve_dict[self.x_channel]["Segment_0"][result_value]
-                result_value_y = self.selected_curve_dict[self.y_channel]["Segment_0"][result_value]
+                result_value_x = self.selected_curve_dict[self.x_channel][marker_segment][result_value]
+                result_value_y = self.selected_curve_dict[self.y_channel][marker_segment][result_value]
                 active_analysis_marker.setData(
                     x=[result_value_x],
                     y=[result_value_y],
@@ -329,9 +341,9 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         analysis_result_colours = get_analysis_result_colours()
         for result_name, result_value in selected_analysis_results.items():
             if result_name not in self.active_analysis_markers:
-                result_colour = analysis_result_colours.get(result_name, "r")
-                result_value_x = self.selected_curve_dict[self.x_channel]["Segment_0"][result_value]
-                result_value_y = self.selected_curve_dict[self.y_channel]["Segment_0"][result_value]
+                result_colour = analysis_result_colours[result_name]
+                result_value_x = self.selected_curve_dict[self.x_channel][marker_segment][result_value]
+                result_value_y = self.selected_curve_dict[self.y_channel][marker_segment][result_value]
 
                 def result_tip(x, y, data=None, result_name=result_name):  # pylint: disable=unused-argument
                     idx = data.get("index", "") if data is not None else ""
@@ -392,6 +404,23 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             if result not in colours:
                 add_colour_for_analysis_result(result, list(analysis_results.keys()), VIBRANT_PALETTE)
 
+    def assign_segment_colours(self, segments: list[str]):
+        """Assign colours to curve segments."""
+        colours = get_curve_segment_colours()
+        for segment in segments:
+            if segment not in colours:
+                add_colour_for_curve_segment(segment, list(segments), SEGMENT_COLOURS)
+
+    def ensure_segment_line(self, segment_name: str):
+        """Create the plot line for a curve segment if it does not exist yet."""
+        if segment_name in self.segment_lines:
+            return
+        self.segment_lines[segment_name] = self.plot_widget.plot(
+            [],
+            [],
+            pen=get_curve_segment_colours()[segment_name],
+        )
+
     def _process_event_coords(self, viewer, event):
         """The core logic to extract and plot the curve at the current mouse position."""
         layer = viewer.layers.selection.active
@@ -400,6 +429,9 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         if loaded_image is None or loaded_image.curves_data is None:
             self.info_label.setText("No force curves found in active layer.")
             return
+        if reader_id != self.current_reader_id:
+            self.refresh_volumes()
+            self.current_reader_id = reader_id
 
         # Get click coordinates and convert to integers
         coords = np.round(layer.world_to_data(event.position)).astype(int)
@@ -415,7 +447,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         curve_num = shape_x * self.y_coord + self.x_coord
 
         curves_data: CurvesDataset = loaded_image.curves_data
-        raw_metadata = curves_data.metadata
+        global_metadata = curves_data.metadata
         if self.volume_selector.currentText() not in curves_data.volumes:
             self.volume_selector.clear()
             self.volume_selector.addItems(curves_data.volumes.keys())
@@ -426,15 +458,21 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             else curves_data.get_default_volume()
         )
 
-        self.channels_units = current_volume.channel_units
+        self.channels_units = current_volume.metadata.channel_units
         try:
             analysis_results = current_volume.get_analysis_results(self.y_coord, self.x_coord)
             self.metadata = {
-                "global": raw_metadata.all_global_metadata,
-                f"curve_{curve_num}": raw_metadata[self.y_coord, self.x_coord],
-                f"curve_{curve_num}_approach": raw_metadata[self.y_coord, self.x_coord, 0],
-                f"curve_{curve_num}_retract": raw_metadata[self.y_coord, self.x_coord, 1],
+                "global": global_metadata,
+                f"curve_{curve_num}": current_volume.metadata[self.y_coord, self.x_coord],
             }
+            self.metadata.update(
+                {
+                    f"curve_{curve_num}_{segment_name}": current_volume.metadata[
+                        self.y_coord, self.x_coord, segment_name
+                    ]
+                    for segment_name in current_volume.metadata.segment_names
+                }
+            )
             if self.parameter_dialog is not None:
                 self.parameter_dialog.populate_parameters(self.metadata)
             curve_dict = current_volume[self.y_coord, self.x_coord]
