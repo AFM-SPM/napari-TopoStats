@@ -983,9 +983,7 @@ def unsave_scripts(selected_scripts):
 
     for file_path, file_list in metadata.items():
         file_path = save_dir / file_path
-        print(f"Checking {file_path} with list {file_list}")
         if not file_list and file_path.exists():
-            print(f"Removing {file_path}")
             file_path.unlink()
             unsaved_files.add(file_path)
     for file_path in unsaved_files:

@@ -231,7 +231,6 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
     def update_volume(self, volume_name: str):
         """Updates the volume of the plot and refreshes curve to match"""
-        print(f"Updating volume to: {volume_name}")
         if not volume_name:
             return
 
