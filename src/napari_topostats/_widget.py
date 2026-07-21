@@ -23,6 +23,7 @@ from pathlib import Path
 from napari import current_viewer  # pylint: disable=no-name-in-module
 from qtpy.QtWidgets import (
     QApplication,
+    QComboBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -95,6 +96,7 @@ MAIN_FUNCTIONS = [
         name="load_config",
         tooltip="Load a configuration file to use with TopoStats functions.",
         function_to_run=load_config,
+        run_immediately=False,
     ),
     WidgetFunction(
         name="run_filters",
@@ -102,7 +104,7 @@ MAIN_FUNCTIONS = [
         function_to_run=Filters.filter_image,
         type_class=Filters,
         path_to_data='obj.images["gaussian_filtered"]',
-        uses_config=True,
+        config_type="topostats",
         of_type=[Image],
         tooltip="Run filters on the selected image layer using the current configuration.",
     ),
@@ -114,7 +116,7 @@ MAIN_FUNCTIONS = [
         path_to_data='obj.mask_images["<DIRECTION>"]["merged_classes"][:, :, 1]',
         of_type=[Image],
         metadata_paths={"config": "config", "grains": "obj"},
-        uses_config=True,
+        config_type="topostats",
         tooltip="Run grain analysis on the selected image layer using the current configuration.",
     ),
     WidgetFunction(
@@ -154,6 +156,7 @@ EXTRA_FUNCTIONS = [
         path_to_data="return",
         function_to_run=find_trigger_point,
         tooltip=inspect.getdoc(find_trigger_point),
+        config_type="forcestats",
         run_immediately=False,
     ),
     WidgetFunction(
@@ -163,6 +166,7 @@ EXTRA_FUNCTIONS = [
         function_to_run=find_contact_point,
         tooltip=inspect.getdoc(find_contact_point),
         run_immediately=False,
+        config_type="forcestats",
     ),
     WidgetFunction(
         name="create_3d_approach_map",
@@ -171,6 +175,7 @@ EXTRA_FUNCTIONS = [
         function_to_run=create_3d_approach_map,
         tooltip=inspect.getdoc(create_3d_approach_map),
         run_immediately=False,
+        config_type="forcestats",
     ),
     WidgetFunction(
         name="correct_curve",
@@ -179,6 +184,7 @@ EXTRA_FUNCTIONS = [
         function_to_run=correct_curve,
         tooltip=inspect.getdoc(correct_curve),
         run_immediately=False,
+        config_type="forcestats",
     ),
 ]
 
@@ -386,16 +392,20 @@ class TopoStatsRootWidget(RootWidget):
                     run_immediately=False,  # Prevent immediate execution for loaded curve functions
                 )
             )
+        reset_type = QComboBox()
+        reset_type.addItems(["topostats", "forcestats"])
+        reset_type.setToolTip("Select the configuration type to reset to default.")
 
         reset_button = QPushButton("Reset Default Config")
         reset_button.setToolTip("Reset the default configuration to the original TopoStats default.")
 
         def on_reset_clicked():
+            config_type = reset_type.currentText()
             config_dir = Path(user_config_dir("TopoStats", "Napari"))
-            default_config_path = config_dir / "config.yaml"
+            default_config_path = config_dir / f"{config_type}_config.yaml"
             if default_config_path.exists():
-                write_new_default_config(default_config_path)
-                load_config_impl(self._viewer, config_path=None, use_default=True)
+                write_new_default_config(default_config_path, config_type=config_type)
+                load_config_impl(self._viewer, config_path=None, config_type=config_type, use_default=True)
                 self.bottom_widget.set_status_message("✅ Default configuration reset successfully.")
             else:
                 self.bottom_widget.set_status_message("No default configuration file found to reset.")
@@ -405,9 +415,9 @@ class TopoStatsRootWidget(RootWidget):
         guide_button = QPushButton("Show Guide")
         guide_button.setToolTip("Open the TopoStats guide.")
         guide_button.clicked.connect(lambda: show_guide(viewer))
-        self.bottom_row.addWidget(guide_button)
-
+        self.bottom_row.addWidget(reset_type)
         self.bottom_row.addWidget(reset_button)
+        self.bottom_row.addWidget(guide_button)
 
         # Add a text label to tell the user they can press 'a' to open the curve viewer and use the line tool
         line_tool_label = QLabel("Hold 'a' to draw a line and view the profile plot")

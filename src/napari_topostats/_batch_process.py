@@ -37,14 +37,15 @@ def batch_process(
     output_path : Path | None
         The output directory where results will be saved. If None, a dialog will prompt for selection.
     """
+    config_type = "topostats"
     widget = batch_process
     if not hasattr(widget, "set_status_message"):
         attach_status_label(widget)
 
-    if not config_loaded():
-        load_config_impl(current_viewer(), use_default=True)
+    if not config_loaded(config_type=config_type):
+        load_config_impl(current_viewer(), config_type=config_type, use_default=True)
 
-    if get_current_config()["base_dir"] == "./":
+    if get_current_config(config_type=config_type)["base_dir"] == "./":
         if data_path is None:
             data_path = QFileDialog.getExistingDirectory(
                 parent=None,
@@ -70,18 +71,18 @@ def batch_process(
             # Worker thread has been deleted and is therefore not running
             pass
     args = argparse.Namespace(
-        config_file=str(get_current_config_path()),
-        module="topostats",
+        config_file=str(get_current_config_path(config_type=config_type)),
+        module=config_type,
         summary_config=None,
     )
     if data_path is not None:
         args.base_dir = str(data_path)
     else:
-        widget.data_path.value = get_current_config()["base_dir"]
+        widget.data_path.value = get_current_config(config_type=config_type)["base_dir"]
     if output_path is not None:
         args.output_dir = str(output_path)
     else:
-        widget.output_path.value = get_current_config()["output_dir"]
+        widget.output_path.value = get_current_config(config_type=config_type)["output_dir"]
 
     widget.set_status_message("⏳ Starting batch processing in the background. View command line for progress.")
     worker = ProcessWorker(process, args)

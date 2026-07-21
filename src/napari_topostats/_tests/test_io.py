@@ -73,15 +73,17 @@ def test_load_config(
         ),
     ):
         if use_default:
-            assert io.load_config_impl(napari_viewer, None, use_default=use_default), "Default config load failed"
-            full_current_config = io.config_wrapper.unflatten()
+            assert io.load_config_impl(
+                napari_viewer, None, config_type="topostats", use_default=use_default
+            ), "Default config load failed"
+            full_current_config = io.config_wrappers["topostats"].unflatten()
             assert full_current_config is not None, "Failed to retrieve current config after loading default."
 
         else:
             # Simulate selecting a config file (assuming a test config file path)
-            result = io.load_config_impl(napari_viewer, test_config_path)
+            result = io.load_config_impl(napari_viewer, test_config_path, config_type="topostats")
             if result:
-                full_current_config = io.config_wrapper.unflatten()
+                full_current_config = io.config_wrappers["topostats"].unflatten()
 
                 with open(test_config_path, encoding="utf-8") as f:
                     expected_config = io.yaml.safe_load(f)

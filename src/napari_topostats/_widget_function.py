@@ -53,7 +53,7 @@ from .utils import _eval, all_curves, calculate_contrast_limits, is_binary_image
 CURVES_VOLUME_PARAM = "curves_volume_to_operate_on"
 
 
-def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
+def enforce_defaults(args: dict[str, Any], params: dict[str, inspect.Parameter]) -> dict[str, Any]:
     """
     Ensure that all required parameters have default values.
 
@@ -61,32 +61,31 @@ def enforce_defaults(args: dict[str, Any], params: list[Any]) -> dict[str, Any]:
     ----------
     args : dict[str, Any]
         The current dictionary of arguments to which the default values will be checked for and added.
-    params : list[Any]
-        The list of parameters for the function.
+    params : dict[str, inspect.Parameter]
+        The function parameters, keyed by name.
 
     Returns
     -------
     args : dict[str, Any]
         The updated dictionary of arguments with default values added for any missing parameters.
     """
-    param_names = [p.name for p in params]
-    if "direction" in param_names:
+    if "direction" in params:
         args.setdefault("direction", "above")
 
-    if "threshold_std_dev" in param_names:
+    if "threshold_std_dev" in params:
         args.setdefault("threshold_std_dev", {})
         if args.get("threshold_std_dev") is None:
             args["threshold_std_dev"] = {}
         args["threshold_std_dev"].setdefault("above", 1.0)
         args["threshold_std_dev"].setdefault("below", 10.0)
 
-    if "threshold_absolute" in param_names:
+    if "threshold_absolute" in params:
         args.setdefault("threshold_absolute", {})
         if args.get("threshold_absolute") is None:
             args["threshold_absolute"] = {}
         args["threshold_absolute"].setdefault("above", 1.0)
         args["threshold_absolute"].setdefault("below", -1.0)
-    if "remove_scars" in param_names:
+    if "remove_scars" in params:
         args.setdefault("remove_scars", {})
         if args.get("remove_scars") is None:
             args["remove_scars"] = {}
@@ -226,11 +225,10 @@ class WidgetFunction:
         return value of the function. It can be "return" to return the data directly (from the function), "obj" to
         return the object itself, or a specific path to access a nested attribute or subscript in the return value
         or the object instance.
-    uses_config : bool, optional
-        Whether the function uses a configuration file to set its parameters. If True, the function will
-        load the configuration file and use it to set the parameters. If False, the function will
-        use only the parameters set in the widget. Note that certain parameters can also be taken from the napari
-        viewer, such as the selected image or from the image metadata, such as the pixel to nm scaling factor.
+    config_type : str | None, optional
+        The type of configuration file the function uses. If None, the function does not use a configuration file.
+        If a string is provided, it specifies the type of configuration file to load and use for the function's
+        parameters.
     ndims : int, optional
         The number of dimensions of the data to be rendered. Can be left as default 2, but can be set to 3 if the
         function returns 3D data.
@@ -260,27 +258,28 @@ class WidgetFunction:
         function_to_run: Callable | list[Callable] | None = None,
         type_class: Any | None = None,
         path_to_data: str | None = None,
-        uses_config: bool = False,
         ndims: int = 2,
         of_type: list = None,
         metadata_paths: dict = None,
         tooltip: str | None = None,
         overide_get_widget: bool = False,
         run_immediately: bool = True,
+        config_type: str | None = None,
+        passes_full_config: bool = False,
         function_manager=None,
     ):
         self.name = name
         self.path_to_data = path_to_data
         self.function_manager = function_manager
-        if path_to_data is not None:
-            self.function_key = function_key
-            self.type_class = type_class
-            self.uses_config = uses_config
-            self.ndims = ndims
-            self.of_type = of_type
-            self.metadata_paths = metadata_paths
+        self.function_key = function_key
+        self.type_class = type_class
+        self.config_type = config_type
+        self.ndims = ndims
+        self.of_type = of_type
+        self.metadata_paths = metadata_paths
         self.function_to_run = function_to_run
         self.run_immediately = run_immediately
+        self.passes_full_config = passes_full_config
         if function_to_run is not None and isinstance(function_to_run, list):
             self.is_group = True
             self.group_functions = {f.name: f for f in function_to_run}
@@ -431,11 +430,11 @@ class WidgetFunction:
             A magicgui widget that can be used in the napari viewer.
         """
         # Check if a config is needed
-        if self.uses_config and (io.config_wrapper is None or io.full_config_container is None):
-            io.load_config_impl(current_viewer(), use_default=True)
+        if self.config_type and (self.config_type not in io.config_wrappers):
+            io.load_config_impl(current_viewer(), use_default=True, config_type=self.config_type)
 
             # Replace any dynamic components of the paths with actual values from the config if needed
-            flat_config = get_current_config(flat=True)
+            flat_config = get_current_config(flat=True, config_type=self.config_type)
 
             def lookup(match):
                 key = match.group(1)
@@ -456,14 +455,18 @@ class WidgetFunction:
                 else:
                     self.path_to_data = "return"
             # Get all the parameters from the function (excluding 'self')
-            parameters_from_function = [
-                p for p in inspect.signature(self.function_to_run).parameters.values() if p.name != "self"
-            ]
+            parameters_from_function = {
+                name: parameter
+                for name, parameter in inspect.signature(self.function_to_run).parameters.items()
+                if name != "self"
+            }
             # Get all the parameters from the type_class (if provided)
             if self.type_class is not None:
                 sig = inspect.signature(self.type_class.__init__)
-                parameters_from_class = [p for name, p in sig.parameters.items() if name != "self"]
-                all_parameters = parameters_from_class + parameters_from_function
+                parameters_from_class = {
+                    name: parameter for name, parameter in sig.parameters.items() if name != "self"
+                }
+                all_parameters = parameters_from_class | parameters_from_function
             else:
                 sig = inspect.signature(self.function_to_run)
                 all_parameters = parameters_from_function
@@ -472,28 +475,31 @@ class WidgetFunction:
             including_config_params_from_function = parameters_from_function.copy()
             including_config_params_from_class = parameters_from_class.copy() if self.type_class is not None else []
             # Then remove parameters that are already in the config (so they are set from config file rather than GUI)
-            if self.uses_config:
-                full_current_config = io.config_wrapper.unflatten()
+            if self.config_type:
+                full_current_config = io.config_wrappers[self.config_type].unflatten()
                 config = full_current_config.get(self.function_key, {})
-                for param_name in [p.name for p in all_parameters]:
+                if self.passes_full_config:
+                    all_parameters.pop("config", None)
+
+                for param_name in all_parameters:
                     if param_name in config:
-                        parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
+                        parameters_from_function.pop(param_name, None)
                         if self.type_class is not None:
-                            parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
+                            parameters_from_class.pop(param_name, None)
                     else:
-                        for flat_key in io.config_wrapper.flat:
+                        for flat_key in io.config_wrappers[self.config_type].flat:
                             if (
                                 flat_key.startswith(f"{self.function_key}.")
                                 and flat_key[len(f"{self.function_key}.") :] == param_name
                             ):
-                                parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
+                                parameters_from_function.pop(param_name, None)
                                 if self.type_class is not None:
-                                    parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
+                                    parameters_from_class.pop(param_name, None)
                                 break
                     if param_name in config and isinstance(config[param_name], dict):
-                        parameters_from_function = [p for p in parameters_from_function if p.name != param_name]
+                        parameters_from_function.pop(param_name, None)
                         if self.type_class is not None:
-                            parameters_from_class = [p for p in parameters_from_class if p.name != param_name]
+                            parameters_from_class.pop(param_name, None)
 
             # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught, attribute-defined-outside-init
             def func(**kwargs):
@@ -512,16 +518,16 @@ class WidgetFunction:
                     selected_curves_volume_name = kwargs.pop(CURVES_VOLUME_PARAM, None)
                     local_params_function = including_config_params_from_function.copy()
                     local_params_from_class = (
-                        including_config_params_from_class.copy() if self.type_class is not None else []
+                        including_config_params_from_class.copy() if self.type_class is not None else {}
                     )
                     func_to_execute = self.function_to_run
 
                     method_args = {}
                     class_args = {}
                     # Determine all relevant parameters
-                    all_params = local_params_function + (local_params_from_class if self.type_class else [])
+                    all_params = local_params_from_class | local_params_function
 
-                    uses_topostats_object = "topostats_object" in [p.name for p in all_params]
+                    uses_topostats_object = "topostats_object" in all_params
 
                     # Handle image selection if required
                     selected_image = get_selected_image(
@@ -531,26 +537,18 @@ class WidgetFunction:
                     if selected_image is None:
                         _cleanup()
                         return
-                    if "image" in [p.name for p in all_params]:
+                    if "image" in all_params:
                         kwargs["image"] = selected_image
 
                     # Handle pixel_to_nm_scaling if required
-                    if (
-                        "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs
-                    ) or uses_topostats_object:
-                        px2nm = selected_image.metadata.get("px2nm", 1.0)
-                    if "pixel_to_nm_scaling" in [p.name for p in all_params] and "pixel_to_nm_scaling" not in kwargs:
-                        kwargs["pixel_to_nm_scaling"] = px2nm
+                    if "pixel_to_nm_scaling" in all_params and "pixel_to_nm_scaling" not in kwargs:
+                        kwargs["pixel_to_nm_scaling"] = selected_image.metadata.get("px2nm", 1.0)
 
                     # Get the filename from the image layer if required
-                    if (
-                        "filename" in [p.name for p in all_params] and "filename" not in kwargs
-                    ) or uses_topostats_object:
-                        filename = "image"
-                    if "filename" in [p.name for p in all_params] and "filename" not in kwargs:
-                        kwargs["filename"] = filename
+                    if "filename" in all_params and "filename" not in kwargs:
+                        kwargs["filename"] = "image"
 
-                    if "curve" in [p.name for p in all_params] and "curve" not in kwargs:
+                    if "curve" in all_params and "curve" not in kwargs:
                         # Add the type class to kwargs so the function can be wrapped in all_curves if needed
                         if self.type_class:
                             kwargs["type_class"] = self.type_class
@@ -716,13 +714,20 @@ class WidgetFunction:
                             default=None,
                             annotation=Any,
                         )
-                        all_params = [p if p.name != "curve" else new_param for p in all_params]
-                        local_params_function = [p if p.name != "curve" else new_param for p in local_params_function]
-                        local_params_from_class = [
-                            p if p.name != "curve" else new_param for p in local_params_from_class
-                        ]
+                        all_params = {
+                            ("curves" if name == "curve" else name): (new_param if name == "curve" else parameter)
+                            for name, parameter in all_params.items()
+                        }
+                        local_params_function = {
+                            ("curves" if name == "curve" else name): (new_param if name == "curve" else parameter)
+                            for name, parameter in local_params_function.items()
+                        }
+                        local_params_from_class = {
+                            ("curves" if name == "curve" else name): (new_param if name == "curve" else parameter)
+                            for name, parameter in local_params_from_class.items()
+                        }
 
-                    if "curves" in [p.name for p in all_params] and "curves" not in kwargs:
+                    if "curves" in all_params and "curves" not in kwargs:
 
                         curves_data = get_selected_curves(
                             kwargs.get("viewer", current_viewer()),
@@ -733,20 +738,14 @@ class WidgetFunction:
                             else curves_data.get_default_volume()
                         )
                         kwargs["curves"] = selected_volume
-                        if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
+                        if "channel_units" in all_params and "channel_units" not in kwargs:
                             kwargs["channel_units"] = selected_volume.metadata.channel_units
-                        if (
-                            "experimental_config" in [p.name for p in all_params]
-                            and "experimental_config" not in kwargs
-                        ):
+                        if "experimental_config" in all_params and "experimental_config" not in kwargs:
                             kwargs["experimental_config"] = curves_data.essential_metadata
                     else:
-                        if "channel_units" in [p.name for p in all_params] and "channel_units" not in kwargs:
+                        if "channel_units" in all_params and "channel_units" not in kwargs:
                             kwargs["channel_units"] = {}
-                        if (
-                            "experimental_config" in [p.name for p in all_params]
-                            and "experimental_config" not in kwargs
-                        ):
+                        if "experimental_config" in all_params and "experimental_config" not in kwargs:
                             kwargs["experimental_config"] = {}
 
                     if uses_topostats_object:
@@ -757,36 +756,38 @@ class WidgetFunction:
                             topostats_object = TopoStats(
                                 image_original=selected_image.data,
                                 image=selected_image.data,
-                                pixel_to_nm_scaling=px2nm,
-                                filename=filename,
-                                config=get_current_config(),
+                                pixel_to_nm_scaling=selected_image.metadata.get("px2nm", 1.0),
+                                filename="image",
+                                config=get_current_config(config_type="topostats"),
                             )
                         kwargs["topostats_object"] = topostats_object
+                    if "config" in all_params and self.passes_full_config and "config" not in kwargs:
+                        kwargs["config"] = io.config_wrappers[self.config_type].unflatten()
                     # Distribute arguments between method_args and class_args
                     # TODO do we need to forget about the check for in local_params because if handling curves
                     # it might be cleaner to add some kwargs which weren't there before
                     for key, value in kwargs.items():
-                        if key in [p.name for p in local_params_function]:
+                        if key in local_params_function:
                             method_args[key] = value
-                        elif self.type_class and key in [p.name for p in local_params_from_class]:
+                        elif self.type_class and key in local_params_from_class:
                             class_args[key] = value
 
                     # Add config values if needed
-                    if self.uses_config:
+                    if self.config_type and self.config_type in io.config_wrappers:
                         method_args = add_values_to_dict_from_config(
                             config,
-                            io.config_wrapper,
+                            io.config_wrappers[self.config_type],
                             self.function_key,
                             method_args,
-                            local_params_function,
+                            list(local_params_function.values()),
                         )
                         if self.type_class:
                             class_args = add_values_to_dict_from_config(
                                 config,
-                                io.config_wrapper,
+                                io.config_wrappers[self.config_type],
                                 self.function_key,
                                 class_args,
-                                local_params_from_class,
+                                list(local_params_from_class.values()),
                             )
 
                     # Enforce defaults
@@ -895,9 +896,9 @@ class WidgetFunction:
 
             new_parameters = []
             for p in (
-                (parameters_from_function + parameters_from_class)
+                (*parameters_from_function.values(), *parameters_from_class.values())
                 if self.type_class is not None
-                else parameters_from_function
+                else parameters_from_function.values()
             ):
                 if p.name == "image":
                     # Sets the default image to the currently selected image in the viewer
@@ -921,9 +922,7 @@ class WidgetFunction:
                 ]:
                     new_parameters.append(new_p)
 
-            has_curves_parameter = "curves" in [p.name for p in all_parameters] or "curve" in [
-                p.name for p in all_parameters
-            ]
+            has_curves_parameter = "curves" in all_parameters or "curve" in all_parameters
 
             if len(new_parameters) == 0 and not has_curves_parameter:
                 self.run_immediately = True

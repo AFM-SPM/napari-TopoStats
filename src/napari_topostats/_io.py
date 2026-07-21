@@ -8,9 +8,10 @@ import re
 import shutil
 from argparse import Namespace
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
+from forcestats.config import write_config_with_comments as write_config_with_comments_forcestats
 from magicgui import magicgui
 from magicgui.widgets import FunctionGui, create_widget
 from napari.viewer import Viewer
@@ -18,6 +19,7 @@ from platformdirs import user_config_dir
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QGuiApplication, QIcon
 from qtpy.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -40,7 +42,7 @@ from napari_topostats.utils import unflatten_dict
 
 # pylint: disable=ungrouped-imports
 try:
-    from topostats.config import write_config_with_comments
+    from topostats.config import write_config_with_comments as write_config_with_comments_topostats
 except ImportError:
     show_error_dialog(
         f"TopoStats version {topostats_version} is not supported. Please install the latest version of TopoStats"
@@ -51,10 +53,9 @@ except ImportError:
 MISC_TITLE = "Batch Settings"
 START_OPEN = {"filter", "grains"}
 # Globals store currently loaded config and UI state so dialogs/widgets can reuse them.
-config_wrapper = None
-full_config_container = None
+config_wrappers = {}
 comment_descriptions = {}
-current_config_path = None
+current_config_paths = {}
 updated_values = {}
 
 
@@ -145,7 +146,7 @@ def should_use_line_edit_for_float(value: float) -> bool:
 
 
 # pylint: disable=global-variable-not-assigned
-def on_config_value_changed(key: str, val: Any):
+def on_config_value_changed(key: str, val: Any, config_type: str = "topostats"):
     """
     Update the config wrapper when a value changes
 
@@ -174,12 +175,17 @@ def on_config_value_changed(key: str, val: Any):
                 val = float(stripped)
     if key.split(".")[0] == MISC_TITLE:
         key = ".".join(key.split(".")[1:])
-    updated_values[key] = val
+    if config_type not in updated_values:
+        updated_values[config_type] = {}
+    updated_values[config_type][key] = val
 
 
 # pylint: disable=too-many-branches, too-many-statements
 def build_dynamic_widget(
-    config: dict[str, Any], descriptions: dict[str, Any] = None, running_reference: str = None
+    config: dict[str, Any],
+    descriptions: dict[str, Any] = None,
+    running_reference: str = None,
+    config_type: str = "topostats",
 ) -> QWidget:
     """
     Recursive function to build widgets.
@@ -210,7 +216,8 @@ def build_dynamic_widget(
             if not isinstance(value, dict):
                 misc_config[key] = value
                 del config_to_display[key]
-        config_to_display[MISC_TITLE] = misc_config
+        if misc_config:
+            config_to_display[MISC_TITLE] = misc_config
 
     else:
         title = _format_config_label(running_reference.split(".")[-1]).title()
@@ -229,7 +236,9 @@ def build_dynamic_widget(
 
         if isinstance(value, dict):
             new_running_reference = key if running_reference is None else f"{running_reference}.{key}"
-            sub_widget = build_dynamic_widget(value, sub_desc, running_reference=new_running_reference)
+            sub_widget = build_dynamic_widget(
+                value, sub_desc, running_reference=new_running_reference, config_type=config_type
+            )
 
             if running_reference is None:
                 layout.addWidget(sub_widget)
@@ -253,7 +262,9 @@ def build_dynamic_widget(
 
         if w is None:
             continue
-        w.changed.connect(lambda val, k=key: on_config_value_changed(f"{running_reference}.{k}", val))
+        w.changed.connect(
+            lambda val, k=key: on_config_value_changed(f"{running_reference}.{k}", val, config_type=config_type)
+        )
         tooltip_text = _format_config_tooltip(key, desc_text)
         w.native.setToolTip(tooltip_text)
 
@@ -285,7 +296,7 @@ def build_dynamic_widget(
     return container
 
 
-def write_new_default_config(config_path: Path):
+def write_new_default_config(config_path: Path, config_type: str = "topostats"):
     """
     Writes a default config file to the provided path using the topostats backend
 
@@ -298,11 +309,14 @@ def write_new_default_config(config_path: Path):
     args.config = None
     args.filename = config_path.name
     args.output_dir = config_path.parent
-    args.module = "topostats"
-    write_config_with_comments(args)
+    args.module = config_type
+    if config_type == "topostats":
+        write_config_with_comments_topostats(args)
+    elif config_type == "forcestats":
+        write_config_with_comments_forcestats(args)
 
 
-def get_current_config_path() -> str | None:
+def get_current_config_path(config_type: str = "topostats") -> str | None:
     """
     Returns the current config path
 
@@ -311,10 +325,12 @@ def get_current_config_path() -> str | None:
     str | None
         The current config path.
     """
-    return current_config_path
+    return current_config_paths.get(config_type)
 
 
-def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_default: bool = False) -> bool:
+def load_config_impl(
+    viewer: Viewer, config_path: Path | None = None, config_type: str = "topostats", use_default: bool = False
+) -> bool:
     """
     Loads config file using default if no path is provided and asking for data from user as required
 
@@ -333,14 +349,14 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
         True if the config was loaded successfully, False otherwise.
     """
     # pylint: disable=global-statement
-    global comment_descriptions, config_wrapper, full_config_container, current_config_path  # Updated global name
+    global comment_descriptions, config_wrappers, current_config_paths  # Updated global name
     if config_path is None:
         if use_default:
             config_dir = Path(user_config_dir("TopoStats", "Napari"))
-            config_path = config_dir / "config.yaml"
+            config_path = config_dir / f"{config_type}_config.yaml"
             if not config_path.exists():
                 config_dir.mkdir(parents=True, exist_ok=True)
-                write_new_default_config(config_path)
+                write_new_default_config(config_path, config_type=config_type)
         else:
             # If no path provided, prompt the user via a standard file dialog.
             file_path, _ = QFileDialog.getOpenFileName(
@@ -355,7 +371,6 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
             widget = load_config
             widget.viewer.value = viewer
             widget.config_path.value = config_path
-    current_config_path = str(config_path)
 
     try:
         with open(config_path, encoding="utf-8") as f:
@@ -376,23 +391,33 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
     ) as e:
         show_error_dialog(f"Failed to load config: {e}")
         return False
-    comment_descriptions = extract_inline_comments(config_path)
+    current_config_paths[config_type] = str(config_path)
+    comment_descriptions[config_type] = extract_inline_comments(config_path)
     if config is None:
         show_error_dialog("Please select a file containing valid config data.")
         return False
-    config_wrapper = ConfigWrapper(config)
+    config_wrappers[config_type] = ConfigWrapper(config)
 
-    full_config_container = build_dynamic_widget(config, comment_descriptions)
-    if full_config_container is None:
-        show_error_dialog("Failed to create full config container.")
-        return False
+    build_dynamic_widget(config, comment_descriptions[config_type], config_type=config_type)
+
     widget_manager = get_widget_manager()
     if "Edit Full Config" not in widget_manager.get_docked_widgets():
+        editor_controls = QWidget()
+        editor_layout = QHBoxLayout(editor_controls)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Create a button to open the config editor
-        btn = QPushButton("Edit Config")
-        btn.clicked.connect(open_config_editor)
-        docked = widget_manager.add_docked_widget(btn, name="Edit Full Config")
+        config_type_selector = QComboBox()
+        config_type_selector.addItems(["topostats", "forcestats"])
+        config_type_selector.setCurrentText(config_type)
+        editor_layout.addWidget(config_type_selector)
+
+        edit_button = QPushButton("Edit")
+        edit_button.clicked.connect(
+            lambda _checked=False: open_config_editor(config_type=config_type_selector.currentText())
+        )
+        editor_layout.addWidget(edit_button)
+
+        docked = widget_manager.add_docked_widget(editor_controls, name="Edit Full Config")
 
         # Remove from state.docked_widgets when widget is closed
         docked.visibilityChanged.connect(
@@ -412,10 +437,12 @@ def load_config_impl(viewer: Viewer, config_path: Path | None = None, use_defaul
         "mode": "r",
         "filter": "*.yaml;*.json",
     },  # Added .json filter
+    config_type={"label": "Config type"},
     call_button="Load Config",
-    auto_call=True,
 )
-def load_config(viewer: Viewer, config_path: Path | None = None) -> bool:
+def load_config(
+    viewer: Viewer, config_path: Path | None = None, config_type: Literal["topostats", "forcestats"] = "topostats"
+) -> bool:
     """
     Load a configuration file and build a dynamic widget to edit it.
     This is a magicgui function that can be called directly from the napari GUI and is an example of a hardcoded
@@ -427,13 +454,15 @@ def load_config(viewer: Viewer, config_path: Path | None = None) -> bool:
         The napari viewer.
     config_path : Path | None, optional
         The path to the config file, by default None
+    config_type : Literal["topostats", "forcestats"], optional
+        The type of configuration, by default "topostats"
 
     Returns
     -------
     bool
         True if the config was loaded successfully, False otherwise.
     """
-    return load_config_impl(viewer, config_path)
+    return load_config_impl(viewer, config_path, config_type=config_type)
 
 
 def set_up_load_config_widget(widget: FunctionGui):
@@ -445,6 +474,7 @@ def set_up_load_config_widget(widget: FunctionGui):
     widget : magicgui.widgets.FunctionGui
         The widget to attach the label to.
     """
+    attach_status_label(widget)
 
     def on_success(result: bool):
         if result:
@@ -453,9 +483,10 @@ def set_up_load_config_widget(widget: FunctionGui):
             widget.set_status_message("❌ Configuration did not load.")
 
     widget.called.connect(on_success)
+    add_save_as_default_button(widget)
 
 
-def save_as_default_config(config: dict[str, Any]):
+def save_as_default_config(config: dict[str, Any], config_type: str = "topostats"):
     """
     Saves the config as the new default (to the user config directory)
 
@@ -463,11 +494,13 @@ def save_as_default_config(config: dict[str, Any]):
     ----------
     config : dict[str, Any]
         The config to save.
+    config_type : str, optional
+        The type of configuration, by default "topostats"
     """
     config_dir = Path(user_config_dir("TopoStats", "Napari"))
-    config_path = config_dir / "config.yaml"
+    config_path = config_dir / f"{config_type}_config.yaml"
     config_dir.mkdir(parents=True, exist_ok=True)
-    save_config_to_file(config_path, config)
+    save_config_to_file(config_path, config, config_type=config_type)
 
 
 def add_save_as_default_button(widget: QWidget):
@@ -484,22 +517,21 @@ def add_save_as_default_button(widget: QWidget):
     save_button.setToolTip("Save the currently loaded configuration as the default config.")
 
     def on_save_clicked():
-        if config_wrapper is None:
+        config_type = widget.config_type.value
+        if config_wrappers is None or config_type not in config_wrappers:
             show_error_dialog("No configuration loaded to save.")
             return
-        full_config = config_wrapper.unflatten()
-        save_as_default_config(full_config)
+        full_config = config_wrappers[config_type].unflatten()
+        save_as_default_config(full_config, config_type=config_type)
         widget.set_status_message("✅ New default configuration saved!")
 
     save_button.clicked.connect(on_save_clicked)
 
     button_row.addWidget(save_button)
-    widget.native.layout().insertLayout(2, button_row)
+    widget.native.layout().insertLayout(3, button_row)
 
 
-attach_status_label(load_config)
 set_up_load_config_widget(load_config)
-add_save_as_default_button(load_config)
 
 
 def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> dict[str, str]:
@@ -588,16 +620,18 @@ def create_info_icon(tooltip_text: str) -> QToolButton:
 
 
 # pylint: disable=too-many-statements
-def open_config_editor():
+def open_config_editor(config_type: str = "topostats"):
     """Opens and renders the config editor with only certain top level keys available"""
     # pylint: disable=global-variable-not-assigned
-    global config_wrapper, full_config_container
+    global config_wrappers
 
-    if config_wrapper is None:
+    if config_wrappers is None or config_type not in config_wrappers:
         show_error_dialog("No config loaded.")
         return
 
-    fresh_container = build_dynamic_widget(get_current_config(), comment_descriptions)
+    fresh_container = build_dynamic_widget(
+        get_current_config(config_type=config_type), comment_descriptions.get(config_type, {}), config_type=config_type
+    )
     fresh_container.setFrameShape(QFrame.NoFrame)
     fresh_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
@@ -624,8 +658,12 @@ def open_config_editor():
     def set_as_default():
         config_dir = Path(user_config_dir("TopoStats", "Napari"))
         config_dir.mkdir(parents=True, exist_ok=True)
-        default_config_path = config_dir / "config.yaml"
-        save_config_to_file(default_config_path, get_current_config())
+        default_config_path = config_dir / f"{config_type}_config.yaml"
+        save_config_to_file(
+            default_config_path,
+            get_current_config(config_type=config_type),
+            config_type=config_type,
+        )
 
         dialog.set_status_message("✅ Default config saved")
 
@@ -639,7 +677,11 @@ def open_config_editor():
         if not file_path:
             dialog.set_status_message("Config save cancelled.")
             return
-        save_config_to_file(Path(file_path), get_current_config())
+        save_config_to_file(
+            Path(file_path),
+            get_current_config(config_type=config_type),
+            config_type=config_type,
+        )
 
         dialog.set_status_message("✅ Config saved to file")
 
@@ -653,14 +695,18 @@ def open_config_editor():
 
     dialog.adjustSize()
     if dialog.exec_():
-        config_wrapper.flat.update(updated_values)
+        config_wrappers[config_type].flat.update(updated_values)
         print("Config updated.")
         # Optionally refresh the full container for other use
-        full_config_container = build_dynamic_widget(get_current_config(), comment_descriptions)
-        save_current_config_as_temp()
+        build_dynamic_widget(
+            get_current_config(config_type=config_type),
+            comment_descriptions.get(config_type, {}),
+            config_type=config_type,
+        )
+        save_current_config_as_temp(config_type=config_type)
 
 
-def save_config_to_file(file_path: Path, full_config: dict[str, Any]):
+def save_config_to_file(file_path: Path, full_config: dict[str, Any], config_type: str = "topostats"):
     """
     Saves the config to a file with comments preserved, displaying an error message if it fails.
 
@@ -677,10 +723,11 @@ def save_config_to_file(file_path: Path, full_config: dict[str, Any]):
                 json.dump(full_config, f, indent=2)
         else:
             # For YAML files, use write_config_with_comments if we have comment descriptions
-            if comment_descriptions:
+            config_comment_descriptions = comment_descriptions.get(config_type, {})
+            if config_comment_descriptions:
                 # Build the comments dict in the format expected by write_config_with_comments
                 # It expects nested dict structure matching the config
-                comments_nested = _unflatten_comments(comment_descriptions)
+                comments_nested = _unflatten_comments(config_comment_descriptions)
 
                 # Use write_config_with_comments to preserve inline comments
                 _write_yaml_with_inline_comments(file_path, full_config, comments_nested)
@@ -788,7 +835,7 @@ def _write_yaml_with_inline_comments(file_path: Path, config: dict, comments: di
         f.write("\n".join(lines) + "\n")
 
 
-def save_current_config_as_temp(overides: dict[str, Any] | None = None):
+def save_current_config_as_temp(overides: dict[str, Any] | None = None, config_type: str = "topostats"):
     """
     Saves the current config as a temporary file with optional overides.
     This is used for maintaining an up to date config file and path for TopoStats backend functions.
@@ -799,28 +846,28 @@ def save_current_config_as_temp(overides: dict[str, Any] | None = None):
         A dictionary of config keys and values to override in the saved config.
     """
     # pylint: disable=global-statement
-    global current_config_path
-    full_current_config = get_current_config()
+    global current_config_paths
+    full_current_config = get_current_config(config_type=config_type)
 
     if overides:
         for key, value in overides.items():
-            config_wrapper.flat[key] = value
+            config_wrappers[config_type].flat[key] = value
     config_dir = Path(user_config_dir("TopoStats", "Napari"))
-    config_path = config_dir / "_temp_config.yaml"
+    config_path = config_dir / f"_temp_{config_type}_config.yaml"
     config_dir.mkdir(parents=True, exist_ok=True)
-    save_config_to_file(config_path, full_current_config)
-    current_config_path = str(config_path)
+    save_config_to_file(config_path, full_current_config, config_type=config_type)
+    current_config_paths[config_type] = str(config_path)
 
 
-def get_current_config(flat: bool = False) -> dict[str, Any]:
+def get_current_config(flat: bool = False, config_type: str = "topostats") -> dict[str, Any]:
     """Returns the current config with any updates from the edit config window applied"""
     if flat:
-        return config_wrapper.flat
-    full_current_config = config_wrapper.unflatten()
+        return config_wrappers[config_type].flat
+    full_current_config = config_wrappers[config_type].unflatten()
     return full_current_config
 
 
-def config_loaded() -> bool:
+def config_loaded(config_type: str = "topostats") -> bool:
     """
     Returns True if a config has been loaded, False otherwise.
 
@@ -829,25 +876,7 @@ def config_loaded() -> bool:
     bool
         True if a config has been loaded, False otherwise.
     """
-    return config_wrapper is not None and full_config_container is not None
-
-
-def get_topostats_default_config():
-    """
-    Returns the default config from the TopoStats backend as a dictionary.
-
-    Returns
-    -------
-    dict
-        The default config.
-    """
-    config_path = Path(user_config_dir("TopoStats", "Napari")) / "default_config.yaml"
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    write_new_default_config(config_path)
-
-    with open(config_path, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-    return config
+    return config_type in config_wrappers
 
 
 def add_values_to_dict_from_config(
