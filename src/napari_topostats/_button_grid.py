@@ -12,35 +12,12 @@ from qtpy.QtCore import QSize
 from qtpy.QtGui import QBrush, QColor, QIcon
 from qtpy.QtWidgets import QListWidget, QListWidgetItem
 
+from napari_topostats._styles import BUTTON_GRID_STYLE
 from napari_topostats._widget_function import WidgetFunction, WidgetFunctionManager
 
 from ._alerts import show_error_dialog
 
 ICON_ROOT = Path(__file__).parent / "icons"
-STYLES = r"""
-    QListWidget{
-        min-width: 200;
-        background: none;
-        font-size: 14pt;
-        margin: 0;
-        padding: 0;
-        color: #eee;
-    }
-    QListWidget::item {
-        width: 80;
-        height: 100;
-        margin: 1;
-        padding: 4;
-    }
-    QListWidget::item::hover {
-        background: #8A929C;
-        width: 80;
-        height: 100;
-        margin: 1;
-        padding: 4;
-    }
-
-"""
 
 
 def _get_background_brush():
@@ -101,7 +78,7 @@ class ButtonGrid(QListWidget):
         self.setUniformItemSizes(True)  # better performance
         self.setIconSize(QSize(90, 40))  # set icon size
         self.setWordWrap(True)  # allow text to wrap
-        self.setStyleSheet(STYLES)  # set the style sheet
+        self.setStyleSheet(BUTTON_GRID_STYLE)  # set the style sheet
         self.setSpacing(2)  # set spacing between items
 
         self.viewer = viewer
