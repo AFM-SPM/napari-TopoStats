@@ -63,6 +63,7 @@ from napari_topostats._guide import check_guide, show_guide
 from napari_topostats._io import (
     load_config,
     load_config_impl,
+    open_config_editor,
     write_new_default_config,
 )
 from napari_topostats._profile_viewer import start_drawing
@@ -345,7 +346,7 @@ class TopoStatsRootWidget(RootWidget):
         The parent widget, by default None.
     """
 
-    def __init__(self, viewer: Viewer, parent=None):
+    def __init__(self, viewer: Viewer, parent=None):  # pylint: disable=too-many-statements
         """
         Initialises TopoStatsRootWidget
 
@@ -392,37 +393,51 @@ class TopoStatsRootWidget(RootWidget):
                     run_immediately=False,  # Prevent immediate execution for loaded curve functions
                 )
             )
-        reset_type = QComboBox()
-        reset_type.addItems(["topostats", "forcestats"])
-        reset_type.setToolTip("Select the configuration type to reset to default.")
+        config_type_selector = QComboBox()
+        config_type_selector.addItems(["TopoStats", "ForceStats"])
+        config_type_selector.setToolTip("Select the configuration type to edit or reset.")
 
-        reset_button = QPushButton("Reset Default Config")
-        reset_button.setToolTip("Reset the default configuration to the original TopoStats default.")
+        reset_button = QPushButton("Reset Default")
+        reset_button.setToolTip("Restore the selected factory configuration as the active and user default.")
 
         def on_reset_clicked():
-            config_type = reset_type.currentText()
+            config_type = config_type_selector.currentText().lower()
             config_dir = Path(user_config_dir("TopoStats", "Napari"))
             default_config_path = config_dir / f"{config_type}_config.yaml"
-            if default_config_path.exists():
-                write_new_default_config(default_config_path, config_type=config_type)
-                load_config_impl(self._viewer, config_path=None, config_type=config_type, use_default=True)
+            config_dir.mkdir(parents=True, exist_ok=True)
+            write_new_default_config(default_config_path, config_type=config_type)
+            if load_config_impl(self._viewer, config_path=None, config_type=config_type, use_default=True):
                 self.bottom_widget.set_status_message("✅ Default configuration reset successfully.")
-            else:
-                self.bottom_widget.set_status_message("No default configuration file found to reset.")
 
         reset_button.clicked.connect(on_reset_clicked)
 
         guide_button = QPushButton("Show Guide")
         guide_button.setToolTip("Open the TopoStats guide.")
         guide_button.clicked.connect(lambda: show_guide(viewer))
-        self.bottom_row.addWidget(reset_type)
-        self.bottom_row.addWidget(reset_button)
-        self.bottom_row.addWidget(guide_button)
-
         # Add a text label to tell the user they can press 'a' to open the curve viewer and use the line tool
         line_tool_label = QLabel("Hold 'a' to draw a line and view the profile plot")
         line_tool_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         line_tool_label.setWordWrap(True)
         self.bottom_row.addWidget(line_tool_label)
+        self.bottom_row.addWidget(guide_button)
+
+        config_row = QHBoxLayout()
+        edit_button = QPushButton("Edit")
+        edit_button.clicked.connect(
+            lambda: open_config_editor(self._viewer, self, config_type_selector.currentText().lower())
+        )
+        config_row.addWidget(config_type_selector)
+        config_row.addWidget(edit_button)
+        config_row.addWidget(reset_button)
+        self.vlayout.addLayout(config_row)
 
         set_topostats_widget(widget=self)
+
+        failed_configs = []
+        for config_type in ("topostats", "forcestats"):
+            if not load_config_impl(self._viewer, config_type=config_type, use_default=True, report_errors=False):
+                failed_configs.append(config_type.title())
+        if failed_configs:
+            self.bottom_widget.set_status_message(
+                f"Could not load the stored default for {', '.join(failed_configs)}. Reset Default can repair it."
+            )

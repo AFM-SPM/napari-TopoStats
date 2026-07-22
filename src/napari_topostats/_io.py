@@ -17,11 +17,8 @@ from magicgui.widgets import FunctionGui, create_widget
 from napari.viewer import Viewer
 from platformdirs import user_config_dir
 from qtpy.QtCore import Qt
-from qtpy.QtGui import QGuiApplication, QIcon
+from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
-    QComboBox,
-    QDialog,
-    QDialogButtonBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -329,7 +326,11 @@ def get_current_config_path(config_type: str = "topostats") -> str | None:
 
 
 def load_config_impl(
-    viewer: Viewer, config_path: Path | None = None, config_type: str = "topostats", use_default: bool = False
+    viewer: Viewer,
+    config_path: Path | None = None,
+    config_type: str = "topostats",
+    use_default: bool = False,
+    report_errors: bool = True,
 ) -> bool:
     """
     Loads config file using default if no path is provided and asking for data from user as required
@@ -389,44 +390,16 @@ def load_config_impl(
         UnicodeDecodeError,
         OSError,
     ) as e:
-        show_error_dialog(f"Failed to load config: {e}")
+        if report_errors:
+            show_error_dialog(f"Failed to load config: {e}")
         return False
     current_config_paths[config_type] = str(config_path)
     comment_descriptions[config_type] = extract_inline_comments(config_path)
     if config is None:
-        show_error_dialog("Please select a file containing valid config data.")
+        if report_errors:
+            show_error_dialog("Please select a file containing valid config data.")
         return False
     config_wrappers[config_type] = ConfigWrapper(config)
-
-    build_dynamic_widget(config, comment_descriptions[config_type], config_type=config_type)
-
-    widget_manager = get_widget_manager()
-    if "Edit Full Config" not in widget_manager.get_docked_widgets():
-        editor_controls = QWidget()
-        editor_layout = QHBoxLayout(editor_controls)
-        editor_layout.setContentsMargins(0, 0, 0, 0)
-
-        config_type_selector = QComboBox()
-        config_type_selector.addItems(["topostats", "forcestats"])
-        config_type_selector.setCurrentText(config_type)
-        editor_layout.addWidget(config_type_selector)
-
-        edit_button = QPushButton("Edit")
-        edit_button.clicked.connect(
-            lambda _checked=False: open_config_editor(config_type=config_type_selector.currentText())
-        )
-        editor_layout.addWidget(edit_button)
-
-        docked = widget_manager.add_docked_widget(editor_controls, name="Edit Full Config")
-
-        # Remove from state.docked_widgets when widget is closed
-        docked.visibilityChanged.connect(
-            lambda visible: (
-                widget_manager.remove_docked_widget("Edit Full Config")
-                if not visible and "Edit Full Config" in widget_manager.get_docked_widgets()
-                else None
-            )
-        )
 
     return True
 
@@ -620,90 +593,115 @@ def create_info_icon(tooltip_text: str) -> QToolButton:
 
 
 # pylint: disable=too-many-statements
-def open_config_editor(config_type: str = "topostats"):
-    """Opens and renders the config editor with only certain top level keys available"""
-    # pylint: disable=global-variable-not-assigned
-    global config_wrappers
+def _apply_editor_values(config_type: str):
+    """Commit pending values for one configuration type."""
+    config_wrappers[config_type].flat.update(updated_values.pop(config_type, {}))
+    save_current_config_as_temp(config_type=config_type)
 
-    if config_wrappers is None or config_type not in config_wrappers:
-        show_error_dialog("No config loaded.")
-        return
 
-    fresh_container = build_dynamic_widget(
-        get_current_config(config_type=config_type), comment_descriptions.get(config_type, {}), config_type=config_type
-    )
-    fresh_container.setFrameShape(QFrame.NoFrame)
-    fresh_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+class ConfigEditorWidget(QWidget):
+    """Reusable dock content for editing one configuration type at a time."""
 
-    dialog = QDialog()
-    dialog.setWindowTitle("Edit Config")
-    dialog.setMinimumWidth(550)
-    screen_height = QGuiApplication.primaryScreen().availableGeometry().height()
-    dialog.setMaximumHeight(int(screen_height * 0.9))
+    def __init__(self, config_type: str):
+        super().__init__()
+        self.config_type = config_type
+        self.setMinimumWidth(550)
+        self.main_layout = QVBoxLayout(self)
+        self.form = None
+        self._build_form(config_type)
+        button_row = QHBoxLayout()
+        save_button = QPushButton("Save to File")
+        default_button = QPushButton("Set as Default")
+        apply_button = QPushButton("Apply")
+        for button in (save_button, default_button, apply_button):
+            button_row.addWidget(button)
+        self.main_layout.addLayout(button_row)
+        attach_status_label(self)
+        save_button.clicked.connect(self.save_to_file)
+        default_button.clicked.connect(self.set_as_default)
+        apply_button.clicked.connect(self.apply)
 
-    main_layout = QVBoxLayout(dialog)
-    main_layout.addWidget(fresh_container)
+    def _build_form(self, config_type: str):
+        """
+        Build the editor form for a configuration type.
 
-    button_box = QDialogButtonBox()
-    button_box.addButton(QDialogButtonBox.Ok)
-    button_box.addButton(QDialogButtonBox.Cancel)
-    save_button = QPushButton("Save Config to File")
-    button_box.addButton(save_button, QDialogButtonBox.ActionRole)
-
-    set_as_default_button = QPushButton("Set config as your default")
-    button_box.addButton(set_as_default_button, QDialogButtonBox.ActionRole)
-
-    # Temporary status label for feedback when setting default
-
-    def set_as_default():
-        config_dir = Path(user_config_dir("TopoStats", "Napari"))
-        config_dir.mkdir(parents=True, exist_ok=True)
-        default_config_path = config_dir / f"{config_type}_config.yaml"
-        save_config_to_file(
-            default_config_path,
-            get_current_config(config_type=config_type),
-            config_type=config_type,
-        )
-
-        dialog.set_status_message("✅ Default config saved")
-
-    def save_to_file():
-
-        file_path, _ = QFileDialog.getSaveFileName(
-            parent=dialog,
-            caption="Save Config As",
-            filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)",
-        )
-        if not file_path:
-            dialog.set_status_message("Config save cancelled.")
-            return
-        save_config_to_file(
-            Path(file_path),
-            get_current_config(config_type=config_type),
-            config_type=config_type,
-        )
-
-        dialog.set_status_message("✅ Config saved to file")
-
-    save_button.clicked.connect(save_to_file)
-    set_as_default_button.clicked.connect(set_as_default)
-    button_box.accepted.connect(dialog.accept)
-    button_box.rejected.connect(dialog.reject)
-
-    attach_status_label(dialog)
-    main_layout.addWidget(button_box)
-
-    dialog.adjustSize()
-    if dialog.exec_():
-        config_wrappers[config_type].flat.update(updated_values)
-        print("Config updated.")
-        # Optionally refresh the full container for other use
-        build_dynamic_widget(
+        Parameters
+        ----------
+        config_type : str
+            The configuration type to display.
+        """
+        if self.form is not None:
+            self.main_layout.removeWidget(self.form)
+            self.form.deleteLater()
+        self.config_type = config_type
+        updated_values.pop(config_type, None)
+        self.form = build_dynamic_widget(
             get_current_config(config_type=config_type),
             comment_descriptions.get(config_type, {}),
             config_type=config_type,
         )
-        save_current_config_as_temp(config_type=config_type)
+        self.form.setFrameShape(QFrame.NoFrame)
+        self.form.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.main_layout.insertWidget(0, self.form)
+
+    def show_config(self, config_type: str):
+        """
+        Display a configuration type in the editor.
+
+        Parameters
+        ----------
+        config_type : str
+            The configuration type to display.
+        """
+        if config_type != self.config_type:
+            updated_values.pop(self.config_type, None)
+            self._build_form(config_type)
+
+    def apply(self):
+        """Apply the edited values to the current configuration."""
+        _apply_editor_values(self.config_type)
+        self.set_status_message("✅ Configuration applied successfully.")
+
+    def save_to_file(self):
+        """Save the edited configuration to a selected file."""
+        self.apply()
+        file_path, _ = QFileDialog.getSaveFileName(
+            parent=self, caption="Save Configuration As", filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)"
+        )
+        if not file_path:
+            self.set_status_message("Configuration save cancelled.")
+            return
+        save_config_to_file(Path(file_path), get_current_config(self.config_type), self.config_type)
+        self.set_status_message("✅ Configuration saved to file.")
+
+    def set_as_default(self):
+        """Save the edited configuration as the user default."""
+        self.apply()
+        save_as_default_config(get_current_config(self.config_type), self.config_type)
+        self.set_status_message("✅ Default configuration saved.")
+
+
+def open_config_editor(viewer: Viewer, main_widget: QWidget, config_type: str = "topostats"):
+    """Open or raise the reusable native napari configuration editor dock."""
+    if config_type not in config_wrappers:
+        main_widget.bottom_widget.set_status_message(f"Could not edit {config_type}: no configuration is loaded.")
+        return
+    manager = get_widget_manager()
+    manager.ensure_valid("Edit Configuration", allow_hidden=True)
+    config_editor_widget = manager.get_widget("Edit Configuration", raw=True)
+    config_editor_dock = manager.get_widget("Edit Configuration")
+    if config_editor_widget is None:
+        config_editor_widget = ConfigEditorWidget(config_type)
+        config_editor_dock = manager.add_docked_widget(config_editor_widget, area="right", name="Edit Configuration")
+    else:
+        config_editor_widget.show_config(config_type)
+    main_dock = main_widget.parentWidget()
+    while main_dock is not None and not hasattr(main_dock, "toggleViewAction"):
+        main_dock = main_dock.parentWidget()
+    if main_dock is not None:
+        viewer.window._qt_window.tabifyDockWidget(main_dock, config_editor_dock)  # pylint: disable=protected-access
+    config_editor_dock.show()
+    config_editor_dock.raise_()
 
 
 def save_config_to_file(file_path: Path, full_config: dict[str, Any], config_type: str = "topostats"):

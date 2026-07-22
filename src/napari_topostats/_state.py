@@ -50,6 +50,7 @@ class WidgetManager:
         global widget_manager  # pylint:disable=global-statement
         self.viewer = viewer
         self.docked_widgets = {}
+        self.raw_docked_widgets = {}
 
         # Set the global widget manager instance to this instance
         widget_manager = self
@@ -72,9 +73,10 @@ class WidgetManager:
         # Only add the new widget if there isn't already a valid and visible widget with the same name
         if name not in self.docked_widgets:
             self.docked_widgets[name] = self.viewer.window.add_dock_widget(widget, area=area, name=name)
+            self.raw_docked_widgets[name] = widget
         return self.docked_widgets[name]
 
-    def ensure_valid(self, name):
+    def ensure_valid(self, name: str, allow_hidden: bool = False):
         """
         Ensure that if a widget with the same name already exists, it is valid and visible.
         If not, remove it from the docked widgets list.
@@ -86,7 +88,8 @@ class WidgetManager:
         """
         # If a widget with the same name already exists and is not valid or visible, remove it before adding the new one
         if name in self.docked_widgets and (
-            not is_valid_widget(self.docked_widgets[name]) or not is_visible_widget(self.docked_widgets[name])
+            not is_valid_widget(self.docked_widgets[name])
+            or (not is_visible_widget(self.docked_widgets[name]) and not allow_hidden)
         ):
             # Try to destroy the old widget if it still exists
             with contextlib.suppress(RuntimeError):
@@ -95,21 +98,9 @@ class WidgetManager:
                 elif hasattr(self.docked_widgets[name], "destroy"):
                     self.docked_widgets[name].destroy()
             self.docked_widgets.pop(name)
+            self.raw_docked_widgets.pop(name, None)
 
-    def record_docked_widget(self, widget, name):
-        """
-        Record a widget in the docked widgets list.
-
-        Parameters
-        ----------
-        widget : FunctionGui | QWidget
-            The widget to record.
-        name : str
-            The name of the widget.
-        """
-        self.docked_widgets[name] = widget
-
-    def get_widget(self, name):
+    def get_widget(self, name: str, raw: bool = False):
         """
         Get a widget by name.
 
@@ -123,6 +114,8 @@ class WidgetManager:
         FunctionGui | QWidget | None
             The widget with the specified name, or None if no such widget exists.
         """
+        if raw:
+            return self.raw_docked_widgets.get(name, None)
         return self.docked_widgets.get(name, None)
 
     def get_docked_widgets(self):
