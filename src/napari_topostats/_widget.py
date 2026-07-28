@@ -40,7 +40,7 @@ if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() 
     QApplication.processEvents()
 
 from forcestats.analysis import find_trigger_point
-from forcestats.contact import create_3d_approach_map, find_contact_point
+from forcestats.contact import create_3d_approach_map, find_contact_point_map
 from forcestats.curve_correction import correct_curve
 from napari.layers import Image, Labels
 from napari.viewer import Viewer
@@ -164,8 +164,8 @@ EXTRA_FUNCTIONS = [
         name="find_contact_point",
         function_key="find_contact_point",
         path_to_data="return",
-        function_to_run=find_contact_point,
-        tooltip=inspect.getdoc(find_contact_point),
+        function_to_run=find_contact_point_map,
+        tooltip=inspect.getdoc(find_contact_point_map),
         run_immediately=False,
         config_type="forcestats",
     ),
