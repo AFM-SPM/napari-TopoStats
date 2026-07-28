@@ -30,7 +30,7 @@ from napari_topostats._styles import (
     SEGMENT_COLOURS,
     VIBRANT_PALETTE,
 )
-from napari_topostats.utils import measured_height_names, unflatten_dict, vertical_deflection_names
+from napari_topostats.utils import unflatten_dict
 
 
 def _filled_cross_symbol() -> QPainterPath:
@@ -563,16 +563,10 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         """Select usable default x and y channels when the current selection is unavailable."""
         if None not in (self.x_channel, self.y_channel) or not self.available_channels:
             return
-        if self.x_channel is None and self.available_channels:
-            for default_x in measured_height_names:
-                if default_x in self.available_channels:
-                    self.x_channel = default_x
-                    break
-        if self.y_channel is None and self.available_channels:
-            for default_y in vertical_deflection_names:
-                if default_y in self.available_channels:
-                    self.y_channel = default_y
-                    break
+        if self.x_channel is None and self.available_channels and "Height (Measured)" in self.available_channels:
+            self.x_channel = "Height (Measured)"
+        if self.y_channel is None and self.available_channels and "Vertical Deflection" in self.available_channels:
+            self.y_channel = "Vertical Deflection"
         if self.x_channel is None:
             self.x_channel = self.available_channels[0]
         if self.y_channel is None:

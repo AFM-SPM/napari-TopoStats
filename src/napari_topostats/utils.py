@@ -18,26 +18,6 @@ if TYPE_CHECKING:
     from napari.types import ImageData
 
 
-vertical_deflection_names = [
-    "vDeflection",
-    "vDefl",
-    "vDef",
-    "Defl",
-    "defl",
-]
-
-measured_height_names = [
-    "measuredHeight",
-    "Raw",
-    "raw",
-]
-
-standardised_curve_channels = {
-    "measuredHeight": measured_height_names,
-    "vDeflection": vertical_deflection_names,
-}
-
-
 def afm2stack(
     image: ImageData,
     by_slices: bool = True,
@@ -258,29 +238,6 @@ def remove_all_but_last(word: str, text: str) -> str:
     return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return
 
 
-def _standardise_curve_with_original_channels(curve: dict) -> tuple[dict, dict[str, str]]:
-    """Standardise curve channel names and track aliases created from existing channels."""
-    created_channels = {}
-    for standard_channel, alternative_channels in standardised_curve_channels.items():
-        if standard_channel in curve:
-            continue
-        for alternative_channel in alternative_channels:
-            if alternative_channel in curve:
-                curve[standard_channel] = curve[alternative_channel]
-                created_channels[standard_channel] = alternative_channel
-                break
-    return curve, created_channels
-
-
-def _move_created_standard_channels_to_originals(curve: dict, created_channels: dict[str, str]) -> dict:
-    """Move edited standardised aliases back to the channels they were copied from."""
-    for standard_channel, original_channel in created_channels.items():
-        if standard_channel in curve:
-            curve[original_channel] = curve[standard_channel]
-            curve.pop(standard_channel, None)
-    return curve
-
-
 # pylint: disable=too-many-positional-arguments
 def _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig):
     """Worker function for parallel curve processing returning full value from function."""
@@ -364,7 +321,6 @@ def all_curves(
     # Try to get z_units from the first curve
     first_curve = dict(curves[0, 0])
     start_time = time.perf_counter()
-    first_curve, created_channels = _standardise_curve_with_original_channels(first_curve)
     return_value = _all_curves_raw_worker(
         first_curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig
     )
@@ -383,9 +339,7 @@ def all_curves(
     else:
         actual_value = return_value
     curve_correcting = isinstance(actual_value, dict)
-    if curve_correcting:
-        return_value = _move_created_standard_channels_to_originals(return_value, created_channels)
-    else:
+    if not curve_correcting:
         first_result_array = np.asarray(actual_value)
         result_is_array = first_result_array.ndim > 0
         if result_is_array:
@@ -402,10 +356,7 @@ def all_curves(
 
     def _all_curves_worker(curve):
         """Worker function for parallel curve processing."""
-        curve, created_channels = _standardise_curve_with_original_channels(curve)
         return_value = _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig)
-        if curve_correcting:
-            return _move_created_standard_channels_to_originals(return_value, created_channels)
         return return_value
 
     if curve_correcting:
@@ -471,6 +422,8 @@ def all_curves(
                 else:
                     extracted_result = result
                 if result_is_array:
+                    # image_map is initialised whenever curve_correcting is false, as it is in this branch.
+                    # pylint: disable-next=used-before-assignment
                     image_map[:, y, x] = extracted_result
                 else:
                     image_map[y][x] = extracted_result
