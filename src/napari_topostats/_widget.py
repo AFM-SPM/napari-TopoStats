@@ -20,10 +20,12 @@ import inspect
 import os
 from pathlib import Path
 
+import numpy as np
 from napari import current_viewer  # pylint: disable=no-name-in-module
 from qtpy.QtWidgets import (
     QApplication,
     QComboBox,
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -32,7 +34,8 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from ._alerts import LoadingWidget, attach_status_label
+from napari_topostats._alerts import LoadingWidget, attach_status_label
+from napari_topostats._components import get_selected_image
 
 if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() is not None:
     loading_spinner = LoadingWidget(current_viewer())
@@ -158,6 +161,7 @@ EXTRA_FUNCTIONS = [
         function_to_run=find_trigger_point_map,
         tooltip=inspect.getdoc(find_trigger_point_map),
         config_type="forcestats",
+        passes_full_config=True,
         run_immediately=False,
     ),
     WidgetFunction(
@@ -411,13 +415,30 @@ class TopoStatsRootWidget(RootWidget):
 
         reset_button.clicked.connect(on_reset_clicked)
 
+        def export_layer_to_csv():
+            image = get_selected_image(self._viewer)
+            csv_filepath, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Table as CSV",
+                f"{image.name.lower().replace(' ', '_')}.csv",
+                "CSV Files (*.csv)",
+            )
+            if csv_filepath:
+                np.savetxt(csv_filepath, image.data, delimiter=",")
+                self.bottom_widget.set_status_message(f"✅ Image data exported to {csv_filepath}")
+
+        export_button = QPushButton("Export Image to CSV")
+        export_button.setToolTip("Export the selected image layer data to a CSV file.")
+        export_button.clicked.connect(export_layer_to_csv)
+
         guide_button = QPushButton("Show Guide")
         guide_button.setToolTip("Open the TopoStats guide.")
-        guide_button.clicked.connect(lambda: show_guide(viewer))
+        guide_button.clicked.connect(lambda: show_guide(self._viewer))
         # Add a text label to tell the user they can press 'a' to open the curve viewer and use the line tool
         line_tool_label = QLabel("Hold 'a' to draw a line and view the profile plot")
         line_tool_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         line_tool_label.setWordWrap(True)
+        self.bottom_row.addWidget(export_button)
         self.bottom_row.addWidget(line_tool_label)
         self.bottom_row.addWidget(guide_button)
 
