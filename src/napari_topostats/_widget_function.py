@@ -937,9 +937,9 @@ class WidgetFunction:
                         suppress_errors=True,
                     )
                     if curves_data is None:
-                        return []
+                        return [""]
                     volume_names = list(curves_data.volumes.keys())
-                    return volume_names or []
+                    return volume_names or [""]
 
                 def get_default_curves_volume_name():
                     curves_data = get_selected_curves(
@@ -948,7 +948,10 @@ class WidgetFunction:
                     )
                     if curves_data is None:
                         return ""
-                    return curves_data.default_volume_name
+                    volume_names = list(curves_data.volumes.keys())
+                    if curves_data.default_volume_name in volume_names:
+                        return curves_data.default_volume_name
+                    return volume_names[0] if volume_names else ""
 
                 curves_volume_param = inspect.Parameter(
                     name=CURVES_VOLUME_PARAM,
