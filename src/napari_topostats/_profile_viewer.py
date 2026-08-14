@@ -406,6 +406,8 @@ def start_drawing(viewer: Viewer):
     if profile_viewer is None or "Profile Viewer" not in widget_manager.get_docked_widgets():
         profile_viewer = ProfileViewer(viewer, shapes_layer=shapes_layer, widget_manager=widget_manager)
         widget_manager.add_docked_widget(profile_viewer, area="right", name="Profile Viewer")
+    else:
+        widget_manager.reveal_docked_widget("Profile Viewer")
     profile_viewer.active_layer = active_layer
     profile_viewer.connect_profile_line_events(shapes_layer)
 

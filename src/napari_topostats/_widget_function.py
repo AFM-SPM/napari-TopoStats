@@ -1227,8 +1227,14 @@ class WidgetFunction:
             save_button.clicked.connect(save_to_csv)
             table.cellClicked.connect(on_row_clicked)
 
-            # Add to viewer
-            viewer.window.add_dock_widget(container, area="right", name=self.function_key.title())
+            # Keep tables for different source layers as tabs
+            table_group = self.function_key.title()
+            table_name = f"{table_group}: {original.name}"
+            widget_manager = self.function_manager.widget_manager
+
+            # Replace if the table already exists for this layer, otherwise add a new one
+            widget_manager.remove_docked_widget(table_name)
+            widget_manager.add_docked_widget(container, area="right", name=table_name, group=table_group)
         else:
             show_error_dialog(
                 f"Function {self.function_key} returned an unsupported type: {type(return_value)}.",
@@ -1298,13 +1304,15 @@ class WidgetFunctionManager:
                         topostats_error=True,
                     )
                 # pylint: disable=used-before-assignment
-                self.add_docked_function(widget, func_name)
+                self.add_docked_function(widget, func_name, group=None)
                 return
             widget = function.get_function_gui()
             for param in widget:
                 if param.name != "call_button":
                     self.add_docked_function(widget, func_name)
                     break
+        else:
+            self.widget_manager.reveal_docked_widget(func_name)
         widget = self.docked_functions.get(func_name) or widget
         if function.overide_get_widget:
             return
@@ -1346,7 +1354,7 @@ class WidgetFunctionManager:
             return None
         return widget
 
-    def add_docked_function(self, widget, name: str, area: str = "right"):
+    def add_docked_function(self, widget, name: str, area: str = "right", group: str | None = "functions"):
         """
         Add a widget to the viewer as a docked widget and keep track of it in the state.
 
@@ -1358,9 +1366,11 @@ class WidgetFunctionManager:
             The name of the widget, used for tracking in the state.
         area : str, optional
             The area of the viewer to dock the widget in (default is "right").
+        group : str, optional
+            The parameter-panel group, or None for an independent working view.
         """
         self.docked_functions[name] = widget
-        self.widget_manager.add_docked_widget(widget, area=area, name=name)
+        self.widget_manager.add_docked_widget(widget, area=area, name=name, group=group)
 
     def get_docked_function(self, name):
         """

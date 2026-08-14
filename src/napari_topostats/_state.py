@@ -7,6 +7,7 @@ It also contains utility functions for ensuring the validity of widgets used in 
 import contextlib
 
 from magicgui.widgets import FunctionGui
+from napari.viewer import Viewer
 from qtpy.QtWidgets import QWidget
 
 docked_widgets = []
@@ -46,16 +47,21 @@ def set_widget_manager(manager):
 class WidgetManager:
     """Class to manage the state of widgets in napari-TopoStats."""
 
-    def __init__(self, viewer):
+    def __init__(self, viewer: Viewer):
         global widget_manager  # pylint:disable=global-statement
         self.viewer = viewer
-        self.docked_widgets = {}
-        self.raw_docked_widgets = {}
+        self.docked_widgets: dict[str, QWidget] = {}
+        self.raw_docked_widgets: dict[str, QWidget] = {}
+
+        # Dictionary mapping group names to lists of dock names in that group
+        self.dock_groups: dict[str, list[str]] = {}
+        # Dictionary mapping dock names to the group they belong to
+        self.widget_groups: dict[str, str] = {}
 
         # Set the global widget manager instance to this instance
         widget_manager = self
 
-    def add_docked_widget(self, widget, area="right", name=None):
+    def add_docked_widget(self, widget, area="right", name=None, group=None):
         """
         Add a widget to the dock
 
@@ -67,38 +73,102 @@ class WidgetManager:
             The area to dock the widget in, by default "right".
         name : str, optional
             The name of the widget, by default None.
+        group : str, optional
+            A named dock group to tabify this widget with, by default None.
         """
         self.ensure_valid(name)
 
         # Only add the new widget if there isn't already a valid and visible widget with the same name
         if name not in self.docked_widgets:
-            self.docked_widgets[name] = self.viewer.window.add_dock_widget(widget, area=area, name=name)
-            self.raw_docked_widgets[name] = widget
-        return self.docked_widgets[name]
+            dock = self.viewer.window.add_dock_widget(widget, area=area, name=name)
 
-    def ensure_valid(self, name: str, allow_hidden: bool = False):
+            # Create the references for the docked widget and its raw widget
+            self.docked_widgets[name] = dock
+            self.raw_docked_widgets[name] = widget
+
+            # Keep lifecycle cleanup tied to this exact dock so a delayed signal cannot remove a same name replacement
+            dock.destroyed.connect(
+                lambda _=None, dock_name=name, expected=dock: self._dock_destroyed(dock_name, expected)
+            )
+
+            if group is not None:
+                # Find an existing dock in the group to tabify with (we can't tabify with a dock that is being added)
+                anchor = self._group_anchor(group, excluding=name)
+
+                # Create the references for the dock's group
+                self.dock_groups.setdefault(group, []).append(name)
+                self.widget_groups[name] = group
+
+                # If an anchor was found (this is not the first dock in the group), tabify the new dock with the anchor
+                if anchor is not None:
+                    # Add the new dock to the group, by tabifying it with an existing dock in the group
+                    self.viewer.window._qt_window.tabifyDockWidget(anchor, dock)  # pylint: disable=protected-access
+
+        return self.reveal_docked_widget(name)
+
+    def reveal_docked_widget(self, name: str) -> QWidget | None:
+        """Show and raise a tracked dock, returning it when it is valid."""
+        self.ensure_valid(name)
+        dock = self.docked_widgets.get(name)
+        if dock is not None:
+            dock.show()
+            dock.raise_()
+        return dock
+
+    def _group_anchor(self, group: str, excluding: str | None = None):
         """
-        Ensure that if a widget with the same name already exists, it is valid and visible.
-        If not, remove it from the docked widgets list.
+        Return any surviving dock in a group that can act as a tab anchor.
+
+        This is required as a group is an arbitary concept and not part of the Qt docking system. We have to
+        find a surviving dock to tabify new docks with.
+
+        Parameters
+        ----------
+        group : str
+            The name of the group to find an anchor for.
+        excluding : str | None
+            A dock name to exclude from consideration, by default None.
+        """
+        for name in list(self.dock_groups.get(group, [])):
+            if name == excluding:
+                continue
+            self.ensure_valid(name)
+            dock = self.docked_widgets.get(name)
+            if dock is not None:
+                return dock
+        return None
+
+    def _clear_widget_references(self, name: str):
+        """Remove every manager reference associated with a dock name."""
+        self.docked_widgets.pop(name, None)
+        self.raw_docked_widgets.pop(name, None)
+        group = self.widget_groups.pop(name, None)
+        if group is not None:
+            members = self.dock_groups.get(group, [])
+            self.dock_groups[group] = [member for member in members if member != name]
+            if not self.dock_groups[group]:
+                self.dock_groups.pop(group)
+
+    def _dock_destroyed(self, name: str, expected):
+        """Clear references when Qt destroys a managed dock."""
+        if self.docked_widgets.get(name) is expected:
+            self._clear_widget_references(name)
+
+    def ensure_valid(self, name: str):
+        """
+        Ensure that a widget with the same name is still valid.
 
         Parameters
         ----------
         name : str
             The name of the widget to ensure validity for.
         """
-        # If a widget with the same name already exists and is not valid or visible, remove it before adding the new one
-        if name in self.docked_widgets and (
-            not is_valid_widget(self.docked_widgets[name])
-            or (not is_visible_widget(self.docked_widgets[name]) and not allow_hidden)
-        ):
+        # If a widget with the given name exists but is no longer valid, remove it from the manager
+        if name in self.docked_widgets and not is_valid_widget(self.docked_widgets[name]):
             # Try to destroy the old widget if it still exists
             with contextlib.suppress(RuntimeError):
-                if hasattr(self.docked_widgets[name], "native"):
-                    self.docked_widgets[name].native.destroy()
-                elif hasattr(self.docked_widgets[name], "destroy"):
-                    self.docked_widgets[name].destroy()
-            self.docked_widgets.pop(name)
-            self.raw_docked_widgets.pop(name, None)
+                self.docked_widgets[name].destroy()
+            self._clear_widget_references(name)
 
     def get_widget(self, name: str, raw: bool = False):
         """
@@ -142,11 +212,7 @@ class WidgetManager:
             # Try to destroy the widget if it still exists
             with contextlib.suppress(RuntimeError):
                 self.viewer.window.remove_dock_widget(self.docked_widgets[name])
-                # if hasattr(self.docked_widgets[name], "native"):
-                #     self.docked_widgets[name].native.destroy()
-                # elif hasattr(self.docked_widgets[name], "destroy"):
-                #     self.docked_widgets[name].destroy()
-            self.docked_widgets.pop(name)
+            self._clear_widget_references(name)
 
 
 def set_running_function(function_name: str | None):
