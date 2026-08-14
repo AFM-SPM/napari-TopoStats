@@ -361,7 +361,11 @@ class WidgetFunction:
 
             button_row = Container(layout="horizontal", widgets=[save_scripts_btn, delete_scripts_btn], labels=False)
 
-            self.function_to_run = magicgui(make_group_func(self), function_name={"choices": get_choices})
+            self.function_to_run = magicgui(
+                make_group_func(self),
+                function_name={"choices": get_choices},
+                call_button="Run / Open options",
+            )
             self.function_to_run.append(button_row)
             attach_status_label(self.function_to_run)
         else:
