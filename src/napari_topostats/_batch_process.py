@@ -1,8 +1,12 @@
 """
 Batch processing functionality for napari-TopoStats.
+
 This module provides a function for batch processing multiple AFM images in a selected folder using the current
 configuration. The batch processing is performed in a separate thread to keep the GUI responsive, and progress
-is communicated through status messages and command line output.
+is communicated through status messages and command line output. It functions effectively identically to running
+TopoStats from the command line, apart from using the current configuration as loaded/ edited in the napari GUI
+and providing the ability to select input and output directories through a dialog if the default is being used
+("./" for input and "./output" for output).
 """
 
 import argparse
@@ -13,9 +17,9 @@ from napari import current_viewer  # pylint: disable=no-name-in-module
 from qtpy.QtWidgets import QFileDialog
 from topostats.run_modules import process
 
-from ._alerts import attach_status_label, show_error_dialog
-from ._io import config_loaded, get_current_config, get_current_config_path, load_config_impl
-from ._parallel_processing import ProcessWorker
+from napari_topostats._alerts import attach_status_label, show_error_dialog
+from napari_topostats._io import config_loaded, get_current_config, get_current_config_path, load_config_impl
+from napari_topostats._parallel_processing import ProcessWorker
 
 
 # pylint: disable=protected-access
@@ -30,6 +34,7 @@ def batch_process(
 ):
     """
     Batch process multiple AFM images in a selected folder using the current configuration.
+
     Parameters
     ----------
     data_path : Path | None
@@ -45,6 +50,7 @@ def batch_process(
     if not config_loaded(config_type=config_type):
         load_config_impl(current_viewer(), config_type=config_type, use_default=True)
 
+    # If the current configuration uses the default input/output directories, prompt the user to select them
     if get_current_config(config_type=config_type)["base_dir"] == "./":
         if data_path is None:
             data_path = QFileDialog.getExistingDirectory(
@@ -61,7 +67,10 @@ def batch_process(
             )
             output_path = Path(output_path)
             widget.output_path.value = output_path
+
     # ruff: noqa: SIM102
+
+    # If the batch process is already running, do not start another one
     if hasattr(widget, "_batch_worker"):
         try:
             if widget._batch_worker.isRunning():

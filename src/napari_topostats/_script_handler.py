@@ -7,10 +7,10 @@ from pathlib import Path
 
 from platformdirs import user_config_dir
 
-from ._alerts import show_error_dialog
-from ._components import SelectionDialog
-from ._state import get_topostats_widget, record_loaded_function_path
-from ._widget_function import WidgetFunction
+from napari_topostats._alerts import show_error_dialog
+from napari_topostats._components import SelectionDialog
+from napari_topostats._state import get_topostats_widget, record_loaded_function_path
+from napari_topostats._widget_function import WidgetFunction
 
 loaded_functions = []
 saved_scripts_loaded = False

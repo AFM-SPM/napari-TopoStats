@@ -24,9 +24,9 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from ._alerts import show_error_dialog
-from ._state import get_channel_colours
-from ._styles import (
+from napari_topostats._alerts import show_error_dialog
+from napari_topostats._state import get_channel_colours
+from napari_topostats._styles import (
     COLLAPSIBLE_BOX_BUTTON_STYLE,
     COLLAPSIBLE_BOX_SUBTLE_BUTTON_STYLE,
     PARAMETER_WARNING_LABEL_STYLE,

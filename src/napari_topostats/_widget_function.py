@@ -36,19 +36,25 @@ from qtpy.QtWidgets import (
 from scipy.ndimage import label
 from topostats.classes import TopoStats
 
-from . import _io as io
-from ._alerts import LoadingWidget, attach_status_label, construct_error_args, show_error_dialog
-from ._components import (
+import napari_topostats._io as io
+from napari_topostats._alerts import LoadingWidget, attach_status_label, construct_error_args, show_error_dialog
+from napari_topostats._components import (
     SelectionDialog,
     get_selected_curves,
     get_selected_image,
     get_selected_loaded_image,
     show_parameter_dialog,
 )
-from ._io import add_values_to_dict_from_config, fetch_saved_scripts, get_current_config, save_scripts, unsave_scripts
-from ._parallel_processing import ProcessWorker
-from ._state import WidgetManager, get_running_function, set_running_function
-from .utils import _eval, all_curves, calculate_contrast_limits, is_binary_image, remove_all_but_last
+from napari_topostats._io import (
+    add_values_to_dict_from_config,
+    fetch_saved_scripts,
+    get_current_config,
+    save_scripts,
+    unsave_scripts,
+)
+from napari_topostats._parallel_processing import ProcessWorker
+from napari_topostats._state import WidgetManager, get_running_function, set_running_function
+from napari_topostats.utils import _eval, all_curves, calculate_contrast_limits, is_binary_image, remove_all_but_last
 
 CURVES_VOLUME_PARAM = "curves_volume_to_operate_on"
 

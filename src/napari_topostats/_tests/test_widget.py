@@ -8,9 +8,8 @@ from pytestqt.qtbot import QtBot
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QCheckBox
 
+from napari_topostats._tests._helpers import load_test_image, run_functions_in_grid
 from napari_topostats._widget import TopoStatsRootWidget
-
-from ._helpers import load_test_image, run_functions_in_grid
 
 
 def test_button_grid_exists(topostats_widget: TopoStatsRootWidget):

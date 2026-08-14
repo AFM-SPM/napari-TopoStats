@@ -2,7 +2,7 @@
 
 from napari.viewer import current_viewer
 
-from ._script_handler import load_py_files
+from napari_topostats._script_handler import load_py_files
 
 
 def napari_get_reader(path: list | str):

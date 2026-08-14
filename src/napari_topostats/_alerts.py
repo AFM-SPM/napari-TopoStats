@@ -13,9 +13,9 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from . import _state as state
-from ._state import is_valid_widget
-from ._styles import (
+import napari_topostats._state as state
+from napari_topostats._state import is_valid_widget
+from napari_topostats._styles import (
     ERROR_DIALOG_BUTTON_STYLE,
     ERROR_DIALOG_LABEL_STYLE,
     ERROR_DIALOG_STYLE,

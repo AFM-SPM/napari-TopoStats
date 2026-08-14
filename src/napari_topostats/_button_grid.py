@@ -12,10 +12,9 @@ from qtpy.QtCore import QSize
 from qtpy.QtGui import QBrush, QColor, QIcon
 from qtpy.QtWidgets import QListWidget, QListWidgetItem
 
+from napari_topostats._alerts import show_error_dialog
 from napari_topostats._styles import BUTTON_GRID_STYLE
 from napari_topostats._widget_function import WidgetFunction, WidgetFunctionManager
-
-from ._alerts import show_error_dialog
 
 ICON_ROOT = Path(__file__).parent / "icons"
 

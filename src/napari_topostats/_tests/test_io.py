@@ -9,8 +9,7 @@ import pytest
 from pytestqt.qtbot import QtBot
 
 from napari_topostats import _io as io
-
-from ._helpers import open_load_config_widget
+from napari_topostats._tests._helpers import open_load_config_widget
 
 
 def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
