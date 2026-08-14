@@ -15,6 +15,17 @@ from qtpy.QtWidgets import (
 
 from . import _state as state
 from ._state import is_valid_widget
+from ._styles import (
+    ERROR_DIALOG_BUTTON_STYLE,
+    ERROR_DIALOG_LABEL_STYLE,
+    ERROR_DIALOG_STYLE,
+    LOADING_CONTAINER_STYLE,
+    LOADING_LABEL_STYLE,
+    LOADING_OVERLAY_STYLE,
+    STATUS_LABEL_HIDDEN_STYLE,
+    STATUS_LABEL_STYLE,
+    STATUS_LABEL_VISIBLE_STYLE,
+)
 
 NAPARI_TOPOSTATS_REPORT = "https://github.com/AFM-SPM/napari-TopoStats/issues/new?template=bug_report.yaml"
 
@@ -41,16 +52,10 @@ class ErrorDialog(QDialog):
         layout = QVBoxLayout()
         layout.setSpacing(10)
 
-        # Error message
+        # Error message text itself
         self.label = QLabel(message)
         self.label.setWordWrap(True)
-        self.label.setStyleSheet("""
-            QLabel {
-                font-size: 13px;
-                color: #333333;
-                padding: 10px;
-            }
-        """)
+        self.label.setStyleSheet(ERROR_DIALOG_LABEL_STYLE)
         layout.addWidget(self.label)
 
         # OK button
@@ -58,22 +63,7 @@ class ErrorDialog(QDialog):
         button_layout.addStretch()
         ok_button = QPushButton("OK")
         ok_button.setMinimumWidth(80)
-        ok_button.setStyleSheet("""
-            QPushButton {
-                background-color: #0078d4;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-size: 13px;
-            }
-            QPushButton:hover {
-                background-color: #106ebe;
-            }
-            QPushButton:pressed {
-                background-color: #005a9e;
-            }
-        """)
+        ok_button.setStyleSheet(ERROR_DIALOG_BUTTON_STYLE)
         ok_button.clicked.connect(self.accept)
         button_layout.addWidget(ok_button)
         layout.addLayout(button_layout)
@@ -82,11 +72,7 @@ class ErrorDialog(QDialog):
         self.setModal(True)
 
         # Dialog styling
-        self.setStyleSheet("""
-            QDialog {
-                background-color: white;
-            }
-        """)
+        self.setStyleSheet(ERROR_DIALOG_STYLE)
 
 
 def show_error_dialog(
@@ -168,13 +154,7 @@ def attach_status_label(widget: FunctionGui | QWidget):
     """
 
     label = QLabel("")
-    label.setStyleSheet("""
-        QLabel {
-            border: none;
-            padding: 0px;
-            margin: 0px;
-        }
-    """)
+    label.setStyleSheet(STATUS_LABEL_STYLE)
     label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
     label.setMinimumWidth(0)
     label.setMaximumWidth(300)  # Prevent excessive width
@@ -200,22 +180,14 @@ def attach_status_label(widget: FunctionGui | QWidget):
             if to_adjust.parent():
                 to_adjust.parent().adjustSize()
                 to_adjust.parent().updateGeometry()
-            label.setStyleSheet("""
-                QLabel {
-                    font-size: 4px
-                }
-            """)
+            label.setStyleSheet(STATUS_LABEL_HIDDEN_STYLE)
 
     label_timer.timeout.connect(remove_label)
     widget.label_timer = label_timer
 
     def set_status_message(message: str):
         label.setText(message)
-        label.setStyleSheet("""
-            QLabel {
-                font-size: 12px
-            }
-        """)
+        label.setStyleSheet(STATUS_LABEL_VISIBLE_STYLE)
         label.adjustSize()
         to_adjust = widget.native if hasattr(widget, "native") else widget
         to_adjust.updateGeometry()
@@ -243,7 +215,7 @@ class LoadingWidget(QWidget):
 
         # Make overlay semi-transparent
         self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
-        self.setStyleSheet("background-color: rgba(0, 0, 0, 120);")
+        self.setStyleSheet(LOADING_OVERLAY_STYLE)
 
         # Center layout
         layout = QVBoxLayout()
@@ -251,26 +223,13 @@ class LoadingWidget(QWidget):
 
         # Create container with rounded background
         loading_container = QWidget()
-        loading_container.setStyleSheet("""
-            QWidget {
-                background-color: rgba(40, 40, 40, 240);
-                border-radius: 15px;
-                padding: 30px;
-            }
-        """)
+        loading_container.setStyleSheet(LOADING_CONTAINER_STYLE)
 
         loading_layout = QVBoxLayout()
         loading_layout.setAlignment(Qt.AlignCenter)
 
         self.loading_label = QLabel()
-        self.loading_label.setStyleSheet("""
-            QLabel {
-                color: white;
-                font-size: 18px;
-                font-weight: bold;
-                background-color: transparent;
-            }
-        """)
+        self.loading_label.setStyleSheet(LOADING_LABEL_STYLE)
         self.loading_label.setAlignment(Qt.AlignCenter)
 
         loading_layout.addWidget(self.loading_label)

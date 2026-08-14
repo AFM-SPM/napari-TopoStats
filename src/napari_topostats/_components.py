@@ -26,7 +26,12 @@ from qtpy.QtWidgets import (
 
 from ._alerts import show_error_dialog
 from ._state import get_channel_colours
-from ._styles import PROFILE_VIEWER_MARGIN
+from ._styles import (
+    COLLAPSIBLE_BOX_BUTTON_STYLE,
+    COLLAPSIBLE_BOX_SUBTLE_BUTTON_STYLE,
+    PARAMETER_WARNING_LABEL_STYLE,
+    PROFILE_VIEWER_MARGIN,
+)
 
 
 class CollapsibleBox(QWidget):
@@ -69,21 +74,9 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setChecked(start_open)
         self.toggle_button.setFlat(subtle)
         if subtle:
-            self.toggle_button.setStyleSheet(
-                "QPushButton {"
-                " text-align: left;"
-                " font-weight: bold;"
-                " padding: 0.15em 0;"
-                " border: none;"
-                " background: transparent;"
-                "}"
-                "QPushButton:hover { background: transparent; text-decoration: underline; }"
-            )
+            self.toggle_button.setStyleSheet(COLLAPSIBLE_BOX_SUBTLE_BUTTON_STYLE)
         else:
-            self.toggle_button.setStyleSheet(
-                "QPushButton { text-align: left; font-weight: bold; padding: 0.5em; border: none; }"
-                "QPushButton:hover { background-color: #555d68; }"
-            )
+            self.toggle_button.setStyleSheet(COLLAPSIBLE_BOX_BUTTON_STYLE)
         self.toggle_button.toggled.connect(self.on_toggle)
         self.layout.addWidget(self.toggle_button)
 
@@ -701,7 +694,7 @@ class DynamicParameterDialog(QDialog):
         if warning_message:
             warning_label = QLabel(warning_message)
             warning_label.setWordWrap(True)
-            warning_label.setStyleSheet("font-weight: bold; color: #ffaa00; margin-bottom: 10px;")
+            warning_label.setStyleSheet(PARAMETER_WARNING_LABEL_STYLE)
             self.layout.addWidget(warning_label)
 
         self.container = Container()

@@ -434,6 +434,7 @@ class TopoStatsRootWidget(RootWidget):
         guide_button = QPushButton("Show Guide")
         guide_button.setToolTip("Open the TopoStats guide.")
         guide_button.clicked.connect(lambda: show_guide(self._viewer))
+
         # Add a text label to tell the user they can press 'a' to open the curve viewer and use the line tool
         line_tool_label = QLabel("Hold 'a' to draw a line and view the profile plot")
         line_tool_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
