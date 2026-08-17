@@ -249,13 +249,13 @@ class ProfileViewer(QWidget):
         if self.loaded_image is not None:
             for channel in self.channel_selector.get_checked_items():
                 # For each selected channel, retrieve the profile data
-                values, px2nm, z_units = self.get_profile_data(channel, row_coords, column_coords)
+                values, pixel_to_nanometre_scaling, z_units = self.get_profile_data(channel, row_coords, column_coords)
 
                 # Create the plot or update it if it already exists
                 if values is not None:
                     self.plot_widget.plot(
                         channel,
-                        np.array(np.arange(len(values))) * float(px2nm),
+                        np.array(np.arange(len(values))) * float(pixel_to_nanometre_scaling),
                         values,
                         unit=z_units,
                     )
@@ -283,12 +283,12 @@ class ProfileViewer(QWidget):
         Returns
         -------
         tuple[np.ndarray | None, float, str]
-            A tuple containing the profile values (or None if empty), the pixel-to-nanometer
+            A tuple containing the profile values (or None if empty), the pixel-to-nanometre
             conversion factor, and the z-axis units.
         """
 
-        # Retrieve the loaded data, pixel-to-nanometer conversion factor, and z-axis units for the specified channel
-        data, px2nm, z_units = self.loaded_image.get_map(channel)
+        # Retrieve the loaded data, pixel-to-nanometre conversion factor, and z-axis units for the specified channel
+        data, pixel_to_nanometre_scaling, z_units = self.loaded_image.get_map(channel)
 
         # Handle multi-dimensional data (take the last 2D slice if needed)
         if data.ndim > 2:
@@ -316,10 +316,10 @@ class ProfileViewer(QWidget):
             elif z_units == "mm":
                 z_units = "m"
                 values = np.array(values) * 1e-3
-            return values, px2nm, z_units
+            return values, pixel_to_nanometre_scaling, z_units
 
         # Values returned as None if empty
-        return None, px2nm, z_units
+        return None, pixel_to_nanometre_scaling, z_units
 
     def get_pixel_coordinates(self) -> tuple[np.ndarray, np.ndarray]:
         """
