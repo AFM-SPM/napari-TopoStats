@@ -90,11 +90,11 @@ disable=C0103,
         logging-fstring-interpolation,
         file-ignored,
         suppressed-message,
-        useless-suppression,
         deprecated-pragma,
         use-symbolic-message-instead,
         too-few-public-methods,
         fixme,
+        broad-exception-caught,
         too-many-positional-arguments,
 
 

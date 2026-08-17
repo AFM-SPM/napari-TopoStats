@@ -54,7 +54,7 @@ def test_load_image(napari_viewer: Viewer, image_path: str):
         )
     ],
 )
-def test_functions_in_grid(  # pylint: disable=too-many-positional-arguments
+def test_functions_in_grid(
     qtbot: QtBot,
     napari_viewer: Viewer,
     topostats_widget: TopoStatsRootWidget,

@@ -19,7 +19,6 @@ ALLOWABLE_PARAMETERS = ["viewer", "image", "curves", "curve", "channel_units"]
 
 def load_py_files(paths, viewer):
     """Load functions from python files into the button grid"""
-    global loaded_functions  # pylint: disable=global-variable-not-assigned
     py_functions = {}
     function_to_filepath = {}
     for py_file in paths:
@@ -118,7 +117,7 @@ def load_functions_from_file(file_path):
 
     try:
         spec.loader.exec_module(module)
-    except Exception as e:  # pylint: disable=broad-exception-caught #noqa: BLE001
+    except Exception as e:  # noqa: BLE001 -- report failures from user-supplied scripts in the GUI
         show_error_dialog(f"Error executing {file_path}: {e}")
         return {}
 

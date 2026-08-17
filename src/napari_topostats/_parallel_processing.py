@@ -1,5 +1,3 @@
-# ruff: noqa: BLE001
-# pylint: disable=broad-exception-caught
 """Provides a worker thread for parallel processing of intensive functions."""
 
 from qtpy.QtCore import QThread, Signal
@@ -37,5 +35,5 @@ class ProcessWorker(QThread):
         try:
             self.result = self.func(*self.args, **self.kwargs)
             self.result_ready.emit(self.result)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- forward worker failures to the GUI thread
             self.error_signal.emit(e)

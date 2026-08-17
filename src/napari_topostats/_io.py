@@ -142,7 +142,6 @@ def should_use_line_edit_for_float(value: float) -> bool:
     return abs(value) != 0 and (abs(value) < 1e-4 or abs(value) > 1e6)
 
 
-# pylint: disable=global-variable-not-assigned
 def on_config_value_changed(key: str, val: Any, config_type: str = "topostats"):
     """
     Update the config wrapper when a value changes
@@ -154,7 +153,6 @@ def on_config_value_changed(key: str, val: Any, config_type: str = "topostats"):
     val : Any
         The new value.
     """
-    global updated_values
     if isinstance(val, str):
         stripped = val.strip()
 

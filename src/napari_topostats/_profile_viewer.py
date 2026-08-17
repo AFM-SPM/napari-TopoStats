@@ -1,7 +1,7 @@
 """Module to add plotting functionality for viewing force curves"""
 
 # pylint: disable=too-many-instance-attributes, unused-argument, too-many-nested-blocks
-# pylint: disable=too-many-branches, global-variable-not-assigned
+# pylint: disable=too-many-branches
 
 
 import numpy as np

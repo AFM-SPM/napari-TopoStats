@@ -256,7 +256,7 @@ class WidgetFunction:
         function is part of a group of functions.
     """
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-instance-attributes, too-many-statements, protected-access
+    # pylint: disable=too-many-arguments, too-many-instance-attributes, too-many-statements, protected-access
     def __init__(
         self,
         name: str,
@@ -511,7 +511,7 @@ class WidgetFunction:
                         if self.type_class is not None:
                             parameters_from_class.pop(param_name, None)
 
-            # pylint: disable=too-many-branches, too-many-statements, broad-exception-caught, attribute-defined-outside-init
+            # pylint: disable=too-many-branches, too-many-statements, attribute-defined-outside-init
             def func(**kwargs):
                 viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
                 loading_widget = LoadingWidget(viewer)
@@ -808,7 +808,6 @@ class WidgetFunction:
                     # Execute function or method
                     # pylint: disable=too-many-return-statements
                     def _func():
-                        # ruff: noqa: BLE001
                         try:
                             if self.type_class:
                                 instance = self.type_class(**class_args)
@@ -846,7 +845,7 @@ class WidgetFunction:
                                 )
                             else:
                                 result = evaluate_path_to_data(self.path_to_data, return_value)
-                        except Exception as e:
+                        except Exception as e:  # noqa: BLE001 -- convert processing failures into GUI error data
                             return construct_error_args(
                                 exception=e, raise_exception=True, topostats_error=True, type_class=self.type_class
                             )
@@ -894,7 +893,7 @@ class WidgetFunction:
                     self.worker.result_ready.connect(_handle_result)
                     self.worker.error_signal.connect(_handle_error)
                     self.worker.start()
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- report failures while preparing the GUI action
                     _cleanup()
                     show_error_dialog(
                         f"Error preparing to run function {self.function_to_run.__name__}: {str(e)}",
@@ -1005,7 +1004,7 @@ class WidgetFunction:
             attach_status_label(magicgui_function)
             return magicgui_function
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- report widget construction failures before propagating them
             show_error_dialog(f"❌ Exception in get_widget: {e}")
             raise
 

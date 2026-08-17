@@ -517,8 +517,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         except IndexError:
             self.info_label.setText("Clicked outside the image bounds.")
 
-        # pylint: disable=broad-exception-caught
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 -- keep plotting failures within the GUI callback
             self.info_label.setText(f"Error plotting curve: {str(e)}")
 
     def set_available_channels(self, available_channels: list):

@@ -1,6 +1,6 @@
 """Contains functions surrounding utilities and cosmetics."""
 
-# pylint: disable=import-outside-toplevel,too-many-nested-blocks,too-many-positional-arguments,too-many-statements
+# pylint: disable=import-outside-toplevel,too-many-nested-blocks,too-many-statements
 
 from __future__ import annotations
 
@@ -238,7 +238,6 @@ def remove_all_but_last(word: str, text: str) -> str:
     return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return
 
 
-# pylint: disable=too-many-positional-arguments
 def _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig):
     """Worker function for parallel curve processing returning full value from function."""
     if type_class is not None:
