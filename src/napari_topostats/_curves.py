@@ -1,10 +1,14 @@
 """Module for viewing force curves at selected image pixels."""
 
+from collections.abc import Generator
+from typing import Any
+
 import numpy as np
 import pyqtgraph as pg
 from AFMReader.data_classes import CurvesDataset
+from napari import Viewer
 from napari_afmreader._reader import get_loaded_image
-from qtpy.QtGui import QPainterPath, QTransform
+from qtpy.QtGui import QHideEvent, QPainterPath, QShowEvent, QTransform
 from qtpy.QtWidgets import (
     QComboBox,
     QDialog,
@@ -41,7 +45,7 @@ def _filled_cross_symbol() -> QPainterPath:
     return QTransform().rotate(45).map(path)
 
 
-def open_curve_viewer(viewer):
+def open_curve_viewer(viewer: Viewer) -> "CurveViewer":
     """
     Return the curve viewer
 
@@ -63,7 +67,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
     """Custom docked widget for displaying force curves"""
 
     # pylint: disable=too-many-statements
-    def __init__(self, viewer):
+    def __init__(self, viewer: Viewer):
         """
         Initialize the curve viewer and attach it to the napari viewer.
 
@@ -216,7 +220,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             self.segment_lines[selected_segment].setData(x_data, y_data)
         self.info_label.setText(f"Plotting curve for pixel (x={self.x_coord}, y={self.y_coord}).")
 
-    def update_channels(self, x_channel=None, y_channel=None):
+    def update_channels(self, x_channel: str | None = None, y_channel: str | None = None):
         """Updates the channels of the plot and refreshes curve to match"""
         if x_channel:
             self.x_channel = x_channel
@@ -288,7 +292,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 del self.segment_lines[segment_name]
         self.update_curve()
 
-    def update_analysis_results(self, analysis_results=None):
+    def update_analysis_results(self, analysis_results: dict[str, int] | None = None):
         """Update visible analysis result markers for the current curve."""
         if isinstance(analysis_results, dict):
             previous_result_names = set(self.current_analysis_results.keys())
@@ -344,7 +348,12 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 result_value_x = self.selected_curve_dict[self.x_channel][marker_segment][result_value]
                 result_value_y = self.selected_curve_dict[self.y_channel][marker_segment][result_value]
 
-                def result_tip(x, y, data=None, result_name=result_name):  # pylint: disable=unused-argument
+                def result_tip(
+                    x: float,
+                    y: float,
+                    data: dict[str, Any] | None = None,
+                    result_name: str = result_name,
+                ) -> str:  # pylint: disable=unused-argument
                     idx = data.get("index", "") if data is not None else ""
                     return f"{result_name.title().replace('_', ' ')}: {idx}"
 
@@ -363,13 +372,13 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 self.active_analysis_markers[result_name] = marker
                 self.plot_widget.addItem(marker)
 
-    def showEvent(self, event):
+    def showEvent(self, event: QShowEvent):
         """Register the mouse callback when the widget is shown."""
         if self.extract_curve not in self.viewer.mouse_drag_callbacks:
             self.viewer.mouse_drag_callbacks.append(self.extract_curve)
         super().showEvent(event)
 
-    def hideEvent(self, event):
+    def hideEvent(self, event: QHideEvent):
         """Clean up the mouse callback and selection cross layer when hidden/closed."""
         if self.extract_curve in self.viewer.mouse_drag_callbacks:
             self.viewer.mouse_drag_callbacks.remove(self.extract_curve)
@@ -377,7 +386,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             self.viewer.layers.remove("Selected Curve")
         super().hideEvent(event)
 
-    def extract_curve(self, viewer, event):
+    def extract_curve(self, viewer: Viewer, event: Any) -> Generator[None, None, None]:
         """Generator that runs when the user clicks and drags the mouse in the viewer."""
         if "Shift" not in event.modifiers:
             return
@@ -420,7 +429,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             pen=get_curve_segment_colours()[segment_name],
         )
 
-    def _process_event_coords(self, viewer, event):
+    def _process_event_coords(self, viewer: Viewer, event: Any):
         """The core logic to extract and plot the curve at the current mouse position."""
         layer = viewer.layers.selection.active
         reader_id = layer.metadata.get("afmreader_id") if layer and layer.metadata else None
@@ -577,7 +586,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 class ParameterDialog(QDialog):
     """Custom parameters dialog to show values for selected curves"""
 
-    def __init__(self, metadata: dict = None, parent=None):
+    def __init__(self, metadata: dict[str, Any] | None = None, parent: QWidget | None = None):
         super().__init__(parent)
         self.setWindowTitle("Experimental Parameters")
         self.resize(500, 600)
@@ -592,14 +601,14 @@ class ParameterDialog(QDialog):
         self.populate_parameters(self.metadata)
         self.layout().addWidget(self.scroll_area)
 
-    def populate_parameters(self, metadata):
+    def populate_parameters(self, metadata: dict[str, Any]):
         """Populate the parameters viewing dialog with the metadata"""
         self.metadata = metadata
         parameters_dict = unflatten_dict(self.metadata)
         self.info_widget.update(parameters_dict)
 
 
-def _get_parameters_widget(dict_data: dict, title: str = "Parameters"):
+def _get_parameters_widget(dict_data: dict[str, Any], title: str = "Parameters") -> CollapsibleBox:
     collapsible_box = CollapsibleBox(title=title)
     for key, value in dict_data.items():
         if isinstance(value, dict):

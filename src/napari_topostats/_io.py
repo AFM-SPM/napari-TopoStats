@@ -760,7 +760,7 @@ def _unflatten_comments(flat_comments: dict[str, str]) -> dict:
     return result
 
 
-def _write_yaml_with_inline_comments(file_path: Path, config: dict, comments: dict):
+def _write_yaml_with_inline_comments(file_path: Path, config: dict[str, Any], comments: dict[str, Any]):
     """
     Write YAML config file with inline comments preserved.
 
@@ -880,8 +880,8 @@ def add_values_to_dict_from_config(
     wrapper: ConfigWrapper,
     function_key: str,
     args: dict[str, Any],
-    params: list,
-):
+    params: list[Any],
+) -> dict[str, Any]:
     """
     Add values from the config to the args dictionary based on the function key and parameters.
     This function checks if the parameters are present in the config and adds them to the args dictionary.
@@ -918,7 +918,7 @@ def add_values_to_dict_from_config(
     return args
 
 
-def save_scripts(selected_scripts):
+def save_scripts(selected_scripts: list[str]) -> set[str]:
     """
     Saves selected scripts to the TopoStats configuration directory.
 
@@ -968,7 +968,7 @@ def save_scripts(selected_scripts):
     return saved_files
 
 
-def unsave_scripts(selected_scripts):
+def unsave_scripts(selected_scripts: list[str]) -> set[str]:
     """
     Unsaves selected scripts from the TopoStats configuration directory.
 
@@ -1023,7 +1023,7 @@ def unsave_scripts(selected_scripts):
     return unsaved_files
 
 
-def fetch_saved_scripts():
+def fetch_saved_scripts() -> dict[str, list[str]]:
     """
     Fetches the metadata of saved scripts.
 

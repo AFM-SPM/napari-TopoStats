@@ -1,12 +1,15 @@
 """Module for containing custom and reusable gui components"""
 
+from collections.abc import Iterable
+from typing import Any
+
 import dask.array as da
 import numpy as np
 import pyqtgraph as pg
 from AFMReader.data_classes import CurvesDataset
 from magicgui.widgets import Container, create_widget
 from napari import Viewer
-from napari.layers import Image, Labels
+from napari.layers import Image, Labels, Layer
 from napari_afmreader._reader import LoadedImage, get_loaded_image
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QColor, QStandardItem, QStandardItemModel
@@ -122,7 +125,7 @@ class CollapsibleBox(QWidget):
         """
         self.content_layout.addWidget(widget)
 
-    def add_parameter(self, name: str, value, editable: bool = False):
+    def add_parameter(self, name: str, value: Any, editable: bool = False):
         """
         Adds a widget representing a given parameter to the collapsible box layout
 
@@ -210,7 +213,7 @@ class CollapsibleBox(QWidget):
 class SelectionDialog(QDialog):
     """Selection dialog to allow so list of items to be given then return selected items"""
 
-    def __init__(self, available_items, text="Select items", parent=None):
+    def __init__(self, available_items: Iterable[str], text: str = "Select items", parent: QWidget | None = None):
         """
         Initializes the selection dialog.
 
@@ -260,7 +263,7 @@ class SelectionDialog(QDialog):
         for i in range(self.list_widget.count()):
             self.list_widget.item(i).setSelected(False)
 
-    def get_selected_items(self):
+    def get_selected_items(self) -> list[str]:
         """Helper method to return the text of the selected items."""
         return [item.text() for item in self.list_widget.selectedItems()]
 
@@ -364,7 +367,7 @@ class SelectionDropdown(QComboBox):
         self.setCurrentIndex(-1)
         self.lineEdit().setText(new_text)
 
-    def get_checked_items(self):
+    def get_checked_items(self) -> list[str]:
         """
         Return a list of the currently checked items.
 
@@ -409,7 +412,7 @@ class SelectionDropdown(QComboBox):
 class MultiPlotWidget(QWidget):
     """A widget to display multiple plots in a grid layout"""
 
-    def __init__(self, title: str, parent=None):
+    def __init__(self, title: str, parent: QWidget | None = None):
         """Initializes the MultiPlotWidget."""
         super().__init__(parent=parent)
         self.setLayout(QHBoxLayout())
@@ -526,7 +529,7 @@ class MultiPlotWidget(QWidget):
                     line_data = self.line_data[(self.current_unit, line_channel)]
                     line_item.setData(line_data[0], line_data[1])
 
-    def remove_unshown_lines(self):
+    def remove_unshown_lines(self) -> list[str]:
         """Remove plotted profile lines that are not shown on either axis."""
         removed = []
         for profile_unit, lines in list(self.profile_lines.items()):
@@ -543,7 +546,7 @@ class MultiPlotWidget(QWidget):
                     self.profile_lines.pop(profile_unit, None)
         return removed
 
-    def get_profile_lines(self):
+    def get_profile_lines(self) -> dict[str, dict[str, pg.PlotDataItem]]:
         """Returns the current profile lines."""
         return self.profile_lines
 
@@ -561,7 +564,7 @@ class MultiPlotWidget(QWidget):
 
 
 # TODO: This function really gets currently selected layer not image
-def get_selected_image(viewer, of_type: list = None) -> Image | None:
+def get_selected_image(viewer: Viewer, of_type: list[type[Any]] | None = None) -> Image | None:
     """
     Get the currently selected image layer from the viewer.
 
@@ -598,7 +601,7 @@ def get_selected_image(viewer, of_type: list = None) -> Image | None:
     return None
 
 
-def get_selected_curves(viewer: Viewer | None, suppress_errors=False) -> CurvesDataset | None:
+def get_selected_curves(viewer: Viewer | None, suppress_errors: bool = False) -> CurvesDataset | None:
     """
     Get the currently selected curves from the viewer.
     This retrieves the curves from the LoadedImage object associated with the selected layer.
@@ -636,10 +639,10 @@ def get_selected_curves(viewer: Viewer | None, suppress_errors=False) -> CurvesD
     return loaded_image.curves_data
 
 
-def get_current_layer(viewer, requires_force_curves=False):
+def get_current_layer(viewer: Viewer, requires_force_curves: bool = False) -> Layer | None:
     """Utility function to get the current active layer, excluding helper shapes layers"""
 
-    def has_force_curves(layer):
+    def has_force_curves(layer: Layer | None) -> bool:
         if not layer or not layer.metadata:
             return False
         reader_id = layer.metadata.get("afmreader_id")
@@ -686,7 +689,13 @@ def get_selected_loaded_image(viewer: Viewer) -> LoadedImage:
 class DynamicParameterDialog(QDialog):
     """A dialog that dynamically generates inputs based on parameters configuration using magicgui."""
 
-    def __init__(self, parameters: dict, title: str = "Parameters", warning_message: str = None, parent=None):
+    def __init__(
+        self,
+        parameters: dict[str, Any],
+        title: str = "Parameters",
+        warning_message: str | None = None,
+        parent: QWidget | None = None,
+    ):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.layout = QVBoxLayout(self)
@@ -736,7 +745,7 @@ class DynamicParameterDialog(QDialog):
         button_layout.addWidget(ok_button)
         self.layout.addLayout(button_layout)
 
-    def _update_visibility(self, *_args):
+    def _update_visibility(self, *_args: Any):
         """Update conditional widget visibility from current dialog values."""
         values = self.get_values()
         for param_name, rule in self.visibility_rules.items():
@@ -744,7 +753,7 @@ class DynamicParameterDialog(QDialog):
             self._set_widget_visible(widget, bool(rule(values)))
 
     @staticmethod
-    def _set_widget_visible(widget, visible: bool):
+    def _set_widget_visible(widget: Any, visible: bool):
         """Set visibility on the magicgui row so both label and control are hidden."""
         labeled_widget_getter = getattr(widget, "_labeled_widget", None)
         labeled_widget = labeled_widget_getter() if callable(labeled_widget_getter) else None
@@ -764,7 +773,10 @@ class DynamicParameterDialog(QDialog):
 
 
 def show_parameter_dialog(
-    parameters: dict, title: str = "Parameters", warning_message: str = None, parent=None
+    parameters: dict[str, Any],
+    title: str = "Parameters",
+    warning_message: str | None = None,
+    parent: QWidget | None = None,
 ) -> dict | None:
     """Helper function to show a DynamicParameterDialog and return values or None."""
     dialog = DynamicParameterDialog(parameters, title, warning_message, parent)

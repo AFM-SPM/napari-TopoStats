@@ -214,7 +214,7 @@ class RootWidget(QWidget):
         The parent widget, by default None.
     """
 
-    def __init__(self, viewer: Viewer, functions: dict[str, WidgetFunction], parent=None):
+    def __init__(self, viewer: Viewer, functions: list[WidgetFunction], parent: QWidget | None = None):
         """
         Initialises RootWidget
 
@@ -277,7 +277,7 @@ class RootWidget(QWidget):
         # Set the layout for the widget
         self.setLayout(self.vlayout)
 
-    def get_functions(self, _functions: dict[str, WidgetFunction | tuple[str, list[WidgetFunction]]]):
+    def get_functions(self, _functions: list[WidgetFunction]) -> dict[str, WidgetFunction]:
         """
         Get the available functions for the button grid.
 
@@ -350,7 +350,7 @@ class TopoStatsRootWidget(RootWidget):
         The parent widget, by default None.
     """
 
-    def __init__(self, viewer: Viewer, parent=None):  # pylint: disable=too-many-statements
+    def __init__(self, viewer: Viewer, parent: QWidget | None = None):  # pylint: disable=too-many-statements
         """
         Initialises TopoStatsRootWidget
 

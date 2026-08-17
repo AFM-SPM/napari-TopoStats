@@ -3,7 +3,9 @@
 import importlib.util
 import inspect
 import json
+from collections.abc import Callable, Iterable
 from pathlib import Path
+from typing import Any
 
 from platformdirs import user_config_dir
 
@@ -12,12 +14,12 @@ from napari_topostats._components import SelectionDialog
 from napari_topostats._state import get_topostats_widget, record_loaded_function_path
 from napari_topostats._widget_function import WidgetFunction
 
-loaded_functions = []
+loaded_functions: list[WidgetFunction] = []
 saved_scripts_loaded = False
 ALLOWABLE_PARAMETERS = ["viewer", "image", "curves", "curve", "channel_units"]
 
 
-def load_py_files(paths, viewer):
+def load_py_files(paths: Iterable[str | Path], viewer: Any):
     """Load functions from python files into the button grid"""
     py_functions = {}
     function_to_filepath = {}
@@ -57,7 +59,7 @@ def load_py_files(paths, viewer):
                 topostats_widget.add_function(widget_function, to_group=True)
 
 
-def fetch_saved_functions():
+def fetch_saved_functions() -> list[WidgetFunction]:
     """Fetch user saved scripts from app data and load them into the button grid"""
     save_dir = Path(user_config_dir("TopoStats", "Napari")) / "scripts"
     metadata_path = save_dir / "saved_scripts.json"
@@ -94,7 +96,7 @@ def fetch_saved_functions():
     return loaded_functions
 
 
-def get_loaded_functions():
+def get_loaded_functions() -> list[WidgetFunction]:
     """Get the list of currently loaded functions from python files."""
     global saved_scripts_loaded  # pylint: disable=global-statement
     if not saved_scripts_loaded:
@@ -103,7 +105,7 @@ def get_loaded_functions():
     return loaded_functions
 
 
-def load_functions_from_file(file_path):
+def load_functions_from_file(file_path: str | Path) -> dict[str, Callable[..., Any]]:
     """Loads a python file dynamically and extracts its functions."""
     path = Path(file_path)
     module_name = path.stem

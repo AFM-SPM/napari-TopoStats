@@ -1,6 +1,7 @@
 """Repeated fixtures for napari_topostats tests."""
 
 import os
+from collections.abc import Generator
 
 import matplotlib
 import napari
@@ -23,7 +24,7 @@ def configure_matplotlib():
 
 
 @pytest.fixture(name="napari_viewer")
-def napari_viewer_fixture(qtbot: QtBot):
+def napari_viewer_fixture(qtbot: QtBot) -> napari.Viewer:
     """Create a Napari viewer with QtBot cleanup."""
     viewer = napari.Viewer(show=False)  # pylint: disable=not-callable
     qtbot.addWidget(viewer.window._qt_window)  # pylint: disable=protected-access
@@ -32,7 +33,7 @@ def napari_viewer_fixture(qtbot: QtBot):
 
 
 @pytest.fixture
-def topostats_widget(napari_viewer, qtbot: QtBot):
+def topostats_widget(napari_viewer: napari.Viewer, qtbot: QtBot) -> Generator[TopoStatsRootWidget, None, None]:
     """Create the TopoStatsRootWidget and return its function grid."""
     widget = TopoStatsRootWidget(napari_viewer)
     qtbot.addWidget(widget)
@@ -53,6 +54,6 @@ def topostats_widget(napari_viewer, qtbot: QtBot):
 
 
 @pytest.fixture
-def widget_manager(napari_viewer):
+def widget_manager(napari_viewer: napari.Viewer) -> WidgetManager:
     """Create a WidgetManager bound to the current test's viewer, updating the global singleton."""
     return WidgetManager(napari_viewer)

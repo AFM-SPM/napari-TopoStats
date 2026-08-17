@@ -4,6 +4,7 @@ test images, simulating button clicks, and opening configuration dialogs.
 """
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from napari import Viewer
@@ -95,7 +96,7 @@ def open_load_config_widget(qtbot: QtBot, topostats_widget: TopoStatsRootWidget)
     """
 
     # pylint: disable=unused-argument
-    def get_file_path(*args, **kwargs):
+    def get_file_path(*args: Any, **kwargs: Any) -> tuple[None, None]:
         return (None, None)
 
     with patch(

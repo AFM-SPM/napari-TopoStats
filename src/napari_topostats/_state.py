@@ -33,12 +33,12 @@ curve_segment_colour_idx = 0
 loaded_function_paths = {}
 
 
-def get_widget_manager():
+def get_widget_manager() -> "WidgetManager | None":
     """Get the global widget manager instance."""
     return widget_manager
 
 
-def set_widget_manager(manager):
+def set_widget_manager(manager: "WidgetManager | None"):
     """Set the global widget manager instance."""
     global widget_manager  # pylint:disable=global-statement
     widget_manager = manager
@@ -61,7 +61,13 @@ class WidgetManager:
         # Set the global widget manager instance to this instance
         widget_manager = self
 
-    def add_docked_widget(self, widget, area="right", name=None, group=None):
+    def add_docked_widget(
+        self,
+        widget: FunctionGui | QWidget,
+        area: str = "right",
+        name: str | None = None,
+        group: str | None = None,
+    ) -> QWidget | None:
         """
         Add a widget to the dock
 
@@ -115,7 +121,7 @@ class WidgetManager:
             dock.raise_()
         return dock
 
-    def _group_anchor(self, group: str, excluding: str | None = None):
+    def _group_anchor(self, group: str, excluding: str | None = None) -> QWidget | None:
         """
         Return any surviving dock in a group that can act as a tab anchor.
 
@@ -149,7 +155,7 @@ class WidgetManager:
             if not self.dock_groups[group]:
                 self.dock_groups.pop(group)
 
-    def _dock_destroyed(self, name: str, expected):
+    def _dock_destroyed(self, name: str, expected: QWidget):
         """Clear references when Qt destroys a managed dock."""
         if self.docked_widgets.get(name) is expected:
             self._clear_widget_references(name)
@@ -170,7 +176,7 @@ class WidgetManager:
                 self.docked_widgets[name].destroy()
             self._clear_widget_references(name)
 
-    def get_widget(self, name: str, raw: bool = False):
+    def get_widget(self, name: str, raw: bool = False) -> FunctionGui | QWidget | None:
         """
         Get a widget by name.
 
@@ -188,7 +194,7 @@ class WidgetManager:
             return self.raw_docked_widgets.get(name, None)
         return self.docked_widgets.get(name, None)
 
-    def get_docked_widgets(self):
+    def get_docked_widgets(self) -> dict[str, QWidget]:
         """
         Get the list of currently docked widgets.
 
@@ -199,7 +205,7 @@ class WidgetManager:
         """
         return self.docked_widgets
 
-    def remove_docked_widget(self, name):
+    def remove_docked_widget(self, name: str):
         """
         Remove a widget from the docked widgets list.
 
@@ -292,13 +298,13 @@ def is_visible_widget(widget: FunctionGui | QWidget) -> bool:
         return False
 
 
-def set_topostats_widget(widget):
+def set_topostats_widget(widget: QWidget | None):
     """Update the topostats widget"""
     global topostats_widget  # pylint:disable=global-statement
     topostats_widget = widget
 
 
-def get_topostats_widget():
+def get_topostats_widget() -> QWidget | None:
     """Get the topostats widget"""
     return topostats_widget
 

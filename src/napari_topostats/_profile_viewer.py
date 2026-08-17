@@ -1,9 +1,9 @@
 """Module to add plotting functionality for viewing force curves"""
 
+from typing import Any
+
 # pylint: disable=too-many-instance-attributes, unused-argument, too-many-nested-blocks
 # pylint: disable=too-many-branches
-
-
 import numpy as np
 from napari import Viewer
 from napari.layers import Shapes
@@ -115,7 +115,7 @@ class ProfileViewer(QWidget):
             if channel not in colours:
                 add_colour_for_channel(channel, self.available_channels, VIBRANT_PALETTE)
 
-    def on_selection_change(self, event=None):
+    def on_selection_change(self, event: Any = None):
         """Called when the user changes the active layer to update the available channels"""
         temp_active = get_current_layer(self.viewer)
 
@@ -177,7 +177,7 @@ class ProfileViewer(QWidget):
         self.shapes_layer.events.data.disconnect(self.on_line_changed)
         self.profile_line_events_connected = False
 
-    def on_line_changed(self, event=None):
+    def on_line_changed(self, event: Any = None):
         """
         Called when the shapes in the Profile Line layer change
 
@@ -201,7 +201,7 @@ class ProfileViewer(QWidget):
         self.start_point, self.end_point = line_coords[0], line_coords[1]
         self.update_profile_from_line()
 
-    def update_profile_from_channels(self, selected_channels=None):
+    def update_profile_from_channels(self, selected_channels: list[str] | None = None):
         """
         Update the profile plot based on the currently active layer and the line drawn in the shapes layer
 

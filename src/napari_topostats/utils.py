@@ -8,6 +8,7 @@ import copy
 import inspect
 import multiprocessing
 import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -23,7 +24,7 @@ def afm2stack(
     by_slices: bool = True,
     numslices: int = 255,
     resolution: float = 1.0,
-):
+) -> np.ndarray:
     """Turns a 2D AFM image to a 3D stack where the stack is separated
     by either specifying the number of slices, or the resolution of the
     split.
@@ -238,7 +239,14 @@ def remove_all_but_last(word: str, text: str) -> str:
     return (parts[0].replace(word, "") + word + parts[1]).replace("  ", " ").strip()  # Remove extra spaces and return
 
 
-def _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig):
+def _all_curves_raw_worker(
+    curve: dict[str, dict[str, np.ndarray]],
+    func: Callable[..., Any],
+    type_class: type[Any] | None,
+    func_kwargs: dict[str, Any],
+    class_kwargs: dict[str, Any],
+    has_curve_in_func_sig: bool,
+) -> Any:
     """Worker function for parallel curve processing returning full value from function."""
     if type_class is not None:
         # Instantiate the class with curve if it's a parameter, otherwise just with class_kwargs
@@ -252,17 +260,17 @@ def _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, h
 
 # pylint: disable=too-many-arguments,too-many-locals
 def all_curves(
-    curves,
-    func,
+    curves: Any,
+    func: Callable[..., Any],
     shape_x: int | None = None,
     shape_y: int | None = None,
-    type_class=None,
+    type_class: type[Any] | None = None,
     parallel: bool | None = None,
     num_workers: int | None = None,
     h5file: Any | None = None,
     new_volume_name: str | None = None,
-    **kwargs,
-) -> np.ndarray | bool:
+    **kwargs: Any,
+) -> tuple[np.ndarray, str] | bool:
     """
     Apply a function to all curves in a list of curves, with optional parameters for shaping the output and handling
     classes. Should return a 2D array of the same shape as the input curves, where each element is the result of
@@ -353,7 +361,7 @@ def all_curves(
         else:
             image_map = np.empty((shape_y, shape_x), dtype=type(actual_value))
 
-    def _all_curves_worker(curve):
+    def _all_curves_worker(curve: dict[str, dict[str, np.ndarray]]) -> Any:
         """Worker function for parallel curve processing."""
         return_value = _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig)
         return return_value

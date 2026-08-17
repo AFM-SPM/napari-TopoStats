@@ -19,7 +19,7 @@ from napari_topostats._widget_function import WidgetFunction, WidgetFunctionMana
 ICON_ROOT = Path(__file__).parent / "icons"
 
 
-def _get_background_brush():
+def _get_background_brush() -> QBrush:
     """
     Sets the background colour for each button in the grid.
 
@@ -36,7 +36,7 @@ def _get_background_brush():
     return background
 
 
-def _get_icon(name):
+def _get_icon(name: str) -> str:
     """
     Get the file path for the icon associated with a given function name.
 
@@ -64,7 +64,7 @@ class ButtonGrid(QListWidget):
 
     def __init__(
         self,
-        parent=None,
+        parent: QListWidget | None = None,
         functions: dict[str, WidgetFunction] | None = None,
         viewer: Viewer = None,
         function_manager: WidgetFunctionManager = None,
@@ -105,7 +105,7 @@ class ButtonGrid(QListWidget):
             self.itemClicked.disconnect()
         self.itemClicked.connect(self.on_function_click)
 
-    def on_function_click(self, item):
+    def on_function_click(self, item: QListWidgetItem):
         """
         Handle the click event on a list item.
         If the item corresponds to a WidgetFunction, it will be added as a docked widget
@@ -150,7 +150,7 @@ class ButtonGrid(QListWidget):
         """
         self.clear()
 
-    def add_function(self, widget_function, label):
+    def add_function(self, widget_function: WidgetFunction, label: str):
         """Add a function button to the button grid"""
         self.functions[label] = widget_function
         self.add_function_button(label, tool_tip=widget_function.tooltip)

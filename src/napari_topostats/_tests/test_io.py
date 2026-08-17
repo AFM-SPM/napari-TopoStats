@@ -6,13 +6,16 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from napari import Viewer
 from pytestqt.qtbot import QtBot
 
 from napari_topostats import _io as io
+from napari_topostats._state import WidgetManager
 from napari_topostats._tests._helpers import open_load_config_widget
+from napari_topostats._widget import TopoStatsRootWidget
 
 
-def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
+def test_load_config_widget(qtbot: QtBot, napari_viewer: Viewer, topostats_widget: TopoStatsRootWidget):
     """Test that the load config widget is created properly when it is clicked in the root widget."""
 
     open_load_config_widget(qtbot, topostats_widget)
@@ -48,8 +51,8 @@ def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
 # ns-rse 2025-11-26 : See issue #72
 # pylint: disable=unused-argument
 def test_load_config(
-    napari_viewer,
-    widget_manager,
+    napari_viewer: Viewer,
+    widget_manager: WidgetManager,
     test_config_path: Path,
     use_default: bool,
     expected_result: str,

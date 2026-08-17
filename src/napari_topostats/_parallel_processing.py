@@ -1,5 +1,8 @@
 """Provides a worker thread for parallel processing of intensive functions."""
 
+from collections.abc import Callable
+from typing import Any
+
 from qtpy.QtCore import QThread, Signal
 
 
@@ -11,7 +14,7 @@ class ProcessWorker(QThread):
     result_ready = Signal(object)
     error_signal = Signal(Exception)
 
-    def __init__(self, func, *args, **kwargs):
+    def __init__(self, func: Callable[..., Any], *args: Any, **kwargs: Any):
         """
         Generate a worker to run function in a separate thread.
         """
@@ -21,7 +24,7 @@ class ProcessWorker(QThread):
         self.func = func
         self.result = None
 
-    def set_parameters(self, *args, **kwargs):
+    def set_parameters(self, *args: Any, **kwargs: Any):
         """
         Set the parameters for the function to be executed.
         """

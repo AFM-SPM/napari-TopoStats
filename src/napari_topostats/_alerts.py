@@ -1,7 +1,11 @@
 """Module used for providing error alerts in the gui and show/ handle loading messages"""
 
+from typing import Any
+
 from magicgui.widgets import FunctionGui
+from napari import Viewer
 from qtpy.QtCore import QTimer, Qt
+from qtpy.QtGui import QResizeEvent
 from qtpy.QtWidgets import (
     QApplication,
     QDialog,
@@ -123,7 +127,7 @@ class LoadingDialog(QDialog):
     A dialog window to indicate a loading or processing state.
     """
 
-    def __init__(self, text="Loading..."):
+    def __init__(self, text: str = "Loading..."):
         """
         Initialize the loading dialog with optional text.
 
@@ -200,7 +204,7 @@ def attach_status_label(widget: FunctionGui | QWidget):
 class LoadingWidget(QWidget):
     """A semi-transparent overlay for napari viewer."""
 
-    def __init__(self, viewer):
+    def __init__(self, viewer: Viewer):
         """
         Initialize the loading widget and attach it to the napari viewer.
 
@@ -242,7 +246,7 @@ class LoadingWidget(QWidget):
 
         self.hide()
 
-    def start(self, message="Loading"):
+    def start(self, message: str = "Loading"):
         """Show the dialog with a message."""
         self.message = message
         self.loading_label.setText(f"{self.message}")
@@ -259,7 +263,7 @@ class LoadingWidget(QWidget):
         self.hide()
         QApplication.processEvents()
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event: QResizeEvent):
         """Keep overlay covering the parent when window resizes."""
         if self.parent():
             self.setGeometry(self.parent().rect())
@@ -271,7 +275,7 @@ def construct_error_args(
     message: str = None,
     raise_exception: bool = False,
     topostats_error: bool = False,
-    type_class=None,
+    type_class: type[Any] | None = None,
 ) -> dict:
     """
     Construct a dictionary of error arguments.

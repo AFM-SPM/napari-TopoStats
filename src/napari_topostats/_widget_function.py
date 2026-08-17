@@ -118,7 +118,7 @@ class CallableWithSignature:
         The signature to use for the wrapped function.
     """
 
-    def __init__(self, real_func, sig):
+    def __init__(self, real_func: Callable[..., Any], sig: inspect.Signature):
         """
         Initialises CallableWithSignature
 
@@ -133,13 +133,18 @@ class CallableWithSignature:
         self.real_func = real_func
         self.__signature__ = sig
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
         bound = self.__signature__.bind(*args, **kwargs)
         bound.apply_defaults()
         return self.real_func(**bound.arguments)
 
 
-def evaluate_path_to_data(path_to_data, return_value, instance=None, type_class=None):
+def evaluate_path_to_data(
+    path_to_data: str,
+    return_value: Any,
+    instance: Any = None,
+    type_class: type[Any] | None = None,
+) -> Any:
     """
     Evaluate a path expression to extract data from return values or object instances.
 
@@ -272,7 +277,7 @@ class WidgetFunction:
         run_immediately: bool = True,
         config_type: str | None = None,
         passes_full_config: bool = False,
-        function_manager=None,
+        function_manager: "WidgetFunctionManager | None" = None,
     ):
         self.name = name
         self.path_to_data = path_to_data
@@ -290,10 +295,10 @@ class WidgetFunction:
             self.is_group = True
             self.group_functions = {f.name: f for f in function_to_run}
 
-            def get_choices(_widget=None):
+            def get_choices(_widget: Any = None) -> list[str]:
                 return list(self.group_functions.keys())
 
-            def make_group_func(widget_function_self):
+            def make_group_func(widget_function_self: "WidgetFunction") -> Callable[[str], None]:
                 def func(function_name: str):
                     wf = widget_function_self.group_functions.get(function_name)
                     widget_function_self.function_manager.add_function_as_widget(function_name, wf)
@@ -382,7 +387,7 @@ class WidgetFunction:
         self.overide_viewer = None
         self.function_gui = self.function_to_run if isinstance(self.function_to_run, FunctionGui) else None
 
-    def add_to_group(self, widget_function):
+    def add_to_group(self, widget_function: "WidgetFunction"):
         """Add a widget function to the group of functions if this WidgetFunction is a group."""
         if not self.is_group:
             return
@@ -446,7 +451,7 @@ class WidgetFunction:
             # Replace any dynamic components of the paths with actual values from the config if needed
             flat_config = get_current_config(flat=True, config_type=self.config_type)
 
-            def lookup(match):
+            def lookup(match: re.Match[str]) -> str:
                 key = match.group(1)
                 if key in flat_config:
                     return str(flat_config[key])
@@ -512,7 +517,7 @@ class WidgetFunction:
                             parameters_from_class.pop(param_name, None)
 
             # pylint: disable=too-many-branches, too-many-statements, attribute-defined-outside-init
-            def func(**kwargs):
+            def func(**kwargs: Any) -> Any:
                 viewer = self.overide_viewer or kwargs.get("viewer") or current_viewer()
                 loading_widget = LoadingWidget(viewer)
                 loading_widget.start(
@@ -636,7 +641,7 @@ class WidgetFunction:
                             # that hasn't been added yet.
                             if not add_to_current_file:
 
-                                def func_to_execute(**kwargs):
+                                def func_to_execute(**kwargs: Any) -> Any:
                                     current_channel = loaded_image.get_current_channel()
                                     loaded_image.loader.save_to_h5()
                                     loaded_image.init_from_loader(headless=True)
@@ -669,7 +674,7 @@ class WidgetFunction:
                                 replace_volume = user_params.get("replace_volume", False)
                                 replacement_volume_name = user_params.get("replacement_volume_name", None)
 
-                                def func_to_execute(**kwargs):
+                                def func_to_execute(**kwargs: Any) -> Any:
                                     current_channel = loaded_image.get_current_channel()
                                     if replace_volume and replacement_volume_name:
                                         make_h5file_inheritable_state(curves_data.h5file, inheritable=False)
@@ -715,7 +720,7 @@ class WidgetFunction:
                             # If the function is designed to take a single curve, wrap it in all_curves to apply
                             # to all curves in the selected layer
                             # pylint: disable=function-redefined
-                            def func_to_execute(**kwargs):
+                            def func_to_execute(**kwargs: Any) -> Any:
                                 return all_curves(func=self.function_to_run, **kwargs)
 
                         new_param = inspect.Parameter(
@@ -807,7 +812,7 @@ class WidgetFunction:
 
                     # Execute function or method
                     # pylint: disable=too-many-return-statements
-                    def _func():
+                    def _func() -> Any:
                         try:
                             if self.type_class:
                                 instance = self.type_class(**class_args)
@@ -851,7 +856,7 @@ class WidgetFunction:
                             )
                         return (result, metadata)
 
-                    def _handle_result(result):
+                    def _handle_result(result: Any):
                         if isinstance(result, dict) and "message" in result:
                             _cleanup()
                             show_error_dialog(**result)
@@ -881,7 +886,7 @@ class WidgetFunction:
                         finally:
                             _cleanup()
 
-                    def _handle_error(exception):
+                    def _handle_error(exception: Exception):
                         _cleanup()
                         show_error_dialog(
                             f"Error executing function {self.function_to_run.__name__}: {str(exception)}",
@@ -940,7 +945,7 @@ class WidgetFunction:
             param_options = {}
             if has_curves_parameter:
 
-                def get_available_curves_volumes(_event=None):
+                def get_available_curves_volumes(_event: Any = None) -> list[str]:
                     curves_data = get_selected_curves(
                         self.overide_viewer or current_viewer(),
                         suppress_errors=True,
@@ -950,7 +955,7 @@ class WidgetFunction:
                     volume_names = list(curves_data.volumes.keys())
                     return volume_names or [""]
 
-                def get_default_curves_volume_name():
+                def get_default_curves_volume_name() -> str:
                     curves_data = get_selected_curves(
                         self.overide_viewer or current_viewer(),
                         suppress_errors=True,
@@ -976,7 +981,7 @@ class WidgetFunction:
                     "label": "curves volume to operate on:",
                 }
 
-                def refresh_curves_volume_widget(_event=None):
+                def refresh_curves_volume_widget(_event: Any = None):
                     if not has_curves_parameter:
                         return
                     volume_widget = magicgui_function[CURVES_VOLUME_PARAM]
@@ -1016,7 +1021,7 @@ class WidgetFunction:
         original: Layer,
         metadata: dict,
         z_units: str | None = None,
-    ):
+    ) -> pd.DataFrame | None:
         """
         Render the return value of a function in the napari viewer.
 
@@ -1144,7 +1149,7 @@ class WidgetFunction:
                         df_nm[col] = df_nm[col] * m_to_nm
                 return df_nm
 
-            def on_checkbox_changed(checked):
+            def on_checkbox_changed(checked: bool):
                 # Convert table from m to nm
                 if checked:
                     df_nm = convert_to_nm(df)
@@ -1163,7 +1168,7 @@ class WidgetFunction:
                             table.setItem(i, j, item)
 
             # pylint: disable=unused-argument
-            def on_row_clicked(row, column):
+            def on_row_clicked(row: int, column: int):
                 """Triggered when a table row is clicked."""
                 nonlocal is_updating
                 # Get the grain number (or label id) from the dataframe
@@ -1186,7 +1191,7 @@ class WidgetFunction:
                     is_updating = True
 
             # pylint: disable=unused-argument
-            def on_label_selected(event):
+            def on_label_selected(event: Any):
                 nonlocal is_updating
                 if is_updating:
                     is_updating = False
@@ -1363,7 +1368,13 @@ class WidgetFunctionManager:
             return None
         return widget
 
-    def add_docked_function(self, widget, name: str, area: str = "right", group: str | None = "functions"):
+    def add_docked_function(
+        self,
+        widget: FunctionGui | QWidget,
+        name: str,
+        area: str = "right",
+        group: str | None = "functions",
+    ):
         """
         Add a widget to the viewer as a docked widget and keep track of it in the state.
 
@@ -1381,7 +1392,7 @@ class WidgetFunctionManager:
         self.docked_functions[name] = widget
         self.widget_manager.add_docked_widget(widget, area=area, name=name, group=group)
 
-    def get_docked_function(self, name):
+    def get_docked_function(self, name: str) -> QWidget | None:
         """
         Get the docked widget for a given function name.
 

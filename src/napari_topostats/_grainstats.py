@@ -5,7 +5,7 @@ from napari.layers import Labels
 from topostats.grainstats import GrainStats
 
 
-def grainstats(image: Labels):
+def grainstats(image: Labels) -> pd.DataFrame:
     """Function used for running topostats grainstats function on a labels layer"""
     cfg = image.metadata["config"]["grainstats"]
     if "run" in cfg:
@@ -36,7 +36,7 @@ def grainstats(image: Labels):
     return df
 
 
-def get_grainstats_df(stats) -> pd.DataFrame:
+def get_grainstats_df(stats: GrainStats) -> pd.DataFrame:
     """
     Reconstructs the 'grainstats' DataFrame from the nested
     grain_crops.stats attributes.

@@ -5,6 +5,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 import markdown
+from napari import Viewer
 from platformdirs import user_config_dir
 from qtpy.QtCore import QUrl
 from qtpy.QtWidgets import QDialog, QTextBrowser, QVBoxLayout
@@ -15,7 +16,7 @@ from napari_topostats._alerts import show_error_dialog
 _guide_dialog = None
 
 
-def get_guide_path():
+def get_guide_path() -> Path:
     """
     Get the path to the GUIDE.md file.
 
@@ -36,7 +37,7 @@ def get_guide_path():
     raise FileNotFoundError("GUIDE.md could not be found.")
 
 
-def load_guide():
+def load_guide() -> tuple[str, Path]:
     """
     Load the GUIDE.md markdown file and convert it to HTML.
 
@@ -55,7 +56,7 @@ def load_guide():
     return html_content, guide_path.parent
 
 
-def show_guide(viewer):
+def show_guide(viewer: Viewer):
     """
     Show the guide to the user in a non-modal QDialog.
 
@@ -104,7 +105,7 @@ def show_guide(viewer):
     _guide_dialog.show()
 
 
-def check_guide(viewer):
+def check_guide(viewer: Viewer):
     """
     Check the installed plugin version and show the guide if it is the first launch or a new version.
 
