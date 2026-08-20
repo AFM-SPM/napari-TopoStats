@@ -15,63 +15,7 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 
 if TYPE_CHECKING:
-    from napari.types import ImageData
-
-
-def image_to_surface(
-    image: ImageData,
-    pixel_to_nm_scaling: float = 1.0,
-    input_z_units: str = "nm",
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Convert a 2D AFM image into surface data for a napari Surface layer.
-
-    Each image pixel becomes a vertex whose height is the corresponding
-    image value. Adjacent pixels are connected by two triangular faces, and
-    the flattened image values are used as the per-vertex surface values.
-
-    Parameters
-    ----------
-    image : napari.types.ImageData
-        Two-dimensional image to convert.
-    pixel_to_nm_scaling : float, optional
-        Width of each pixel in nanometres, by default 1.0.
-    input_z_units : str, optional
-        Unit of the image values. Values in metres are converted to
-        nanometres, by default ``"nm"``.
-
-    Returns
-    -------
-    tuple of np.ndarray
-        Vertices, triangular face indices, and per-vertex values in the
-        format expected by a napari Surface layer.
-    """
-    shape_y, shape_x = image.shape
-
-    vertices = []
-
-    if input_z_units == "m":
-        image = image * 1e9  # Convert meters to nanometers for visualization
-
-    # Convert the 2D image into a list of vertices in 3D space with each vertex as (z, y, x)
-    for y in range(shape_y):
-        for x in range(shape_x):
-            vertices.append((image[y, x], y * pixel_to_nm_scaling, x * pixel_to_nm_scaling))
-
-    faces = []
-
-    for y in range(shape_y - 1):
-        for x in range(shape_x - 1):
-            # Draw a grid of squares between the vertices
-            top_left = y * shape_x + x
-            top_right = top_left + 1
-            bottom_left = top_left + shape_x
-            bottom_right = bottom_left + 1
-
-            # Create two triangles for each square in the grid by cutting the square diagonally
-            faces.append([top_left, bottom_left, bottom_right])
-            faces.append([top_left, bottom_right, top_right])
-
-    return np.array(vertices), np.array(faces), image.ravel()
+    pass
 
 
 def calculate_contrast_limits(image: np.ndarray, percentage: float = 2.0) -> tuple[float, float]:

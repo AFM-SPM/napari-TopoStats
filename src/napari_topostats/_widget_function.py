@@ -54,6 +54,7 @@ from napari_topostats._io import (
 )
 from napari_topostats._parallel_processing import ProcessWorker
 from napari_topostats._state import WidgetManager, get_running_function, set_running_function
+from napari_topostats._surface import create_dynamic_surface
 from napari_topostats.utils import _eval, all_curves, calculate_contrast_limits, is_binary_image, remove_all_but_last
 
 CURVES_VOLUME_PARAM = "curves_volume_to_operate_on"
@@ -277,6 +278,7 @@ class WidgetFunction:
         run_immediately: bool = True,
         config_type: str | None = None,
         passes_full_config: bool = False,
+        handle_return_callback: Callable[..., None] | None = None,
         function_manager: "WidgetFunctionManager | None" = None,
     ):
         self.name = name
@@ -291,6 +293,7 @@ class WidgetFunction:
         self.function_to_run = function_to_run
         self.run_immediately = run_immediately
         self.passes_full_config = passes_full_config
+        self.handle_return_callback = handle_return_callback
         if function_to_run is not None and isinstance(function_to_run, list):
             self.is_group = True
             self.group_functions = {f.name: f for f in function_to_run}
@@ -1050,7 +1053,25 @@ class WidgetFunction:
             The units for the z-axis. Default is None (though will be programmaticaly defaulted to nm).
         """
 
-        # Check if the return value is a numpy array
+        if self.handle_return_callback is not None:
+            scale = original.scale if original else (1.0, 1.0, 1.0)
+            if len(scale) == 2:
+                scale = scale + (1.0,)
+            available_arguments = {
+                "return_value": return_value,
+                "viewer": viewer,
+                "original": original,
+                "metadata": metadata,
+                "z_units": z_units,
+                "scale": scale,
+            }
+            callback_parameters = inspect.signature(self.handle_return_callback).parameters
+            callback_arguments = {
+                name: value for name, value in available_arguments.items() if name in callback_parameters
+            }
+            self.handle_return_callback(**callback_arguments)
+            return
+
         if isinstance(return_value, bool) and return_value:
             display_name = self.name.replace("_", " ").title()
             message = f"✅ {display_name} successful."
@@ -1062,15 +1083,12 @@ class WidgetFunction:
             and len(return_value) == 3
             and all(isinstance(x, np.ndarray) for x in return_value)
         ):
-            # If the return value is a tuple of three numpy arrays, assume it's 3D surface data
-            viewer.add_surface(
-                return_value,
-                name=f"{original.name} {self.function_key.replace('_', ' ').title()} Surface",
-                contrast_limits=calculate_contrast_limits(return_value[2], percentage=0.5),
-                metadata=metadata,
-            )
+            scale = original.scale if original else (1.0, 1.0, 1.0)
+            if len(scale) == 2:
+                scale = scale + (1.0,)
+            name = f"{original.name} {self.function_key.replace('_', ' ').title()} Surface"
 
-            viewer.dims.ndisplay = 3
+            create_dynamic_surface(viewer, return_value, name=name)
         elif isinstance(return_value, np.ndarray):
             # Get the scale from the original layer; default to (1, 1) if not found
             current_scale = original.scale if original else (1, 1)
@@ -1111,6 +1129,9 @@ class WidgetFunction:
             else:
                 name = f"{original.name} {self.function_key.replace('_', ' ').title()} Image"
                 name = remove_all_but_last("Image", name)
+                combined_metadata["z_units"] = (
+                    z_units if z_units is not None else combined_metadata.get("z_units", "nm")
+                )
 
                 viewer.add_image(
                     return_value,

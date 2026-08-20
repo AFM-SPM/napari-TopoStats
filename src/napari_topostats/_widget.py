@@ -72,10 +72,8 @@ from napari_topostats._io import (
 from napari_topostats._profile_viewer import start_drawing
 from napari_topostats._script_handler import get_loaded_functions
 from napari_topostats._state import MIN_TOPOSTATS_VERSION, WidgetManager, get_running_function, set_topostats_widget
+from napari_topostats._surface import image_to_surface
 from napari_topostats._widget_function import WidgetFunction, WidgetFunctionManager
-from napari_topostats.utils import (
-    image_to_surface,
-)
 
 check_guide(current_viewer())
 
