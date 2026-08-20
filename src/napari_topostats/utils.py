@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import copy
 import inspect
 import multiprocessing
 import time
@@ -19,48 +18,60 @@ if TYPE_CHECKING:
     from napari.types import ImageData
 
 
-def afm2stack(
+def image_to_surface(
     image: ImageData,
-    by_slices: bool = True,
-    numslices: int = 255,
-    resolution: float = 1.0,
-) -> np.ndarray:
-    """Turns a 2D AFM image to a 3D stack where the stack is separated
-    by either specifying the number of slices, or the resolution of the
-    split.
+    pixel_to_nm_scaling: float = 1.0,
+    input_z_units: str = "nm",
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Convert a 2D AFM image into surface data for a napari Surface layer.
+
+    Each image pixel becomes a vertex whose height is the corresponding
+    image value. Adjacent pixels are connected by two triangular faces, and
+    the flattened image values are used as the per-vertex surface values.
 
     Parameters
     ----------
-    image : Napari.types.ImageData
-        The image as an np.ndarray.
-    by_slices : bool, optional
-        Wether to stack by slices, by default True
-    numslices : int, optional
-        The number of slices in the stack, by default 255
-    resolution : float, optional
-        The resolution or distance between each slice, by default 1.0
+    image : napari.types.ImageData
+        Two-dimensional image to convert.
+    pixel_to_nm_scaling : float, optional
+        Width of each pixel in nanometres, by default 1.0.
+    input_z_units : str, optional
+        Unit of the image values. Values in metres are converted to
+        nanometres, by default ``"nm"``.
 
     Returns
     -------
-    np.ndarray
-        _description_
+    tuple of np.ndarray
+        Vertices, triangular face indices, and per-vertex values in the
+        format expected by a napari Surface layer.
     """
-    shape = image.shape
-    minval, maxval = image.min(), image.max()
-    totalrange = maxval - minval
-    if not by_slices:
-        numslices = int(totalrange / resolution)
-    increment = totalrange / numslices
-    output = np.empty((numslices, shape[0], shape[1]))
-    current_z = minval
-    for z in range(numslices):
-        dup = copy.deepcopy(image)
-        dup[dup >= current_z] = current_z
-        dup[dup < current_z] = 0
-        output[z, :, :] = dup
-        current_z += increment
+    shape_y, shape_x = image.shape
 
-    return output
+    vertices = []
+
+    if input_z_units == "m":
+        image = image * 1e9  # Convert meters to nanometers for visualization
+
+    # Convert the 2D image into a list of vertices in 3D space with each vertex as (z, y, x)
+    for y in range(shape_y):
+        for x in range(shape_x):
+            vertices.append((image[y, x], y * pixel_to_nm_scaling, x * pixel_to_nm_scaling))
+
+    faces = []
+
+    for y in range(shape_y - 1):
+        for x in range(shape_x - 1):
+            # Draw a grid of squares between the vertices
+            top_left = y * shape_x + x
+            top_right = top_left + 1
+            bottom_left = top_left + shape_x
+            bottom_right = bottom_left + 1
+
+            # Create two triangles for each square in the grid by cutting the square diagonally
+            faces.append([top_left, bottom_left, bottom_right])
+            faces.append([top_left, bottom_right, top_right])
+
+    return np.array(vertices), np.array(faces), image.ravel()
 
 
 def calculate_contrast_limits(image: np.ndarray, percentage: float = 2.0) -> tuple[float, float]:

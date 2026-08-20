@@ -559,6 +559,10 @@ class WidgetFunction:
                     if "pixel_to_nm_scaling" in all_params and "pixel_to_nm_scaling" not in kwargs:
                         kwargs["pixel_to_nm_scaling"] = selected_image.metadata.get("px2nm", 1.0)
 
+                    # Handle input_z_units if required
+                    if "input_z_units" in all_params:
+                        kwargs["input_z_units"] = selected_image.metadata.get("z_units", "nm")
+
                     # Get the filename from the image layer if required
                     if "filename" in all_params and "filename" not in kwargs:
                         kwargs["filename"] = "image"
@@ -685,7 +689,7 @@ class WidgetFunction:
                                         copy_h5_file(
                                             src_path=curves_data.h5file,
                                             dest_path=temp_new_path,
-                                            without=[f"Curve_Data/{replacement_volume_name}_VOLM"],
+                                            without_paths=[f"Curve_Data/{replacement_volume_name}_VOLM"],
                                         )
                                         h5_saver = H5Saver(temp_new_path)
                                         new_h5_file = h5_saver.create_file(
@@ -926,6 +930,7 @@ class WidgetFunction:
                     new_p = p
                 if new_p.name not in [
                     "pixel_to_nm_scaling",
+                    "input_z_units",
                     "image",
                     "filename",
                     "topostats_object",
@@ -1052,6 +1057,20 @@ class WidgetFunction:
             if hasattr(self, "function_gui") and self.function_gui and hasattr(self.function_gui, "set_status_message"):
                 self.function_gui.set_status_message(message)
             return
+        elif (
+            isinstance(return_value, tuple)
+            and len(return_value) == 3
+            and all(isinstance(x, np.ndarray) for x in return_value)
+        ):
+            # If the return value is a tuple of three numpy arrays, assume it's 3D surface data
+            viewer.add_surface(
+                return_value,
+                name=f"{original.name} {self.function_key.replace('_', ' ').title()} Surface",
+                contrast_limits=calculate_contrast_limits(return_value[2], percentage=0.5),
+                metadata=metadata,
+            )
+
+            viewer.dims.ndisplay = 3
         elif isinstance(return_value, np.ndarray):
             # Get the scale from the original layer; default to (1, 1) if not found
             current_scale = original.scale if original else (1, 1)

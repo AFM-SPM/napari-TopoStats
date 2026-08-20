@@ -74,7 +74,7 @@ from napari_topostats._script_handler import get_loaded_functions
 from napari_topostats._state import MIN_TOPOSTATS_VERSION, WidgetManager, get_running_function, set_topostats_widget
 from napari_topostats._widget_function import WidgetFunction, WidgetFunctionManager
 from napari_topostats.utils import (
-    afm2stack,
+    image_to_surface,
 )
 
 check_guide(current_viewer())
@@ -126,7 +126,7 @@ MAIN_FUNCTIONS = [
     WidgetFunction(
         name="make_3d",
         function_key="3d",
-        function_to_run=afm2stack,
+        function_to_run=image_to_surface,
         path_to_data="return",
         of_type=[Image],
         ndims=3,
