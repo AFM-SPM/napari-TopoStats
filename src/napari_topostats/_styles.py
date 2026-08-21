@@ -103,6 +103,8 @@ STATUS_LABEL_VISIBLE_STYLE = """
     }
 """
 
+CONFIG_OPTIONS_LABEL_STYLE = "font-size: 10px;"
+
 LOADING_OVERLAY_STYLE = "background-color: rgba(0, 0, 0, 120);"
 
 LOADING_CONTAINER_STYLE = """

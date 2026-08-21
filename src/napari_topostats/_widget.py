@@ -72,6 +72,7 @@ from napari_topostats._io import (
 from napari_topostats._profile_viewer import start_drawing
 from napari_topostats._script_handler import get_loaded_functions
 from napari_topostats._state import MIN_TOPOSTATS_VERSION, WidgetManager, get_running_function, set_topostats_widget
+from napari_topostats._styles import CONFIG_OPTIONS_LABEL_STYLE
 from napari_topostats._surface import image_to_surface
 from napari_topostats._widget_function import WidgetFunction, WidgetFunctionManager
 
@@ -440,6 +441,10 @@ class TopoStatsRootWidget(RootWidget):
         self.bottom_row.addWidget(export_button)
         self.bottom_row.addWidget(line_tool_label)
         self.bottom_row.addWidget(guide_button)
+
+        config_options_label = QLabel("Config options")
+        config_options_label.setStyleSheet(CONFIG_OPTIONS_LABEL_STYLE)
+        self.vlayout.addWidget(config_options_label)
 
         config_row = QHBoxLayout()
         edit_button = QPushButton("Edit")
