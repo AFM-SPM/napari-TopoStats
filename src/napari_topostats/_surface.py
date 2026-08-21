@@ -1,5 +1,7 @@
 """Create static and frame-dependent napari surface layers."""
 
+from typing import Annotated
+
 import numpy as np
 from napari import Viewer
 from napari.types import ImageData
@@ -12,6 +14,7 @@ def image_to_surface(
     pixel_to_nm_scaling: float = 1.0,
     input_z_units: str = "nm",
     vertical_exaggeration: float = 1.0,
+    triangle_size: Annotated[int, {"min": 1}] = 1,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Convert a 2D AFM image or image stack into napari surface data.
 
@@ -30,6 +33,11 @@ def image_to_surface(
         Length unit of the image values. Supported values are metres,
         millimetres, micrometres, nanometres, and picometres. Heights are
         converted to nanometres, by default ``"nm"``.
+    vertical_exaggeration : float, optional
+        Factor applied to surface heights, by default 1.0.
+    triangle_size : int, optional
+        Sampling interval in source-image pixels. Larger values produce
+        fewer, larger triangles for faster rendering, by default 1.
 
     Returns
     -------
@@ -52,24 +60,39 @@ def image_to_surface(
 
     if image.ndim not in (2, 3):
         raise ValueError("Input image must be 2D or 3D.")
+    if isinstance(triangle_size, bool) or not isinstance(triangle_size, int):
+        raise TypeError("Triangle size must be an integer.")
+    if triangle_size < 1:
+        raise ValueError("Triangle size must be at least 1.")
 
     image = image * unit_to_nanometres[normalised_z_units] * vertical_exaggeration
 
+    y_indices = np.arange(0, image.shape[-2], triangle_size)
+    x_indices = np.arange(0, image.shape[-1], triangle_size)
+    if y_indices[-1] != image.shape[-2] - 1:
+        y_indices = np.append(y_indices, image.shape[-2] - 1)
+    if x_indices[-1] != image.shape[-1] - 1:
+        x_indices = np.append(x_indices, image.shape[-1] - 1)
+
     y, x = np.meshgrid(
-        np.arange(image.shape[-2]),
-        np.arange(image.shape[-1]),
+        y_indices,
+        x_indices,
         indexing="ij",
     )
 
     y_coordinates = (y.ravel() * pixel_to_nm_scaling).astype(np.float32)
     x_coordinates = (x.ravel() * pixel_to_nm_scaling).astype(np.float32)
-    stack_lowered = image.astype(np.float32)
+    stack_lowered = image[..., y_indices[:, np.newaxis], x_indices].astype(np.float32)
     if stack_lowered.ndim == 3:
         initial_image = stack_lowered[0]
-        vertices = np.column_stack((initial_image.ravel(), np.zeros(initial_image.size), y_coordinates, x_coordinates))
+        vertices = np.column_stack(
+            (initial_image.ravel(), np.zeros(initial_image.size, dtype=np.float32), y_coordinates, x_coordinates)
+        )
     else:
-        vertices = np.column_stack((stack_lowered.ravel(), np.zeros(stack_lowered.size), y_coordinates, x_coordinates))
-    faces = make_faces(shape_y=image.shape[-2], shape_x=image.shape[-1])
+        vertices = np.column_stack(
+            (stack_lowered.ravel(), np.zeros(stack_lowered.size, dtype=np.float32), y_coordinates, x_coordinates)
+        )
+    faces = make_faces(shape_y=stack_lowered.shape[-2], shape_x=stack_lowered.shape[-1])
 
     return vertices, faces, stack_lowered
 
