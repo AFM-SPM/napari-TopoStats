@@ -83,15 +83,17 @@ def enforce_defaults(args: dict[str, Any], params: dict[str, inspect.Parameter])
         args.setdefault("threshold_std_dev", {})
         if args.get("threshold_std_dev") is None:
             args["threshold_std_dev"] = {}
-        args["threshold_std_dev"].setdefault("above", 1.0)
-        args["threshold_std_dev"].setdefault("below", 10.0)
+        if isinstance(args["threshold_std_dev"], dict):
+            args["threshold_std_dev"].setdefault("above", 1.0)
+            args["threshold_std_dev"].setdefault("below", 10.0)
 
     if "threshold_absolute" in params:
         args.setdefault("threshold_absolute", {})
         if args.get("threshold_absolute") is None:
             args["threshold_absolute"] = {}
-        args["threshold_absolute"].setdefault("above", 1.0)
-        args["threshold_absolute"].setdefault("below", -1.0)
+        if isinstance(args["threshold_absolute"], dict):
+            args["threshold_absolute"].setdefault("above", 1.0)
+            args["threshold_absolute"].setdefault("below", -1.0)
     if "remove_scars" in params:
         args.setdefault("remove_scars", {})
         if args.get("remove_scars") is None:
