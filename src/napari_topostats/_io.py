@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from forcestats.config import write_config_with_comments as write_config_with_comments_forcestats
 from magicgui import magicgui
 from magicgui.widgets import FunctionGui, create_widget
 from napari.viewer import Viewer
@@ -36,6 +35,17 @@ from napari_topostats._alerts import attach_status_label, show_error_dialog
 from napari_topostats._components import CollapsibleBox
 from napari_topostats._state import MIN_TOPOSTATS_VERSION, get_loaded_function_path, get_widget_manager
 from napari_topostats.utils import unflatten_dict
+
+try:
+    from forcestats.config import write_config_with_comments as write_config_with_comments_forcestats
+except ModuleNotFoundError as error:
+    if error.name != "forcestats":
+        raise
+    write_config_with_comments_forcestats = None
+
+ConfigType = (
+    Literal["topostats", "forcestats"] if write_config_with_comments_forcestats is not None else Literal["topostats"]
+)
 
 # pylint: disable=ungrouped-imports
 try:
@@ -308,6 +318,8 @@ def write_new_default_config(config_path: Path, config_type: str = "topostats"):
     if config_type == "topostats":
         write_config_with_comments_topostats(args)
     elif config_type == "forcestats":
+        if write_config_with_comments_forcestats is None:
+            raise RuntimeError("ForceStats must be installed to create a ForceStats configuration.")
         write_config_with_comments_forcestats(args)
 
 
@@ -347,8 +359,6 @@ def load_config_impl(
     bool
         True if the config was loaded successfully, False otherwise.
     """
-    # pylint: disable=global-statement
-    global comment_descriptions, config_wrappers, current_config_paths  # Updated global name
     if config_path is None:
         if use_default:
             config_dir = Path(user_config_dir("TopoStats", "Napari"))
@@ -411,9 +421,7 @@ def load_config_impl(
     config_type={"label": "Config type"},
     call_button="Load Config",
 )
-def load_config(
-    viewer: Viewer, config_path: Path | None = None, config_type: Literal["topostats", "forcestats"] = "topostats"
-) -> bool:
+def load_config(viewer: Viewer, config_path: Path | None = None, config_type: ConfigType = "topostats") -> bool:
     """
     Load a configuration file and build a dynamic widget to edit it.
     This is a magicgui function that can be called directly from the napari GUI and is an example of a hardcoded
@@ -841,8 +849,6 @@ def save_current_config_as_temp(overides: dict[str, Any] | None = None, config_t
     overides : dict[str, Any] | None
         A dictionary of config keys and values to override in the saved config.
     """
-    # pylint: disable=global-statement
-    global current_config_paths
     full_current_config = get_current_config(config_type=config_type)
 
     if overides:

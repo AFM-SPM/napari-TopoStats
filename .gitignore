@@ -47,6 +47,11 @@ output/config.yaml
 .idea/
 *~
 
+# Install scripts
+scripts
+scripts/*.sh
+scripts/*.ps1
+
 # Documentation
 _build/
 

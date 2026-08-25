@@ -37,6 +37,18 @@ def get_guide_path() -> Path:
     raise FileNotFoundError("GUIDE.md could not be found.")
 
 
+def _load_forcestats_guide_html() -> str:
+    """Load the optional HTML guide section supplied by ForceStats."""
+    try:
+        from forcestats.guide import get_guide_html  # pylint: disable=import-outside-toplevel
+
+        return get_guide_html()
+    except ModuleNotFoundError as error:
+        if error.name in {"forcestats", "forcestats.guide"}:
+            return ""
+        raise
+
+
 def load_guide() -> tuple[str, Path]:
     """
     Load the GUIDE.md markdown file and convert it to HTML.
@@ -50,10 +62,14 @@ def load_guide() -> tuple[str, Path]:
     with open(guide_path, encoding="utf-8") as f:
         text = f.read()
 
-    # Convert markdown to HTML with powerful extensions
-    html_content = markdown.markdown(text, extensions=["extra", "codehilite", "tables"])
+    html_sections = [markdown.markdown(text, extensions=["extra", "codehilite", "tables"])]
 
-    return html_content, guide_path.parent
+    # If ForceStats is installed, load its optional guide section
+    forcestats_guide_html = _load_forcestats_guide_html()
+    if forcestats_guide_html:
+        html_sections.append(forcestats_guide_html)
+
+    return "\n".join(html_sections), guide_path.parent
 
 
 def show_guide(viewer: Viewer):

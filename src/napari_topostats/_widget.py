@@ -42,9 +42,17 @@ if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() 
     loading_spinner.start()
     QApplication.processEvents()
 
-from forcestats.analysis import find_trigger_point_map
-from forcestats.contact import create_3d_approach_map, find_contact_point_map
-from forcestats.curve_correction import correct_curve
+try:
+    from forcestats.analysis import find_trigger_point_map
+    from forcestats.contact import create_3d_approach_map, find_contact_point_map
+    from forcestats.curve_correction import correct_curve
+except ModuleNotFoundError as error:
+    if error.name != "forcestats":
+        raise
+    FORCESTATS_AVAILABLE = False
+else:
+    FORCESTATS_AVAILABLE = True
+
 from napari.layers import Image, Labels
 from napari.viewer import Viewer
 from packaging.version import parse as parse_version
@@ -152,45 +160,50 @@ MAIN_FUNCTIONS = [
     ),
 ]
 
-EXTRA_FUNCTIONS = [
-    WidgetFunction(
-        name="find_trigger_point",
-        function_key="find_trigger_point",
-        path_to_data="return",
-        function_to_run=find_trigger_point_map,
-        tooltip=inspect.getdoc(find_trigger_point_map),
-        config_type="forcestats",
-        passes_full_config=True,
-        run_immediately=False,
-    ),
-    WidgetFunction(
-        name="find_contact_point",
-        function_key="find_contact_point",
-        path_to_data="return",
-        function_to_run=find_contact_point_map,
-        tooltip=inspect.getdoc(find_contact_point_map),
-        run_immediately=False,
-        config_type="forcestats",
-    ),
-    WidgetFunction(
-        name="create_3d_approach_map",
-        function_key="create_3d_approach_map",
-        path_to_data="return",
-        function_to_run=create_3d_approach_map,
-        tooltip=inspect.getdoc(create_3d_approach_map),
-        run_immediately=False,
-        config_type="forcestats",
-    ),
-    WidgetFunction(
-        name="correct_curve",
-        function_key="correct_curve",
-        path_to_data="return",
-        function_to_run=correct_curve,
-        tooltip=inspect.getdoc(correct_curve),
-        run_immediately=False,
-        config_type="forcestats",
-    ),
-]
+EXTRA_FUNCTIONS = []
+
+if FORCESTATS_AVAILABLE:
+    EXTRA_FUNCTIONS.extend(
+        [
+            WidgetFunction(
+                name="find_trigger_point",
+                function_key="find_trigger_point",
+                path_to_data="return",
+                function_to_run=find_trigger_point_map,
+                tooltip=inspect.getdoc(find_trigger_point_map),
+                config_type="forcestats",
+                passes_full_config=True,
+                run_immediately=False,
+            ),
+            WidgetFunction(
+                name="find_contact_point",
+                function_key="find_contact_point",
+                path_to_data="return",
+                function_to_run=find_contact_point_map,
+                tooltip=inspect.getdoc(find_contact_point_map),
+                run_immediately=False,
+                config_type="forcestats",
+            ),
+            WidgetFunction(
+                name="create_3d_approach_map",
+                function_key="create_3d_approach_map",
+                path_to_data="return",
+                function_to_run=create_3d_approach_map,
+                tooltip=inspect.getdoc(create_3d_approach_map),
+                run_immediately=False,
+                config_type="forcestats",
+            ),
+            WidgetFunction(
+                name="correct_curve",
+                function_key="correct_curve",
+                path_to_data="return",
+                function_to_run=correct_curve,
+                tooltip=inspect.getdoc(correct_curve),
+                run_immediately=False,
+                config_type="forcestats",
+            ),
+        ]
+    )
 
 
 MAX_LOADED_FUNCTIONS = 3  # Maximum number of functions that can be loaded from external scripts to prevent overload
@@ -397,7 +410,7 @@ class TopoStatsRootWidget(RootWidget):
                 )
             )
         config_type_selector = QComboBox()
-        config_type_selector.addItems(["TopoStats", "ForceStats"])
+        config_type_selector.addItems(["TopoStats", "ForceStats"] if FORCESTATS_AVAILABLE else ["TopoStats"])
         config_type_selector.setToolTip("Select the configuration type to edit or reset.")
 
         reset_button = QPushButton("Reset Default")
@@ -459,7 +472,7 @@ class TopoStatsRootWidget(RootWidget):
         set_topostats_widget(widget=self)
 
         failed_configs = []
-        for config_type in ("topostats", "forcestats"):
+        for config_type in ("topostats", "forcestats") if FORCESTATS_AVAILABLE else ("topostats",):
             if not load_config_impl(self._viewer, config_type=config_type, use_default=True, report_errors=False):
                 failed_configs.append(config_type.title())
         if failed_configs:
