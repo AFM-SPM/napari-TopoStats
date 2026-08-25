@@ -693,7 +693,7 @@ def open_config_editor(viewer: Viewer, main_widget: QWidget, config_type: str = 
         main_widget.bottom_widget.set_status_message(f"Could not edit {config_type}: no configuration is loaded.")
         return
     manager = get_widget_manager()
-    manager.ensure_valid("Edit Configuration", allow_hidden=True)
+    manager.ensure_valid("Edit Configuration")
     config_editor_widget = manager.get_widget("Edit Configuration", raw=True)
     config_editor_dock = manager.get_widget("Edit Configuration")
     if config_editor_widget is None:
