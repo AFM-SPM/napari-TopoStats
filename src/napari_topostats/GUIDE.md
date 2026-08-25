@@ -1,49 +1,3 @@
-# napari-TopoStats
-
-[![License MIT][license-shield]][license-link]
-[![PyPI][pypi-shield]][pypi-link]
-[![Python Version][python-version-shield]][python-version-link]
-[![tests][tests-shield]][tests-link]
-[![codecov][codecov-shield]][codecov-link]
-[![napari hub][napari-hub-shield]][napari-hub-link]
-
-----------------------------------
-
-This [napari] plugin was generated with [Cookiecutter] using the [cookiecutter-napari-plugin] template.
-
-<!--
-Don't miss the full getting started guide to set up your new package:
-https://github.com/napari/cookiecutter-napari-plugin#getting-started
-
-and review the napari docs for plugin developers:
-https://napari.org/stable/plugins/index.html
--->
-
-## Installation
-
-Activate your Python environment (e.g. Conda) and make sure your Python version is >= 3.10 and < 3.12. An example
-conda enviroment command would be:
-
-    conda create -n napari-env python=3.11
-    conda activate napari-env
-
-The pypi release of napari-TopoStats can be installed with pip:
-
-    pip install napari-topostats
-
-Alternatively, to ensure the latest version is installed, with [Git installed] on your machine, you can install the
-napari-TopoStats package from GitHub using [pip][pip].
-
-    pip install git+https://github.com/AFM-SPM/napari-TopoStats.git@main
-
-This command will install other required modules from GitHub (AFMReader, napari-AFMReader, TopoStats)
-
-You can then run napari with:
-
-    napari
-
-## Usage
-
 To load an image into the napari viewer, drag and drop your image file into the window.
 A small window will open prompting you to input the input channel for the image you are loading.
 Enter the channel used by your image (e.g. Height). The loaded image will appear as a layer in the GUI.
@@ -153,23 +107,6 @@ Distributed under the terms of the [MIT] license,
 If you encounter any problems, please [file an issue] along with a detailed description.
 
 [napari-AFMReader]: https://github.com/AFM-SPM/napari-AFMReader
-[Cookiecutter]: https://github.com/audreyr/cookiecutter
-[Git installed]: https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
 [MIT]: http://opensource.org/licenses/MIT
-[cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
-[napari]: https://github.com/napari/napari
-[pip]: <https://pypi.org/project/pip/>
 [tox]: https://tox.readthedocs.io/en/latest/
 [file an issue]: https://github.com/AFM-SPM/napari-TopoStats/issues
-[license-shield]: https://img.shields.io/pypi/l/napari-loadafm.svg?color=green
-[license-link]: https://github.com/MaxGamill-Sheffield/napari-loadafm/raw/main/LICENSE
-[pypi-shield]: https://img.shields.io/pypi/v/napari-loadafm.svg?color=green
-[pypi-link]: https://pypi.org/project/napari-loadafm
-[python-version-shield]: https://img.shields.io/pypi/pyversions/napari-loadafm.svg?color=green
-[python-version-link]: https://python.org
-[tests-shield]: https://github.com/MaxGamill-Sheffield/napari-loadafm/workflows/tests/badge.svg
-[tests-link]: https://github.com/MaxGamill-Sheffield/napari-loadafm/actions
-[codecov-shield]: https://codecov.io/gh/MaxGamill-Sheffield/napari-loadafm/branch/main/graph/badge.svg
-[codecov-link]: https://codecov.io/gh/MaxGamill-Sheffield/napari-loadafm
-[napari-hub-shield]: https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-loadafm
-[napari-hub-link]: https://napari-hub.org/plugins/napari-loadafm
