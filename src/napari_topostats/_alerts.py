@@ -122,36 +122,6 @@ def show_error_dialog(
         raise ValueError(message)
 
 
-class LoadingDialog(QDialog):
-    """
-    A dialog window to indicate a loading or processing state.
-    """
-
-    def __init__(self, text: str = "Loading..."):
-        """
-        Initialize the loading dialog with optional text.
-
-        Parameters
-        ----------
-        text : str, optional
-            The message to display in the loading dialog (default is "Loading...").
-        """
-        super().__init__()
-        self.setWindowTitle("Please wait")
-        layout = QVBoxLayout()
-
-        self.label_text = QLabel(text)
-        layout.addWidget(self.label_text)
-
-        self.spinner_label = QLabel()
-        layout.addWidget(self.spinner_label)
-
-        self.setLayout(layout)
-        self.setModal(True)
-
-        self.adjustSize()
-
-
 def attach_status_label(widget: FunctionGui | QWidget):
     """
     Add status label to passed in widget, which can be updated when then function associated with that widget runs.
