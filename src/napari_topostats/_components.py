@@ -1,15 +1,16 @@
 """Module for containing custom and reusable gui components"""
 
+# pylint: disable=too-many-branches
+
 from collections.abc import Iterable
 from typing import Any
 
-import dask.array as da
 import numpy as np
 import pyqtgraph as pg
 from AFMReader.data_classes import CurvesDataset
 from magicgui.widgets import Container, create_widget
 from napari import Viewer
-from napari.layers import Image, Labels, Layer
+from napari.layers import Layer
 from napari_afmreader._reader import LoadedImage, get_loaded_image
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QColor, QStandardItem, QStandardItemModel
@@ -315,6 +316,7 @@ class SelectionDropdown(QComboBox):
 
         # Add checkable items
         self.set_items(items, starting_items, item_colors)
+
         # Update the text when a box is checked/unchecked
         self.model.itemChanged.connect(self.on_selection_change)
 
@@ -328,16 +330,20 @@ class SelectionDropdown(QComboBox):
             The list of items to display in the dropdown.
         starting_items : list, optional
             The list of items that should be initially checked (default is None).
-        block_signals : bool, optional
-            Whether to block signals while setting items (default is False).
+        item_colors : dict, optional
+            A dictionary mapping items to their colors (default is None).
         """
         self.selector_items = items
         self.model.clear()
         starting_items = starting_items or []
         for text in items:
             item = QStandardItem(text)
+
+            # Set the item to be checkable and enabled, and set its initial check state based on starting_items
             item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             item.setData(Qt.Checked if text in starting_items else Qt.Unchecked, Qt.CheckStateRole)
+
+            # Set the colour of the item if it is specified in the item_colors dictionary
             if item_colors and text in item_colors:
                 item.setForeground(QColor(item_colors[text]))
             self.model.appendRow(item)
@@ -356,6 +362,7 @@ class SelectionDropdown(QComboBox):
         Update the text displayed in the line edit based on the current selection.
         """
         checked = self.get_checked_items()
+        # Update the line edit text based on the number of checked items and the available items
         if len(self.selector_items) == 0:
             new_text = f"No {self.type_text} available"
         elif len(checked) == 0:
@@ -363,7 +370,9 @@ class SelectionDropdown(QComboBox):
         elif len(checked) < 4:
             new_text = f"{', '.join(checked)}"
         else:
+            # If more than 3 items are selected, show the count of selected items instead of listing them all
             new_text = f"{len(checked)} {self.type_text} selected" if checked else f"No {self.type_text} selected"
+        # Clears the current selection (a multiple selection dropdown shouldn't have a single selected item)
         self.setCurrentIndex(-1)
         self.lineEdit().setText(new_text)
 
@@ -505,11 +514,15 @@ class MultiPlotWidget(QWidget):
             return
 
         # TODO does this need to be split into unit so it matches structure of profile_lines?
+
+        # If the unit has changed, change the axis and move the lines to the appropriate plot
         if unit != self.current_unit:
+            returning_to_previous_unit = unit == self.previous_unit
             self.previous_unit = self.current_unit
             self.current_unit = unit
             if self.previous_unit and self.previous_unit in self.profile_lines:
 
+                # Move each line from the previous left axis unit to the secondary plot (right axis)
                 for line_channel in self.profile_lines[self.previous_unit]:
                     line_item = self.profile_lines[self.previous_unit][line_channel]
                     if line_item in self.p1.items:
@@ -518,30 +531,40 @@ class MultiPlotWidget(QWidget):
                         self.p2.addItem(line_item)
                     line_data = self.line_data[(self.previous_unit, line_channel)]
                     line_item.setData(line_data[0], line_data[1])
+
+                # Update the right axis label to reflect the previous unit
                 self.p1.setLabel("right", "", units=self.previous_unit)
 
-                for line_channel in self.profile_lines[self.current_unit]:
-                    line_item = self.profile_lines[self.current_unit][line_channel]
-                    if line_item in self.p2.items:
-                        self.p2.removeItem(line_item)
-                    if line_item not in self.p1.items:
-                        self.p1.addItem(line_item)
-                    line_data = self.line_data[(self.current_unit, line_channel)]
-                    line_item.setData(line_data[0], line_data[1])
+                # If the new current unit was the right axis (secondary unit) before this plot, move the lines
+                # back to the left axis (primary unit)
+                if returning_to_previous_unit:
+                    for line_channel in self.profile_lines[self.current_unit]:
+                        line_item = self.profile_lines[self.current_unit][line_channel]
+                        if line_item in self.p2.items:
+                            self.p2.removeItem(line_item)
+                        if line_item not in self.p1.items:
+                            self.p1.addItem(line_item)
+                        line_data = self.line_data[(self.current_unit, line_channel)]
+                        line_item.setData(line_data[0], line_data[1])
 
     def remove_unshown_lines(self) -> list[str]:
         """Remove plotted profile lines that are not shown on either axis."""
         removed = []
         for profile_unit, lines in list(self.profile_lines.items()):
+            # If not the current (left) or previous (right) unit, remove the lines from both plots
             if profile_unit not in [self.current_unit, self.previous_unit]:
                 for line_channel, line_item in list(lines.items()):
+                    # Line item should only be in one of the plots, but check both to be safe
                     if line_item in self.p1.items:
                         self.p1.removeItem(line_item)
                     if line_item in self.p2.items:
                         self.p2.removeItem(line_item)
+                    # Remove the line from the profile_lines dictionary
                     lines.pop(line_channel, None)
                     self.line_data.pop((profile_unit, line_channel), None)
                     removed.append(line_channel)
+
+                # If there are no more lines for this unit, remove the unit from the profile_lines dictionary
                 if not lines:
                     self.profile_lines.pop(profile_unit, None)
         return removed
@@ -553,62 +576,61 @@ class MultiPlotWidget(QWidget):
     def remove_profile_line(self, channel: str, unit: str):
         """Removes the profile line for the given channel."""
         if unit in self.profile_lines and channel in self.profile_lines[unit]:
+            # Remove the line from the profile_lines dictionary
             line_item = self.profile_lines[unit].pop(channel)
+            # Remove from the plots
             if line_item in self.p2.items:
                 self.p2.removeItem(line_item)
             if line_item in self.p1.items:
                 self.p1.removeItem(line_item)
             self.line_data.pop((unit, channel), None)
+            # If there are no more lines for this unit, remove the unit from the profile_lines dictionary
             if not self.profile_lines[unit]:
                 self.profile_lines.pop(unit, None)
 
 
-# TODO: This function really gets currently selected layer not image
-def get_selected_image(viewer: Viewer, of_type: list[type[Any]] | None = None) -> Image | None:
+def get_selected_layer(viewer: Viewer, of_type: list[type[Any]] | None = None) -> Layer | None:
     """
-    Get the currently selected image layer from the viewer.
+    Get the currently selected layer from the viewer.
+
+    Notably, will fail if no layer is selected or layer is not of the required type(s) unlike get_current_layer
+    which will return the first visible layer if no layer is selected.
 
     Parameters
     ----------
     viewer : Viewer
-        The napari viewer instance from which to get the selected image layer.
+        The napari viewer instance from which to get the selected layer.
 
     Returns
     -------
-    Image | None
-        The selected image layer, or None if no layer is selected.
+    Layer | None
+        The selected layer, or None if no layer is selected.
     """
-    selected = list(viewer.layers.selection)
+    selected_layer = viewer.layers.selection.active
 
-    if not selected:
+    if not selected_layer:
         show_error_dialog("No layer selected. Select a layer ")
         return None
-    layer = selected[0]
-    if of_type is not None and layer.__class__ not in of_type:
+
+    # Raise an error if the selected layer is not of the required type(s)
+    if of_type is not None and selected_layer.__class__ not in of_type:
         pretty_types = [t.__name__ for t in of_type]
         show_error_dialog(
             f"Selected layer is not of a required type: {', '.join(pretty_types)}.",
             raise_exception=False,
         )
         return None
-    if isinstance(layer, Image):
-        data = layer.data
-        if isinstance(data, (np.ndarray, da.Array)):  # conforms to ImageData
-            return layer
-        show_error_dialog("Layer data is not valid ImageData.", raise_exception=True)
-    elif isinstance(layer, Labels):
-        return layer
-    return None
+    return selected_layer
 
 
-def get_selected_curves(viewer: Viewer | None, suppress_errors: bool = False) -> CurvesDataset | None:
+def get_selected_curves(viewer: Viewer, suppress_errors: bool = False) -> CurvesDataset | None:
     """
     Get the currently selected curves from the viewer.
     This retrieves the curves from the LoadedImage object associated with the selected layer.
 
     Parameters
     ----------
-    viewer : Viewer | None
+    viewer : Viewer
         The napari viewer instance from which to get the selected curves.
 
     Returns
@@ -616,21 +638,18 @@ def get_selected_curves(viewer: Viewer | None, suppress_errors: bool = False) ->
     CurvesDataset | None
         The selected curves, or None if no layer is selected or if the selected layer does not have curves.
     """
-    if viewer is None:
-        if not suppress_errors:
-            show_error_dialog("No viewer available. Select a layer ")
-        return None
+    selected_layer = viewer.layers.selection.active
 
-    selected = list(viewer.layers.selection)
-
-    if not selected:
+    if not selected_layer:
         if not suppress_errors:
             show_error_dialog("No layer selected. Select a layer ")
         return None
-    layer = selected[0]
 
-    reader_id = layer.metadata.get("afmreader_id") if layer.metadata else None
+    # Get the reader_id (the layer must have been loaded through napari-AFMReader to have this metadata)
+    reader_id = selected_layer.metadata.get("afmreader_id") if selected_layer.metadata else None
     loaded_image = get_loaded_image(reader_id) if reader_id is not None else None
+
+    # Raise an error if the selected layer does not have curves data
     if loaded_image is None or loaded_image.curves_data is None:
         if not suppress_errors:
             show_error_dialog("Selected layer does not contain curves", raise_exception=True)
@@ -642,6 +661,7 @@ def get_selected_curves(viewer: Viewer | None, suppress_errors: bool = False) ->
 def get_current_layer(viewer: Viewer, requires_force_curves: bool = False) -> Layer | None:
     """Utility function to get the current active layer, excluding helper shapes layers"""
 
+    # Helper function to check if a layer has force curves using the napari-AFMReader LoadedImage object
     def has_force_curves(layer: Layer | None) -> bool:
         if not layer or not layer.metadata:
             return False
@@ -651,14 +671,16 @@ def get_current_layer(viewer: Viewer, requires_force_curves: bool = False) -> La
         loaded_image = get_loaded_image(reader_id)
         return loaded_image is not None and loaded_image.curves_data is not None
 
-    active = viewer.layers.selection.active
+    selected_layer = viewer.layers.selection.active
+    # If a layer is selected and it is not a helper shape layer, return it (if it has force curves if required)
     if (
-        active
-        and active.name not in ("Profile Line", "Selected Curve")
-        and (not requires_force_curves or has_force_curves(active))
+        selected_layer
+        and selected_layer.name not in ("Profile Line", "Selected Curve")
+        and (not requires_force_curves or has_force_curves(selected_layer))
     ):
-        return active
+        return selected_layer
 
+    # Otherwise, return the first visible layer that is not a helper shape layer (that has force curves if required)
     for layer in reversed(viewer.layers):
         if (
             layer.visible

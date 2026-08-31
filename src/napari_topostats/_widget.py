@@ -35,7 +35,7 @@ from qtpy.QtWidgets import (
 )
 
 from napari_topostats._alerts import LoadingWidget, attach_status_label
-from napari_topostats._components import get_selected_image
+from napari_topostats._components import get_selected_layer
 
 if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() is not None:
     loading_spinner = LoadingWidget(current_viewer())
@@ -428,7 +428,7 @@ class TopoStatsRootWidget(RootWidget):
         reset_button.clicked.connect(on_reset_clicked)
 
         def export_layer_to_csv():
-            image = get_selected_image(self._viewer)
+            image = get_selected_layer(self._viewer)
             csv_filepath, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save Table as CSV",

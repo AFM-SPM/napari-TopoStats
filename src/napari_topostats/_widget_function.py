@@ -41,7 +41,7 @@ from napari_topostats._alerts import LoadingWidget, attach_status_label, constru
 from napari_topostats._components import (
     SelectionDialog,
     get_selected_curves,
-    get_selected_image,
+    get_selected_layer,
     get_selected_loaded_image,
     show_parameter_dialog,
 )
@@ -550,7 +550,7 @@ class WidgetFunction:
                     uses_topostats_object = "topostats_object" in all_params
 
                     # Handle image selection if required
-                    selected_image = get_selected_image(
+                    selected_image = get_selected_layer(
                         kwargs.get("viewer", current_viewer()),
                         of_type=self.of_type,
                     )
@@ -1374,10 +1374,9 @@ class WidgetFunctionManager:
             return
 
         if not function.is_group and function.run_immediately:
-            # If the function is not in the , run it with the appropriate parameters,
-            # using the selected image layer as the image parameter
+            # If the function is not made with get_widget and has image or viewer parameters, set them
             if hasattr(widget, "image") and widget.image.value is None:
-                selected_image = get_selected_image(self.viewer)
+                selected_image = get_selected_layer(self.viewer)
                 if selected_image is not None:
                     widget.image.value = selected_image
             if hasattr(widget, "viewer"):

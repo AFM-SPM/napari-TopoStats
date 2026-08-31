@@ -50,7 +50,8 @@ def batch_process(
     if not config_loaded(config_type=config_type):
         load_config_impl(current_viewer(), config_type=config_type, use_default=True)
 
-    # If the current configuration uses the default input/output directories, prompt the user to select them
+    # If the current configuration uses the default input/output directories, prompt the user to select them instead
+    # as ./ is assumed to be the default and not necessarily intentional.
     if get_current_config(config_type=config_type)["base_dir"] == "./":
         if data_path is None:
             data_path = QFileDialog.getExistingDirectory(
@@ -84,21 +85,28 @@ def batch_process(
         module=config_type,
         summary_config=None,
     )
+
+    # If the user has just provided a data_path or output_path through the GUI, use those values.
+    # Otherwise, use the values from the current configuration.
+
     if data_path is not None:
         args.base_dir = str(data_path)
     else:
         widget.data_path.value = get_current_config(config_type=config_type)["base_dir"]
+
     if output_path is not None:
         args.output_dir = str(output_path)
     else:
         widget.output_path.value = get_current_config(config_type=config_type)["output_dir"]
 
+    # Start the batch processing in a separate thread to keep the GUI responsive
     widget.set_status_message("⏳ Starting batch processing in the background. View command line for progress.")
     worker = ProcessWorker(process, args)
     worker.finished.connect(lambda: widget.set_status_message("✅ Batch processing complete."))
     worker.finished.connect(worker.deleteLater)
     worker.error_signal.connect(handle_batch_process_error)
-    widget._batch_worker = worker  # prevent garbage collection
+    # Prevent garbage collection
+    widget._batch_worker = worker
     worker.start()
 
 

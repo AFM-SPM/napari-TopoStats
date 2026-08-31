@@ -139,7 +139,8 @@ def attach_status_label(widget: FunctionGui | QWidget):
     else:
         widget.layout().addWidget(label)
 
-    widget.status_label = label  # Store label as widget property
+    # Store label as widget property so it can be accessed later for updates
+    widget.status_label = label
     label_timer = QTimer()
     label_timer.setSingleShot(True)
 
@@ -212,8 +213,8 @@ class LoadingWidget(QWidget):
         layout.addWidget(loading_container)
         self.setLayout(layout)
 
+        # Start with the overlay hidden
         self.message = ""
-
         self.hide()
 
     def start(self, message: str = "Loading"):
@@ -224,13 +225,15 @@ class LoadingWidget(QWidget):
         # Cover the entire napari window
         self.setGeometry(self.parent().rect())
 
+        # Bring to front
         self.show()
-        self.raise_()  # Bring to front
+        self.raise_()
         QApplication.processEvents()
 
     def stop(self):
-        """Hide the widget."""
+        """Hide the single-use loading widget and schedule it for deletion."""
         self.hide()
+        self.deleteLater()
         QApplication.processEvents()
 
     def resizeEvent(self, event: QResizeEvent):
