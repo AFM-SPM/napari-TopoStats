@@ -589,38 +589,99 @@ class MultiPlotWidget(QWidget):
                 self.profile_lines.pop(unit, None)
 
 
-def get_selected_layer(viewer: Viewer, of_type: list[type[Any]] | None = None) -> Layer | None:
+def get_selected_layer(
+    viewer: Viewer,
+    of_type: list[type[Any]] | None = None,
+    requires_force_curves: bool = False,
+    silent_fallback: bool = False,
+    no_helper_layer: bool = True,
+) -> Layer | None:
     """
-    Get the currently selected layer from the viewer.
+    Get a layer from the viewer which meets the specified requirements.
 
-    Notably, will fail if no layer is selected or layer is not of the required type(s) unlike get_current_layer
-    which will return the first visible layer if no layer is selected.
+    By default, return the selected non-helper layer. When ``silent_fallback`` is
+    enabled and the selected layer is unsuitable, return the first suitable
+    visible layer instead.
 
     Parameters
     ----------
     viewer : Viewer
         The napari viewer instance from which to get the selected layer.
+    of_type : list[type[Any]] | None, optional
+        Layer types which may be returned. If ``None``, accept any layer type.
+    requires_force_curves : bool, optional
+        Require the returned layer to contain force-curve data.
+    silent_fallback : bool, optional
+        Search visible layers when the selected layer does not meet the
+        requirements.
+    no_helper_layer : bool, optional
+        Exclude the profile-viewer helper layers.
 
     Returns
     -------
     Layer | None
-        The selected layer, or None if no layer is selected.
+        A suitable selected or visible layer, or ``None`` if none is available.
     """
     selected_layer = viewer.layers.selection.active
 
-    if not selected_layer:
-        show_error_dialog("No layer selected. Select a layer ")
+    # Define constants for the different requirement check results
+    MATCHES_REQUIREMENTS = 0
+    NO_SELECTED = 1
+    TYPE_MISMATCH = 2
+    FORCE_CURVES_MISSING = 3
+    SELECTED_HELPER_LAYER = 4
+
+    # Check whether the layer meets the specified requirements and return the corresponding result code.
+    def check_requirements(layer: Layer | None) -> int:
+        loaded_image = (
+            get_loaded_image(layer.metadata.get("afmreader_id")) if layer.metadata and requires_force_curves else None
+        )
+        if not layer:
+            return NO_SELECTED
+        if of_type is not None and layer.__class__ not in of_type:
+            return TYPE_MISMATCH
+        if requires_force_curves and (not loaded_image or not loaded_image.curves_data):
+            return FORCE_CURVES_MISSING
+        if no_helper_layer and layer.name in ("Profile Line", "Selected Curve"):
+            return SELECTED_HELPER_LAYER
+        return MATCHES_REQUIREMENTS
+
+    result = check_requirements(selected_layer)
+    if result == MATCHES_REQUIREMENTS:
+        return selected_layer
+
+    # Report errors if requirements are not met unless silent_fallback is True
+    if not silent_fallback:
+        if result == NO_SELECTED:
+            show_error_dialog("No layer selected. Select a layer and try again.", raise_exception=False)
+        elif result == TYPE_MISMATCH:
+            pretty_types = [t.__name__ for t in of_type]
+            show_error_dialog(
+                f"Selected layer is not of a required type: {', '.join(pretty_types)}.",
+                raise_exception=False,
+            )
+        elif result == FORCE_CURVES_MISSING:
+            show_error_dialog(
+                "Selected layer does not contain force curves. Select a layer with force curves.",
+                raise_exception=False,
+            )
+        elif result == SELECTED_HELPER_LAYER:
+            show_error_dialog(
+                "Selected layer is a helper layer and not valid for this function. Select a different layer.",
+                raise_exception=False,
+            )
         return None
 
-    # Raise an error if the selected layer is not of the required type(s)
-    if of_type is not None and selected_layer.__class__ not in of_type:
-        pretty_types = [t.__name__ for t in of_type]
-        show_error_dialog(
-            f"Selected layer is not of a required type: {', '.join(pretty_types)}.",
-            raise_exception=False,
-        )
-        return None
-    return selected_layer
+    # If silent_fallback is True, return the first visible layer that meets the requirements
+    for layer in reversed(viewer.layers):
+        if layer.visible and check_requirements(layer) == MATCHES_REQUIREMENTS:
+            return layer
+
+    # If no fallback layer is found, show an error dialog and return None
+    show_error_dialog(
+        "No suitable layer found. Ensure a layer is selected or visible that is valid for this operation."
+    )
+    return None
 
 
 def get_selected_curves(viewer: Viewer, suppress_errors: bool = False) -> CurvesDataset | None:
@@ -658,40 +719,7 @@ def get_selected_curves(viewer: Viewer, suppress_errors: bool = False) -> Curves
     return loaded_image.curves_data
 
 
-def get_current_layer(viewer: Viewer, requires_force_curves: bool = False) -> Layer | None:
-    """Utility function to get the current active layer, excluding helper shapes layers"""
-
-    # Helper function to check if a layer has force curves using the napari-AFMReader LoadedImage object
-    def has_force_curves(layer: Layer | None) -> bool:
-        if not layer or not layer.metadata:
-            return False
-        reader_id = layer.metadata.get("afmreader_id")
-        if reader_id is None:
-            return False
-        loaded_image = get_loaded_image(reader_id)
-        return loaded_image is not None and loaded_image.curves_data is not None
-
-    selected_layer = viewer.layers.selection.active
-    # If a layer is selected and it is not a helper shape layer, return it (if it has force curves if required)
-    if (
-        selected_layer
-        and selected_layer.name not in ("Profile Line", "Selected Curve")
-        and (not requires_force_curves or has_force_curves(selected_layer))
-    ):
-        return selected_layer
-
-    # Otherwise, return the first visible layer that is not a helper shape layer (that has force curves if required)
-    for layer in reversed(viewer.layers):
-        if (
-            layer.visible
-            and layer.name not in ("Profile Line", "Selected Curve")
-            and (not requires_force_curves or has_force_curves(layer))
-        ):
-            return layer
-    return None
-
-
-def get_selected_loaded_image(viewer: Viewer) -> LoadedImage:
+def get_selected_loaded_image(viewer: Viewer) -> LoadedImage | None:
     """
     Get the currently selected loaded image from the viewer.
 
@@ -700,11 +728,20 @@ def get_selected_loaded_image(viewer: Viewer) -> LoadedImage:
     LoadedImage | None
         The selected loaded image, or None if no layer is selected or if the selected layer is not a LoadedImage.
     """
-    selected_layer = get_current_layer(viewer)
-    loaded_image = get_loaded_image(selected_layer.metadata["afmreader_id"])
+    selected_layer = get_selected_layer(viewer, silent_fallback=True)
+
+    # If no layer is selected, show an error dialog and return None
+    if selected_layer is None:
+        show_error_dialog("No layer selected. Select a layer loaded through napari-AFMReader")
+        return None
+
+    # Use afmreader_id from the selected layer's metadata to get the corresponding LoadedImage from napari-AFMReader
+    loaded_image = get_loaded_image(selected_layer.metadata.get("afmreader_id")) if selected_layer.metadata else None
     if loaded_image is not None:
         return loaded_image
-    show_error_dialog("Selected layer was not loaded throught napari-AFMReader", raise_exception=True)
+
+    # If no afmreader_id found in the selected layer's metadata, show an error dialog and return None
+    show_error_dialog("Selected layer was not loaded through napari-AFMReader", raise_exception=True)
     return None
 
 
@@ -713,7 +750,7 @@ class DynamicParameterDialog(QDialog):
 
     def __init__(
         self,
-        parameters: dict[str, Any],
+        parameters: dict[str, dict[str, Any]],
         title: str = "Parameters",
         warning_message: str | None = None,
         parent: QWidget | None = None,
@@ -722,6 +759,7 @@ class DynamicParameterDialog(QDialog):
         self.setWindowTitle(title)
         self.layout = QVBoxLayout(self)
 
+        # Show a warning message at the top of the dialog if provided
         if warning_message:
             warning_label = QLabel(warning_message)
             warning_label.setWordWrap(True)
@@ -732,7 +770,9 @@ class DynamicParameterDialog(QDialog):
         self.widgets = {}
         self.visibility_rules = {}
 
+        # Create widgets for each parameter based on its configuration
         for param_name, config in parameters.items():
+
             param_type = config.get("type")
             default = config.get("default")
             label_text = config.get("label", param_name)
@@ -748,11 +788,14 @@ class DynamicParameterDialog(QDialog):
 
             self.container.append(w)
             self.widgets[param_name] = w
+
+            # Store visibility rules for the widget if specified in the configuration
             if config.get("visible_if") is not None:
                 self.visibility_rules[param_name] = config["visible_if"]
 
         self._update_visibility()
         for widget in self.widgets.values():
+            # Whenever the widget's value changes, update the visibility of all widgets (only effecting dependent ones)
             widget.changed.connect(self._update_visibility)
 
         self.layout.addWidget(self.container.native)
@@ -771,6 +814,8 @@ class DynamicParameterDialog(QDialog):
         """Update conditional widget visibility from current dialog values."""
         values = self.get_values()
         for param_name, rule in self.visibility_rules.items():
+            # Each visibility rule is a callable that takes the current parameter values and returns a boolean
+            # indicating whether the widget should be visible
             widget = self.widgets[param_name]
             self._set_widget_visible(widget, bool(rule(values)))
 

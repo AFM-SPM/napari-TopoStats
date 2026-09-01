@@ -21,7 +21,7 @@ from napari_topostats._components import (
     CollapsibleBox,
     MultiPlotWidget,
     SelectionDropdown,
-    get_current_layer,
+    get_selected_layer,
 )
 from napari_topostats._state import (
     WidgetManager,
@@ -48,7 +48,7 @@ class ProfileViewer(QWidget):
         self.widget_manager = widget_manager or get_widget_manager()
 
         # Get the currently active layer in the viewer to determine which image is being analyzed
-        self.active_layer = get_current_layer(self.viewer)
+        self.active_layer = get_selected_layer(self.viewer, silent_fallback=True)
         reader_id = (
             self.active_layer.metadata.get("afmreader_id") if self.active_layer and self.active_layer.metadata else None
         )
@@ -117,7 +117,7 @@ class ProfileViewer(QWidget):
 
     def on_selection_change(self, event: Any = None):
         """Called when the user changes the active layer to update the available channels"""
-        temp_active = get_current_layer(self.viewer)
+        temp_active = get_selected_layer(self.viewer, silent_fallback=True)
 
         # If the active layer hasn't actually changed, do nothing
         if temp_active == self.active_layer:
@@ -371,7 +371,7 @@ def start_drawing(viewer: Viewer):
 
     global profile_viewer  # pylint: disable=global-statement
 
-    active_layer = get_current_layer(viewer)
+    active_layer = get_selected_layer(viewer, silent_fallback=True)
     if active_layer is None:
         return
 
