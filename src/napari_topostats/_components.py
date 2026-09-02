@@ -41,6 +41,19 @@ from napari_topostats._styles import (
 class CollapsibleBox(QWidget):
     """
     A widget to contain over widgets in a collapsible area
+
+    Parameters
+    ----------
+    title : str, optional
+        The title of the box, by default ""
+    parent : QWidget, optional
+        The parent widget, by default None
+    start_open : bool, optional
+        Whether the box should start open, by default False
+    cut_off_title : int
+        Number of characters to remove from the start of the title
+    subtle : bool, optional
+        Whether to use a quieter header style without a visible button bar, by default False
     """
 
     def __init__(
@@ -62,6 +75,8 @@ class CollapsibleBox(QWidget):
             The parent widget, by default None
         start_open : bool, optional
             Whether the box should start open, by default False
+        cut_off_title : int
+            Number of characters to remove from the start of the title
         subtle : bool, optional
             Whether to use a quieter header style without a visible button bar, by default False
         """
@@ -212,7 +227,18 @@ class CollapsibleBox(QWidget):
 
 
 class SelectionDialog(QDialog):
-    """Selection dialog to allow so list of items to be given then return selected items"""
+    """
+    Selection dialog to allow so list of items to be given then return selected items
+
+    Parameters
+    ----------
+    available_items : list
+        The list of items to display in the selection dialog.
+    text : str, optional
+        The title of the selection dialog (default is "Select items").
+    parent : QWidget, optional
+        The parent widget of the dialog (default is None).
+    """
 
     def __init__(self, available_items: Iterable[str], text: str = "Select items", parent: QWidget | None = None):
         """
@@ -265,12 +291,36 @@ class SelectionDialog(QDialog):
             self.list_widget.item(i).setSelected(False)
 
     def get_selected_items(self) -> list[str]:
-        """Helper method to return the text of the selected items."""
+        """
+        Helper method to return the text of the selected items.
+
+        Returns
+        -------
+        list[str]
+            Result produced by the operation.
+        """
         return [item.text() for item in self.list_widget.selectedItems()]
 
 
 class SelectionDropdown(QComboBox):
-    """A dropdown with checkable items to allow multiple selection"""
+    """
+    A dropdown with checkable items to allow multiple selection
+
+    Parameters
+    ----------
+    items : list
+        The list of items to display in the dropdown.
+    parent : QWidget, optional
+        The parent widget of the dropdown (default is None).
+    type_text : str, optional
+        The type of items being displayed (default is "items").
+    starting_items : list, optional
+        The list of items that should be initially checked (default is None).
+    on_change : callable, optional
+        A callback function to be called when the selection changes (default is None).
+    item_colors : dict, optional
+        A dictionary mapping items to their colors (default is None).
+    """
 
     def __init__(
         self,
@@ -299,7 +349,6 @@ class SelectionDropdown(QComboBox):
         item_colors : dict, optional
             A dictionary mapping items to their colors (default is None).
         """
-
         super().__init__(parent)
         self.selector_items = items
         self.type_text = type_text
@@ -350,17 +399,13 @@ class SelectionDropdown(QComboBox):
         self.update_text()
 
     def on_selection_change(self):
-        """
-        Handle changes in selection and update the displayed text accordingly.
-        """
+        """Handle changes in selection and update the displayed text accordingly."""
         self.update_text()
         if self.on_change:
             self.on_change(self.get_checked_items())
 
     def update_text(self):
-        """
-        Update the text displayed in the line edit based on the current selection.
-        """
+        """Update the text displayed in the line edit based on the current selection."""
         checked = self.get_checked_items()
         # Update the line edit text based on the number of checked items and the available items
         if len(self.selector_items) == 0:
@@ -400,7 +445,6 @@ class SelectionDropdown(QComboBox):
         checked_items : list
             The list of items that should be checked.
         """
-
         # Temporarily disable the on_change callback to avoid triggering it during updates
         temp_on_change = self.on_change
         self.on_change = None
@@ -419,10 +463,28 @@ class SelectionDropdown(QComboBox):
 
 
 class MultiPlotWidget(QWidget):
-    """A widget to display multiple plots in a grid layout"""
+    """
+    A widget to display multiple plots in a grid layout
+
+    Parameters
+    ----------
+    title : str
+        Title displayed above the plots.
+    parent : QWidget | None, optional
+        Parent widget for the plot widget.
+    """
 
     def __init__(self, title: str, parent: QWidget | None = None):
-        """Initializes the MultiPlotWidget."""
+        """
+        Initializes the MultiPlotWidget.
+
+        Parameters
+        ----------
+        title : str
+            Title displayed above the plots.
+        parent : QWidget | None, optional
+            Parent widget for the plot widget.
+        """
         super().__init__(parent=parent)
         self.setLayout(QHBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
@@ -548,7 +610,14 @@ class MultiPlotWidget(QWidget):
                         line_item.setData(line_data[0], line_data[1])
 
     def remove_unshown_lines(self) -> list[str]:
-        """Remove plotted profile lines that are not shown on either axis."""
+        """
+        Remove plotted profile lines that are not shown on either axis.
+
+        Returns
+        -------
+        list[str]
+            A list of channels that were removed
+        """
         removed = []
         for profile_unit, lines in list(self.profile_lines.items()):
             # If not the current (left) or previous (right) unit, remove the lines from both plots
@@ -570,11 +639,27 @@ class MultiPlotWidget(QWidget):
         return removed
 
     def get_profile_lines(self) -> dict[str, dict[str, pg.PlotDataItem]]:
-        """Returns the current profile lines."""
+        """
+        Returns the current profile lines.
+
+        Returns
+        -------
+        dict[str, dict[str, pg.PlotDataItem]]
+            A dictionary
+        """
         return self.profile_lines
 
     def remove_profile_line(self, channel: str, unit: str):
-        """Removes the profile line for the given channel."""
+        """
+        Removes the profile line for the given channel.
+
+        Parameters
+        ----------
+        channel : str
+            Channel used by the operation.
+        unit : str
+            Unit used by the operation.
+        """
         if unit in self.profile_lines and channel in self.profile_lines[unit]:
             # Remove the line from the profile_lines dictionary
             line_item = self.profile_lines[unit].pop(channel)
@@ -633,11 +718,24 @@ def get_selected_layer(
 
     # Check whether the layer meets the specified requirements and return the corresponding result code.
     def check_requirements(layer: Layer | None) -> int:
+        """
+        Check requirements to see if the passed layer is valid as a selected layer
+
+        Parameters
+        ----------
+        layer : Layer | None
+            Layer used by the operation.
+
+        Returns
+        -------
+        int
+            Result produced by the operation.
+        """
+        if not layer:
+            return NO_SELECTED
         loaded_image = (
             get_loaded_image(layer.metadata.get("afmreader_id")) if layer.metadata and requires_force_curves else None
         )
-        if not layer:
-            return NO_SELECTED
         if of_type is not None and layer.__class__ not in of_type:
             return TYPE_MISMATCH
         if requires_force_curves and (not loaded_image or not loaded_image.curves_data):
@@ -693,6 +791,8 @@ def get_selected_curves(viewer: Viewer, suppress_errors: bool = False) -> Curves
     ----------
     viewer : Viewer
         The napari viewer instance from which to get the selected curves.
+    suppress_errors : bool
+        Suppress errors used by the operation.
 
     Returns
     -------
@@ -727,6 +827,11 @@ def get_selected_loaded_image(viewer: Viewer) -> LoadedImage | None:
     -------
     LoadedImage | None
         The selected loaded image, or None if no layer is selected or if the selected layer is not a LoadedImage.
+
+    Parameters
+    ----------
+    viewer : Viewer
+        Napari viewer used by the operation.
     """
     selected_layer = get_selected_layer(viewer, silent_fallback=True)
 
@@ -746,7 +851,20 @@ def get_selected_loaded_image(viewer: Viewer) -> LoadedImage | None:
 
 
 class DynamicParameterDialog(QDialog):
-    """A dialog that dynamically generates inputs based on parameters configuration using magicgui."""
+    """
+    A dialog that dynamically generates inputs based on parameters configuration using magicgui.
+
+    Parameters
+    ----------
+    parameters : dict[str, dict[str, Any]]
+        Parameter definitions used to construct the controls.
+    title : str, optional
+        Dialog window title.
+    warning_message : str | None, optional
+        Warning shown above the controls.
+    parent : QWidget | None, optional
+        Parent widget for the dialog.
+    """
 
     def __init__(
         self,
@@ -755,6 +873,20 @@ class DynamicParameterDialog(QDialog):
         warning_message: str | None = None,
         parent: QWidget | None = None,
     ):
+        """
+        Initialises DynamicParameterDialog.
+
+        Parameters
+        ----------
+        parameters : dict[str, dict[str, Any]]
+            Parameter definitions used to construct the controls.
+        title : str, optional
+            Dialog window title.
+        warning_message : str | None, optional
+            Warning shown above the controls.
+        parent : QWidget | None, optional
+            Parent widget for the dialog.
+        """
         super().__init__(parent)
         self.setWindowTitle(title)
         self.layout = QVBoxLayout(self)
@@ -811,7 +943,14 @@ class DynamicParameterDialog(QDialog):
         self.layout.addLayout(button_layout)
 
     def _update_visibility(self, *_args: Any):
-        """Update conditional widget visibility from current dialog values."""
+        """
+        Update conditional widget visibility from current dialog values.
+
+        Parameters
+        ----------
+        *_args : Any
+            Additional positional arguments.
+        """
         values = self.get_values()
         for param_name, rule in self.visibility_rules.items():
             # Each visibility rule is a callable that takes the current parameter values and returns a boolean
@@ -821,7 +960,16 @@ class DynamicParameterDialog(QDialog):
 
     @staticmethod
     def _set_widget_visible(widget: Any, visible: bool):
-        """Set visibility on the magicgui row so both label and control are hidden."""
+        """
+        Set visibility on the magicgui row so both label and control are hidden.
+
+        Parameters
+        ----------
+        widget : Any
+            Widget used by the operation.
+        visible : bool
+            Visible used by the operation.
+        """
         labeled_widget_getter = getattr(widget, "_labeled_widget", None)
         labeled_widget = labeled_widget_getter() if callable(labeled_widget_getter) else None
         native = labeled_widget.native if labeled_widget is not None else widget.native
@@ -845,7 +993,25 @@ def show_parameter_dialog(
     warning_message: str | None = None,
     parent: QWidget | None = None,
 ) -> dict | None:
-    """Helper function to show a DynamicParameterDialog and return values or None."""
+    """
+    Helper function to show a DynamicParameterDialog and return values or None.
+
+    Parameters
+    ----------
+    parameters : dict[str, Any]
+        Parameters to be rendered in the dialog
+    title : str
+        Title of the dialog
+    warning_message : str | None
+        Warning message if any to show at the top of the widget
+    parent : QWidget | None
+        Parent widget.
+
+    Returns
+    -------
+    dict | None
+        Result produced by the operation.
+    """
     dialog = DynamicParameterDialog(parameters, title, warning_message, parent)
     if dialog.exec_() == QDialog.Accepted:
         return dialog.get_values()
