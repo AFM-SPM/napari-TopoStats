@@ -34,20 +34,49 @@ loaded_function_paths = {}
 
 
 def get_widget_manager() -> "WidgetManager | None":
-    """Get the global widget manager instance."""
+    """
+    Get the global widget manager instance.
+
+    Returns
+    -------
+    "WidgetManager | None"
+        The manager registered for the current napari viewer, if any.
+    """
     return widget_manager
 
 
 def set_widget_manager(manager: "WidgetManager | None"):
-    """Set the global widget manager instance."""
+    """
+    Set the global widget manager instance.
+
+    Parameters
+    ----------
+    manager : "WidgetManager | None"
+        Manager to register globally, or ``None`` to clear it.
+    """
     global widget_manager  # pylint:disable=global-statement
     widget_manager = manager
 
 
 class WidgetManager:
-    """Class to manage the state of widgets in napari-TopoStats."""
+    """
+    Class to manage the state of widgets in napari-TopoStats.
+
+    Parameters
+    ----------
+    viewer : Viewer
+        Napari viewer whose widgets are managed.
+    """
 
     def __init__(self, viewer: Viewer):
+        """
+        Initialises WidgetManager.
+
+        Parameters
+        ----------
+        viewer : Viewer
+            Napari viewer whose widgets are managed.
+        """
         global widget_manager  # pylint:disable=global-statement
         self.viewer = viewer
         self.docked_widgets: dict[str, QWidget] = {}
@@ -81,6 +110,11 @@ class WidgetManager:
             The name of the widget, by default None.
         group : str, optional
             A named dock group to tabify this widget with, by default None.
+
+        Returns
+        -------
+        QWidget | None
+            The newly shown dock, or ``None`` when no dock was created.
         """
         self.ensure_valid(name)
 
@@ -113,7 +147,19 @@ class WidgetManager:
         return self.reveal_docked_widget(name)
 
     def reveal_docked_widget(self, name: str) -> QWidget | None:
-        """Show and raise a tracked dock, returning it when it is valid."""
+        """
+        Show and raise a tracked dock, returning it when it is valid.
+
+        Parameters
+        ----------
+        name : str
+            Name of the tracked dock to reveal.
+
+        Returns
+        -------
+        QWidget | None
+            Visible dock with that name, or ``None`` if it no longer exists.
+        """
         self.ensure_valid(name)
         dock = self.docked_widgets.get(name)
         if dock is not None:
@@ -134,6 +180,11 @@ class WidgetManager:
             The name of the group to find an anchor for.
         excluding : str | None
             A dock name to exclude from consideration, by default None.
+
+        Returns
+        -------
+        QWidget | None
+            A surviving dock in the group, or ``None`` if the group is empty.
         """
         for name in list(self.dock_groups.get(group, [])):
             if name == excluding:
@@ -145,7 +196,14 @@ class WidgetManager:
         return None
 
     def _clear_widget_references(self, name: str):
-        """Remove every manager reference associated with a dock name."""
+        """
+        Remove every manager reference associated with a dock name.
+
+        Parameters
+        ----------
+        name : str
+            Name of the destroyed dock.
+        """
         self.docked_widgets.pop(name, None)
         self.raw_docked_widgets.pop(name, None)
         group = self.widget_groups.pop(name, None)
@@ -156,7 +214,16 @@ class WidgetManager:
                 self.dock_groups.pop(group)
 
     def _dock_destroyed(self, name: str, expected: QWidget):
-        """Clear references when Qt destroys a managed dock."""
+        """
+        Clear references when Qt destroys a managed dock.
+
+        Parameters
+        ----------
+        name : str
+            Name under which the dock is tracked.
+        expected : QWidget
+            Dock instance that emitted the destruction signal.
+        """
         if self.docked_widgets.get(name) is expected:
             self._clear_widget_references(name)
 
@@ -184,6 +251,8 @@ class WidgetManager:
         ----------
         name : str
             The name of the widget to get.
+        raw : bool
+            Whether to return the original widget instead of its dock container.
 
         Returns
         -------
@@ -299,18 +368,43 @@ def is_visible_widget(widget: FunctionGui | QWidget) -> bool:
 
 
 def set_topostats_widget(widget: QWidget | None):
-    """Update the topostats widget"""
+    """
+    Update the topostats widget
+
+    Parameters
+    ----------
+    widget : QWidget | None
+        Plugin's main widget to register globally, or ``None`` to clear it.
+    """
     global topostats_widget  # pylint:disable=global-statement
     topostats_widget = widget
 
 
 def get_topostats_widget() -> QWidget | None:
-    """Get the topostats widget"""
+    """
+    Get the topostats widget
+
+    Returns
+    -------
+    QWidget | None
+        Registered plugin main widget, if available.
+    """
     return topostats_widget
 
 
 def add_colour_for_channel(channel_name: str, current_channels: list[str], palette: list[str]):
-    """Add a colour for a specific channel"""
+    """
+    Add a colour for a specific channel
+
+    Parameters
+    ----------
+    channel_name : str
+        Channel receiving a persistent display colour.
+    current_channels : list[str]
+        Channels currently displayed in the profile viewer.
+    palette : list[str]
+        Colours to cycle through when assigning a channel colour.
+    """
     global channel_colour_idx  # pylint:disable=global-statement
     if len(channel_colours) >= len(palette):
         for key in channel_colours:
@@ -322,7 +416,18 @@ def add_colour_for_channel(channel_name: str, current_channels: list[str], palet
 
 
 def add_colour_for_analysis_result(result_name: str, current_results: list[str], palette: list[str]):
-    """Add a colour for a specific analysis result"""
+    """
+    Add a colour for a specific analysis result
+
+    Parameters
+    ----------
+    result_name : str
+        Analysis result receiving a persistent display colour.
+    current_results : list[str]
+        Analysis results currently displayed in the curve viewer.
+    palette : list[str]
+        Colours to cycle through when assigning a result colour.
+    """
     global analysis_result_colour_idx  # pylint:disable=global-statement
     if len(analysis_result_colours) >= len(palette):
         for key in analysis_result_colours:
@@ -334,7 +439,18 @@ def add_colour_for_analysis_result(result_name: str, current_results: list[str],
 
 
 def add_colour_for_curve_segment(segment_name: str, current_segments: list[str], palette: list[str]):
-    """Add a colour for a specific curve segment"""
+    """
+    Add a colour for a specific curve segment
+
+    Parameters
+    ----------
+    segment_name : str
+        Curve segment receiving a persistent display colour.
+    current_segments : list[str]
+        Curve segments currently displayed in the curve viewer.
+    palette : list[str]
+        Colours to cycle through when assigning a segment colour.
+    """
     global curve_segment_colour_idx  # pylint:disable=global-statement
     if len(curve_segment_colours) >= len(palette):
         for key in curve_segment_colours:
@@ -346,25 +462,67 @@ def add_colour_for_curve_segment(segment_name: str, current_segments: list[str],
 
 
 def get_channel_colours() -> dict[str, str]:
-    """Get the current channel colours"""
+    """
+    Get the current channel colours
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping of channel names to their assigned colours.
+    """
     return channel_colours
 
 
 def get_analysis_result_colours() -> dict[str, str]:
-    """Get the current analysis result colours"""
+    """
+    Get the current analysis result colours
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping of analysis result names to their assigned colours.
+    """
     return analysis_result_colours
 
 
 def get_curve_segment_colours() -> dict[str, str]:
-    """Get the current curve segment colours"""
+    """
+    Get the current curve segment colours
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping of curve segment names to their assigned colours.
+    """
     return curve_segment_colours
 
 
 def record_loaded_function_path(func_name: str, file_path: str):
-    """Record the source python file path for a dynamically loaded function."""
+    """
+    Record the source python file path for a dynamically loaded function.
+
+    Parameters
+    ----------
+    func_name : str
+        Name under which the dynamically loaded function is registered.
+    file_path : str
+        Path to the file.
+    """
     loaded_function_paths[func_name] = file_path
 
 
 def get_loaded_function_path(func_name: str) -> str | None:
-    """Get the source python file path for a dynamically loaded function."""
+    """
+    Get the source python file path for a dynamically loaded function.
+
+    Parameters
+    ----------
+    func_name : str
+        Name of the dynamically loaded function to look up.
+
+    Returns
+    -------
+    str | None
+        Source script path for the function, or ``None`` when it is unknown.
+    """
     return loaded_function_paths.get(func_name)

@@ -39,9 +39,32 @@ profile_viewer = None
 
 
 class ProfileViewer(QWidget):
-    """Custom docked widget for displaying profiles along a line"""
+    """
+    Custom docked widget for displaying profiles along a line
+
+    Parameters
+    ----------
+    viewer : Viewer
+        Napari viewer containing the profiled image.
+    shapes_layer : Shapes, optional
+        Shapes layer used to draw the profile line.
+    widget_manager : WidgetManager, optional
+        Manager for docked plugin widgets.
+    """
 
     def __init__(self, viewer: Viewer, shapes_layer: Shapes = None, widget_manager: WidgetManager = None):
+        """
+        Initialises ProfileViewer.
+
+        Parameters
+        ----------
+        viewer : Viewer
+            Napari viewer containing the profiled image.
+        shapes_layer : Shapes, optional
+            Shapes layer used to draw the profile line.
+        widget_manager : WidgetManager, optional
+            Manager for docked plugin widgets.
+        """
         super().__init__()
         self.viewer = viewer
         self.shapes_layer = shapes_layer
@@ -116,7 +139,14 @@ class ProfileViewer(QWidget):
                 add_colour_for_channel(channel, self.available_channels, VIBRANT_PALETTE)
 
     def on_selection_change(self, event: Any = None):
-        """Called when the user changes the active layer to update the available channels"""
+        """
+        Called when the user changes the active layer to update the available channels
+
+        Parameters
+        ----------
+        event : Any
+            Layer-selection event emitted by napari.
+        """
         temp_active = get_selected_layer(self.viewer, silent_fallback=True)
 
         # If the active layer hasn't actually changed, do nothing
@@ -186,7 +216,6 @@ class ProfileViewer(QWidget):
         event : Event
             The event that triggered the update; not used but required for the callback signature.
         """
-
         # If there is no shapes layer or if it has no data, reset the start and end points and return
         if self.shapes_layer is None or len(self.shapes_layer.data) == 0:
             self.start_point = None
@@ -210,7 +239,6 @@ class ProfileViewer(QWidget):
         selected_channels : list, optional
             The list of channels to plot. Not used but required for the callback signature of the channel selector.
         """
-
         # Get the pixel coordinates covered by the line drawn in the shapes layer
         self.update_profile_from_line()
 
@@ -234,7 +262,6 @@ class ProfileViewer(QWidget):
 
     def update_profile_from_line(self):
         """Update the profile plot based on the coordinates of the drawn line"""
-
         # If there is no active layer, no shapes layer, or the shapes layer has no data,
         # close the profile viewer and return.
         if self.active_layer is None or self.shapes_layer is None or len(self.shapes_layer.data) == 0:
@@ -286,7 +313,6 @@ class ProfileViewer(QWidget):
             A tuple containing the profile values (or None if empty), the pixel-to-nanometre
             conversion factor, and the z-axis units.
         """
-
         # Retrieve the loaded data, pixel-to-nanometre conversion factor, and z-axis units for the specified channel
         data, pixel_to_nanometre_scaling, z_units = self.loaded_image.get_map(channel)
 
@@ -330,7 +356,6 @@ class ProfileViewer(QWidget):
         tuple[np.ndarray, np.ndarray]
             A tuple containing the row and column coordinates of the pixels along the line.
         """
-
         # Convert the start and end points from data coordinates in the shapes layer to world coordinates
         start_point = self.shapes_layer.data_to_world(self.start_point)
         end_point = self.shapes_layer.data_to_world(self.end_point)
@@ -348,7 +373,18 @@ class ProfileViewer(QWidget):
 
 
 def close_profile_viewer(viewer: Viewer, shapes_layer: Shapes, widget_manager: WidgetManager):
-    """Utility function to close the profile viewer and remove the shapes layer"""
+    """
+    Utility function to close the profile viewer and remove the shapes layer
+
+    Parameters
+    ----------
+    viewer : Viewer
+        Viewer containing the profile dock and its helper layer.
+    shapes_layer : Shapes
+        Profile-line layer to remove from the viewer.
+    widget_manager : WidgetManager
+        Manager that owns the Profile Viewer dock.
+    """
     global profile_viewer  # pylint: disable=global-statement
     if profile_viewer is not None:
         profile_viewer.disconnect_profile_line_events()
@@ -368,7 +404,6 @@ def start_drawing(viewer: Viewer):
     viewer : napari.Viewer
         The napari viewer to attach the profile viewer to.
     """
-
     global profile_viewer  # pylint: disable=global-statement
 
     active_layer = get_selected_layer(viewer, silent_fallback=True)

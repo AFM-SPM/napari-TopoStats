@@ -37,6 +37,11 @@ NAPARI_TOPOSTATS_REPORT = "https://github.com/AFM-SPM/napari-TopoStats/issues/ne
 class ErrorDialog(QDialog):
     """
     A simple dialog window to display error messages.
+
+    Parameters
+    ----------
+    message : str
+        The error message to display in the dialog.
     """
 
     def __init__(self, message: str):
@@ -94,6 +99,10 @@ def show_error_dialog(
         The error message to display.
     raise_exception : bool, optional
         If True, raise a ValueError after showing the dialog. Used for errors that should halt execution.
+    topostats_error : bool
+        Whether or not the error was throw during the running of a backend topostats function
+    exception : Exception | None
+        The exception that triggered the dialog
     """
     if topostats_error:
         message += (
@@ -125,8 +134,12 @@ def show_error_dialog(
 def attach_status_label(widget: FunctionGui | QWidget):
     """
     Add status label to passed in widget, which can be updated when then function associated with that widget runs.
-    """
 
+    Parameters
+    ----------
+    widget : FunctionGui | QWidget
+        Widget to attach the status label to
+    """
     label = QLabel("")
     label.setStyleSheet(STATUS_LABEL_STYLE)
     label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
@@ -145,6 +158,7 @@ def attach_status_label(widget: FunctionGui | QWidget):
     label_timer.setSingleShot(True)
 
     def remove_label():
+        """Remove label by setting its text to an empty string and resetting geometry"""
         if is_valid_widget(widget):
             label.setText("")
             label.adjustSize()
@@ -161,6 +175,14 @@ def attach_status_label(widget: FunctionGui | QWidget):
     widget.label_timer = label_timer
 
     def set_status_message(message: str):
+        """
+        Updates the status message
+
+        Parameters
+        ----------
+        message : str
+            The message the status label should display
+        """
         label.setText(message)
         label.setStyleSheet(STATUS_LABEL_VISIBLE_STYLE)
         label.adjustSize()
@@ -173,7 +195,14 @@ def attach_status_label(widget: FunctionGui | QWidget):
 
 
 class LoadingWidget(QWidget):
-    """A semi-transparent overlay for napari viewer."""
+    """
+    A semi-transparent overlay for napari viewer.
+
+    Parameters
+    ----------
+    viewer : napari.Viewer
+        The napari viewer to attach the loading widget to.
+    """
 
     def __init__(self, viewer: Viewer):
         """
@@ -218,7 +247,14 @@ class LoadingWidget(QWidget):
         self.hide()
 
     def start(self, message: str = "Loading"):
-        """Show the dialog with a message."""
+        """
+        Show the dialog with a message.
+
+        Parameters
+        ----------
+        message : str
+            The loading message to show on the widget
+        """
         self.message = message
         self.loading_label.setText(f"{self.message}")
 
@@ -237,7 +273,14 @@ class LoadingWidget(QWidget):
         QApplication.processEvents()
 
     def resizeEvent(self, event: QResizeEvent):
-        """Keep overlay covering the parent when window resizes."""
+        """
+        Keep overlay covering the parent when window resizes.
+
+        Parameters
+        ----------
+        event : QResizeEvent
+            Resize event emitted by the overlay's parent widget.
+        """
         if self.parent():
             self.setGeometry(self.parent().rect())
         super().resizeEvent(event)
@@ -255,8 +298,6 @@ def construct_error_args(
 
     Parameters
     ----------
-    e : Exception, optional
-        The exception that was caught (default is None).
     message : str, optional
         A custom error message to display (default is None). If None, a message will be constructed from the exception.
     raise_exception : bool, optional
@@ -265,6 +306,8 @@ def construct_error_args(
         Whether the error is specific to Topostats (default is False).
     type_class : type, optional
         The class type associated with the error (default is None).
+    exception : Exception, optional
+        The exception that was caught.
 
     Returns
     -------

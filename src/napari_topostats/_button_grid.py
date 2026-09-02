@@ -60,6 +60,17 @@ class ButtonGrid(QListWidget):
     """
     A QListWidget that displays a grid of buttons, each representing a function.
     Each button can be clicked to execute the corresponding function, and open a docked widget in the viewer.
+
+    Parameters
+    ----------
+    parent : QListWidget | None, optional
+        Parent list widget.
+    functions : dict[str, WidgetFunction] | None, optional
+        Functions represented by buttons in the grid.
+    viewer : Viewer, optional
+        Napari viewer associated with the grid.
+    function_manager : WidgetFunctionManager, optional
+        Manager used to open function widgets.
     """
 
     def __init__(
@@ -69,6 +80,20 @@ class ButtonGrid(QListWidget):
         viewer: Viewer = None,
         function_manager: WidgetFunctionManager = None,
     ):
+        """
+        Initialises ButtonGrid.
+
+        Parameters
+        ----------
+        parent : QListWidget | None, optional
+            Parent list widget.
+        functions : dict[str, WidgetFunction] | None, optional
+            Functions represented by buttons in the grid.
+        viewer : Viewer, optional
+            Napari viewer associated with the grid.
+        function_manager : WidgetFunctionManager, optional
+            Manager used to open function widgets.
+        """
         super().__init__(parent=parent)
         # Set style and properties for the QListWidget
         self.setMovement(self.Static)  # The items cannot be moved by the user.
@@ -96,7 +121,6 @@ class ButtonGrid(QListWidget):
         functions : dict[str, WidgetFunction] | None
             A dictionary of function names and their corresponding WidgetFunction objects.
         """
-
         # Add the functions to the grid, including the tooltip if it exists.
         self.functions = functions or {}
         for label, function in functions.items():
@@ -143,7 +167,6 @@ class ButtonGrid(QListWidget):
         tool_tip : str | None
             The tooltip for the button. If None, no tooltip will be set.
         """
-
         # If the label is already a QListWidgetItem, add it directly to the grid.
         if isinstance(label, QListWidgetItem):
             super().addItem(label)
@@ -160,12 +183,19 @@ class ButtonGrid(QListWidget):
         super().addItem(item)
 
     def remove_all_items(self):
-        """
-        Remove all items from the QListWidget.
-        """
+        """Remove all items from the QListWidget."""
         self.clear()
 
     def add_function(self, widget_function: WidgetFunction, label: str):
-        """Add a function button to the button grid"""
+        """
+        Add a function button to the button grid
+
+        Parameters
+        ----------
+        widget_function : WidgetFunction
+            Widget function to be added to the button grid
+        label : str
+            Label/ name of the function
+        """
         self.functions[label] = widget_function
         self.add_function_button(label, tool_tip=widget_function.tooltip)

@@ -20,7 +20,16 @@ ALLOWABLE_PARAMETERS = ["viewer", "image", "curves", "curve", "channel_units"]
 
 
 def load_py_files(paths: Iterable[str | Path], viewer: Any):
-    """Load functions from python files into the button grid"""
+    """
+    Load functions from python files into the button grid
+
+    Parameters
+    ----------
+    paths : Iterable[str | Path]
+        Python script paths from which functions are imported.
+    viewer : Any
+        Viewer that owns the import-selection dialog and button grid.
+    """
     py_functions = {}
     function_to_filepath = {}
     for py_file in paths:
@@ -60,7 +69,14 @@ def load_py_files(paths: Iterable[str | Path], viewer: Any):
 
 
 def fetch_saved_functions() -> list[WidgetFunction]:
-    """Fetch user saved scripts from app data and load them into the button grid"""
+    """
+    Fetch user saved scripts from app data and load them into the button grid
+
+    Returns
+    -------
+    list[WidgetFunction]
+        Functions restored from the user's saved-script metadata.
+    """
     save_dir = Path(user_config_dir("TopoStats", "Napari")) / "scripts"
     metadata_path = save_dir / "saved_scripts.json"
 
@@ -97,7 +113,14 @@ def fetch_saved_functions() -> list[WidgetFunction]:
 
 
 def get_loaded_functions() -> list[WidgetFunction]:
-    """Get the list of currently loaded functions from python files."""
+    """
+    Get the list of currently loaded functions from python files.
+
+    Returns
+    -------
+    list[WidgetFunction]
+        All dynamically loaded functions, including saved functions on first use.
+    """
     global saved_scripts_loaded  # pylint: disable=global-statement
     if not saved_scripts_loaded:
         fetch_saved_functions()
@@ -106,7 +129,19 @@ def get_loaded_functions() -> list[WidgetFunction]:
 
 
 def load_functions_from_file(file_path: str | Path) -> dict[str, Callable[..., Any]]:
-    """Loads a python file dynamically and extracts its functions."""
+    """
+    Loads a python file dynamically and extracts its functions.
+
+    Parameters
+    ----------
+    file_path : str | Path
+        Path to the file.
+
+    Returns
+    -------
+    dict[str, Callable[..., Any]]
+        Public functions from the script that can be exposed in the plugin.
+    """
     path = Path(file_path)
     module_name = path.stem
 

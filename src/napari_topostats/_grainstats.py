@@ -6,7 +6,19 @@ from topostats.grainstats import GrainStats
 
 
 def grainstats(image: Labels) -> pd.DataFrame:
-    """Function used for running topostats grainstats function on a labels layer"""
+    """
+    Function used for running topostats grainstats function on a labels layer
+
+    Parameters
+    ----------
+    image : Labels
+        Labels layer whose grain measurements are calculated.
+
+    Returns
+    -------
+    pd.DataFrame
+        Grain measurements, including pixel-space centres when available.
+    """
     cfg = image.metadata["config"]["grainstats"]
     if "run" in cfg:
         cfg.pop("run")
@@ -40,6 +52,16 @@ def get_grainstats_df(stats: GrainStats) -> pd.DataFrame:
     """
     Reconstructs the 'grainstats' DataFrame from the nested
     grain_crops.stats attributes.
+
+    Parameters
+    ----------
+    stats : GrainStats
+        Completed TopoStats grain-statistics object to flatten.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per measured grain or subgrain.
     """
     rows = []
 

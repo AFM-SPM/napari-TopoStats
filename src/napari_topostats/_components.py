@@ -1,6 +1,6 @@
 """Module for containing custom and reusable gui components"""
 
-# pylint: disable=too-many-branches
+# pylint: disable=too-many-branches,too-many-lines
 
 from collections.abc import Iterable
 from typing import Any
@@ -297,7 +297,7 @@ class SelectionDialog(QDialog):
         Returns
         -------
         list[str]
-            Result produced by the operation.
+            Text values of the items selected in the dialog.
         """
         return [item.text() for item in self.list_widget.selectedItems()]
 
@@ -656,9 +656,9 @@ class MultiPlotWidget(QWidget):
         Parameters
         ----------
         channel : str
-            Channel used by the operation.
+            Channel whose profile line should be removed.
         unit : str
-            Unit used by the operation.
+            Unit group containing the profile line.
         """
         if unit in self.profile_lines and channel in self.profile_lines[unit]:
             # Remove the line from the profile_lines dictionary
@@ -724,12 +724,12 @@ def get_selected_layer(
         Parameters
         ----------
         layer : Layer | None
-            Layer used by the operation.
+            Candidate layer to validate against the requested requirements.
 
         Returns
         -------
         int
-            Result produced by the operation.
+            Requirement status code for the candidate layer.
         """
         if not layer:
             return NO_SELECTED
@@ -792,7 +792,7 @@ def get_selected_curves(viewer: Viewer, suppress_errors: bool = False) -> Curves
     viewer : Viewer
         The napari viewer instance from which to get the selected curves.
     suppress_errors : bool
-        Suppress errors used by the operation.
+        Whether to return ``None`` silently when no curve data is available.
 
     Returns
     -------
@@ -831,7 +831,7 @@ def get_selected_loaded_image(viewer: Viewer) -> LoadedImage | None:
     Parameters
     ----------
     viewer : Viewer
-        Napari viewer used by the operation.
+        Current napari viewer
     """
     selected_layer = get_selected_layer(viewer, silent_fallback=True)
 
@@ -949,7 +949,7 @@ class DynamicParameterDialog(QDialog):
         Parameters
         ----------
         *_args : Any
-            Additional positional arguments.
+            Placeholder parameters so function passes when an event is automatically passed from a connection
         """
         values = self.get_values()
         for param_name, rule in self.visibility_rules.items():
@@ -966,9 +966,9 @@ class DynamicParameterDialog(QDialog):
         Parameters
         ----------
         widget : Any
-            Widget used by the operation.
+            Magicgui control whose labelled row is updated.
         visible : bool
-            Visible used by the operation.
+            Whether the control and its label should be displayed.
         """
         labeled_widget_getter = getattr(widget, "_labeled_widget", None)
         labeled_widget = labeled_widget_getter() if callable(labeled_widget_getter) else None
@@ -1010,7 +1010,7 @@ def show_parameter_dialog(
     Returns
     -------
     dict | None
-        Result produced by the operation.
+        Selected parameter values, or ``None`` when the dialog is cancelled.
     """
     dialog = DynamicParameterDialog(parameters, title, warning_message, parent)
     if dialog.exec_() == QDialog.Accepted:

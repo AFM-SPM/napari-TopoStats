@@ -297,6 +297,11 @@ class RootWidget(QWidget):
         -------
         functions : dict[str, WidgetFunction | FunctionGui]
             A dictionary of function names and their corresponding WidgetFunction or FunctionGui objects.
+
+        Parameters
+        ----------
+        _functions : list[WidgetFunction]
+            Functions to add to the plugin's button grid.
         """
         functions = {}
         for function in _functions:
@@ -314,11 +319,19 @@ class RootWidget(QWidget):
         str | None
             The name of the currently running function, or None if no function is running.
         """
-
         return get_running_function()
 
     def add_function(self, function_to_add: WidgetFunction, to_group: bool = False):
-        """Add a function to the button grid (designed for retrospective use, after loading widget)"""
+        """
+        Add a function to the button grid (designed for retrospective use, after loading widget)
+
+        Parameters
+        ----------
+        function_to_add : WidgetFunction
+            Widget function to add to the grid.
+        to_group : bool
+            Whether the function is added to the grouped-functions menu.
+        """
         function_to_add.function_manager = self.function_manager
         function_name = function_to_add.name
         display_name = function_name.replace("_", " ").title()
@@ -417,6 +430,7 @@ class TopoStatsRootWidget(RootWidget):
         reset_button.setToolTip("Restore the selected factory configuration as the active and user default.")
 
         def on_reset_clicked():
+            """Reset the currently selected config to the module default when the reset button is clicked"""
             config_type = config_type_selector.currentText().lower()
             config_dir = Path(user_config_dir("TopoStats", "Napari"))
             default_config_path = config_dir / f"{config_type}_config.yaml"
@@ -428,7 +442,8 @@ class TopoStatsRootWidget(RootWidget):
         reset_button.clicked.connect(on_reset_clicked)
 
         def export_layer_to_csv():
-            image = get_selected_layer(self._viewer)
+            """Export the selected image layer to a CSV file"""
+            image = get_selected_layer(self._viewer, of_type=Image)
             csv_filepath, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save Table as CSV",

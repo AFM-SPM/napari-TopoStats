@@ -67,12 +67,38 @@ updated_values = {}
 
 
 def _format_config_label(key: str) -> str:
-    """Format a config key for display without changing the stored key."""
+    """
+    Format a config key for display without changing the stored key.
+
+    Parameters
+    ----------
+    key : str
+        Configuration key to convert into a display label.
+
+    Returns
+    -------
+    str
+        Label with underscores replaced by spaces.
+    """
     return key.replace("_", " ")
 
 
 def _format_config_tooltip(key: str, description: str = "") -> str:
-    """Build a tooltip that keeps the original config key visible."""
+    """
+    Build a tooltip that keeps the original config key visible.
+
+    Parameters
+    ----------
+    key : str
+        Original configuration key to show in the tooltip.
+    description : str
+        Optional explanatory text for the setting.
+
+    Returns
+    -------
+    str
+        Tooltip containing the key and, when present, its description.
+    """
     if description:
         return f"{key}\n\n{description}"
     return key
@@ -81,6 +107,11 @@ def _format_config_tooltip(key: str, description: str = "") -> str:
 class ConfigWrapper:
     """
     A wrapper for configuration dictionaries to provide a flat view and unflattening functionality.
+
+    Parameters
+    ----------
+    config : dict
+        The configuration dictionary.
     """
 
     def __init__(self, config: dict):
@@ -162,6 +193,8 @@ def on_config_value_changed(key: str, val: Any, config_type: str = "topostats"):
         The key of the value that changed.
     val : Any
         The new value.
+    config_type : str
+        The module (usually topostats) whose config value is being updated.
     """
     if isinstance(val, str):
         stripped = val.strip()
@@ -205,6 +238,8 @@ def build_dynamic_widget(
         The descriptions for the config values, by default None
     running_reference : str, optional
         The running reference for the current config level, by default None
+    config_type : str
+        The module (usually topostats) whose config widget is being built.
 
     Returns
     -------
@@ -309,6 +344,8 @@ def write_new_default_config(config_path: Path, config_type: str = "topostats"):
     ----------
     config_path : Path
         The path to write the config file to.
+    config_type : str
+        The module (usually topostats) to create the default config for.
     """
     args = Namespace()
     args.config = None
@@ -331,6 +368,11 @@ def get_current_config_path(config_type: str = "topostats") -> str | None:
     -------
     str | None
         The current config path.
+
+    Parameters
+    ----------
+    config_type : str
+        The module (usually topostats) whose current config path is returned.
     """
     return current_config_paths.get(config_type)
 
@@ -353,6 +395,10 @@ def load_config_impl(
         The path to the config file, by default None
     use_default : bool, optional
         Whether to use the default config, by default False
+    config_type : str
+        The module (usually topostats) to load the config for.
+    report_errors : bool
+        Whether loading failures should be shown in an error dialog.
 
     Returns
     -------
@@ -434,7 +480,7 @@ def load_config(viewer: Viewer, config_path: Path | None = None, config_type: Co
     config_path : Path | None, optional
         The path to the config file, by default None
     config_type : Literal["topostats", "forcestats"], optional
-        The type of configuration, by default "topostats"
+        The module (usually topostats) to load the config for.
 
     Returns
     -------
@@ -456,6 +502,14 @@ def set_up_load_config_widget(widget: FunctionGui):
     attach_status_label(widget)
 
     def on_success(result: bool):
+        """
+        Function to run once the load_config function has been called.
+
+        Parameters
+        ----------
+        result : bool
+            Result of the loading of the config.
+        """
         if result:
             widget.set_status_message("✅ Configuration loaded successfully!")
         else:
@@ -474,7 +528,7 @@ def save_as_default_config(config: dict[str, Any], config_type: str = "topostats
     config : dict[str, Any]
         The config to save.
     config_type : str, optional
-        The type of configuration, by default "topostats"
+        The module (usually topostats) to save the default config for.
     """
     config_dir = Path(user_config_dir("TopoStats", "Napari"))
     config_path = config_dir / f"{config_type}_config.yaml"
@@ -496,6 +550,7 @@ def add_save_as_default_button(widget: QWidget):
     save_button.setToolTip("Save the currently loaded configuration as the default config.")
 
     def on_save_clicked():
+        """Save the config to the user config directory for the napari plugin so it persists between napari instances"""
         config_type = widget.config_type.value
         if config_wrappers is None or config_type not in config_wrappers:
             show_error_dialog("No configuration loaded to save.")
@@ -600,15 +655,37 @@ def create_info_icon(tooltip_text: str) -> QToolButton:
 
 # pylint: disable=too-many-statements
 def _apply_editor_values(config_type: str):
-    """Commit pending values for one configuration type."""
+    """
+    Commit pending values for one configuration type.
+
+    Parameters
+    ----------
+    config_type : str
+        The module (usually topostats) whose pending config edits are applied.
+    """
     config_wrappers[config_type].flat.update(updated_values.pop(config_type, {}))
     save_current_config_as_temp(config_type=config_type)
 
 
 class ConfigEditorWidget(QWidget):
-    """Reusable dock content for editing one configuration type at a time."""
+    """
+    Reusable dock content for editing one configuration type at a time.
+
+    Parameters
+    ----------
+    config_type : str
+        The module (usually topostats) whose config is edited.
+    """
 
     def __init__(self, config_type: str):
+        """
+        Initialises ConfigEditorWidget.
+
+        Parameters
+        ----------
+        config_type : str
+            The module (usually topostats) whose config is edited.
+        """
         super().__init__()
         self.config_type = config_type
         self.setMinimumWidth(550)
@@ -634,7 +711,7 @@ class ConfigEditorWidget(QWidget):
         Parameters
         ----------
         config_type : str
-            The configuration type to display.
+            The module (usually topostats) whose config form is built.
         """
         if self.form is not None:
             self.main_layout.removeWidget(self.form)
@@ -657,7 +734,7 @@ class ConfigEditorWidget(QWidget):
         Parameters
         ----------
         config_type : str
-            The configuration type to display.
+            The module (usually topostats) whose config is displayed.
         """
         if config_type != self.config_type:
             updated_values.pop(self.config_type, None)
@@ -688,7 +765,18 @@ class ConfigEditorWidget(QWidget):
 
 
 def open_config_editor(viewer: Viewer, main_widget: QWidget, config_type: str = "topostats"):
-    """Open or raise the reusable native napari configuration editor dock."""
+    """
+    Open or raise the reusable native napari configuration editor dock.
+
+    Parameters
+    ----------
+    viewer : Viewer
+        The current napari viewer
+    main_widget : QWidget
+        Plugin main widget (TopoStatsWidget) used to display status messages and tabify the dock.
+    config_type : str
+        The module (usually topostats) whose config is opened in the editor.
+    """
     if config_type not in config_wrappers:
         main_widget.bottom_widget.set_status_message(f"Could not edit {config_type}: no configuration is loaded.")
         return
@@ -720,6 +808,8 @@ def save_config_to_file(file_path: Path, full_config: dict[str, Any], config_typ
         The path to save the file to.
     full_config : dict[str, Any]
         The config to save.
+    config_type : str
+        The module (usually topostats) whose config is saved to the file.
     """
     try:
         if file_path.suffix.lower() == ".json":
@@ -784,7 +874,19 @@ def _write_yaml_with_inline_comments(file_path: Path, config: dict[str, Any], co
     lines = []
 
     def format_value(value: Any) -> str:
-        """Format a value as YAML inline style"""
+        """
+        Format a value as YAML inline style
+
+        Parameters
+        ----------
+        value : Any
+            Value to serialise in YAML flow style.
+
+        Returns
+        -------
+        str
+            YAML representation of the value.
+        """
         if isinstance(value, list):
             # Format lists in flow style [item1, item2]
             formatted_items = []
@@ -810,11 +912,22 @@ def _write_yaml_with_inline_comments(file_path: Path, config: dict[str, Any], co
             return value
         return str(value)
 
-    def write_dict(d: dict, comment_dict: dict, indent: int = 0):
-        """Recursively write dictionary with comments"""
+    def write_dict(current_dictionary: dict, comment_dict: dict, indent: int = 0):
+        """
+        Recursively write dictionary with comments
+
+        Parameters
+        ----------
+        current_dictionary : dict
+            Dictionary at the current nesting level.
+        comment_dict : dict
+            Comments associated with the current dictionary level.
+        indent : int
+            Current YAML indentation depth.
+        """
         indent_str = "  " * indent
 
-        for key, val in d.items():
+        for key, val in current_dictionary.items():
             key_comment = comment_dict.get(key) if isinstance(comment_dict, dict) else None
 
             if isinstance(val, dict):
@@ -848,6 +961,8 @@ def save_current_config_as_temp(overides: dict[str, Any] | None = None, config_t
     ----------
     overides : dict[str, Any] | None
         A dictionary of config keys and values to override in the saved config.
+    config_type : str
+        The module (usually topostats) whose config is saved temporarily.
     """
     full_current_config = get_current_config(config_type=config_type)
 
@@ -862,7 +977,21 @@ def save_current_config_as_temp(overides: dict[str, Any] | None = None, config_t
 
 
 def get_current_config(flat: bool = False, config_type: str = "topostats") -> dict[str, Any]:
-    """Returns the current config with any updates from the edit config window applied"""
+    """
+    Returns the current config with any updates from the edit config window applied
+
+    Parameters
+    ----------
+    flat : bool
+        Whether to return dotted keys instead of the nested configuration.
+    config_type : str
+        The module (usually topostats) whose current config is returned.
+
+    Returns
+    -------
+    dict[str, Any]
+        Current configuration, in flat or nested form as requested.
+    """
     if flat:
         return config_wrappers[config_type].flat
     full_current_config = config_wrappers[config_type].unflatten()
@@ -877,6 +1006,11 @@ def config_loaded(config_type: str = "topostats") -> bool:
     -------
     bool
         True if a config has been loaded, False otherwise.
+
+    Parameters
+    ----------
+    config_type : str
+        The module (usually topostats) whose config loaded state is checked.
     """
     return config_type in config_wrappers
 

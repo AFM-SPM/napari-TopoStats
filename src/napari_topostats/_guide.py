@@ -38,7 +38,14 @@ def get_guide_path() -> Path:
 
 
 def _load_forcestats_guide_html() -> str:
-    """Load the optional HTML guide section supplied by ForceStats."""
+    """
+    Load the optional HTML guide section supplied by ForceStats.
+
+    Returns
+    -------
+    str
+        ForceStats guide HTML, or an empty string when ForceStats is unavailable.
+    """
     try:
         from forcestats.guide import get_guide_html  # pylint: disable=import-outside-toplevel
 

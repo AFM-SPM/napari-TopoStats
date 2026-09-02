@@ -26,6 +26,8 @@ def calculate_contrast_limits(image: np.ndarray, percentage: float = 2.0) -> tup
     ----------
     image : ImageData
         The input image data.
+    percentage : float
+        Percentage excluded from each end of the image-value distribution.
 
     Returns
     -------
@@ -149,20 +151,39 @@ def _eval(obj: Any, string: str) -> Any:
     return obj
 
 
-def next_punctuation(s: str, start: int = 0, checking_for: str = ".([") -> int:
-    """Find the next punctuation character in a string."""
-    for i in range(start, len(s)):
-        if s[i] in checking_for:
+def next_punctuation(input_string: str, start: int = 0, checking_for: str = ".([") -> int:
+    """
+    Find the next punctuation character in a string.
+
+    Parameters
+    ----------
+    input_string : str
+        Text to search.
+    start : int
+        Index at which to begin searching.
+    checking_for : str
+        Characters that terminate the search.
+
+    Returns
+    -------
+    int
+        Index of the first matching character, or ``-1`` when none is found.
+    """
+    for i in range(start, len(input_string)):
+        if input_string[i] in checking_for:
             return i
     return -1
 
 
 def is_binary_image(arr: np.ndarray) -> bool:
-    """Check if the array is a binary image (0s and 1s or 0s and 255s).
+    """
+    Check if the array is a binary image (0s and 1s or 0s and 255s).
+
     Parameters
     ----------
     arr : np.ndarray
         The array to check.
+
     Returns
     -------
     bool
@@ -174,7 +195,8 @@ def is_binary_image(arr: np.ndarray) -> bool:
 
 
 def remove_all_but_last(word: str, text: str) -> str:
-    """Remove all occurrences of 'word' in 'text' except the last one.
+    """
+    Remove all occurrences of 'word' in 'text' except the last one.
 
     Parameters
     ----------
@@ -202,7 +224,29 @@ def _all_curves_raw_worker(
     class_kwargs: dict[str, Any],
     has_curve_in_func_sig: bool,
 ) -> Any:
-    """Worker function for parallel curve processing returning full value from function."""
+    """
+    Worker function for parallel curve processing returning full value from function.
+
+    Parameters
+    ----------
+    curve : dict[str, dict[str, np.ndarray]]
+        Curve data supplied to the processing function.
+    func : Callable[..., Any]
+        Function or bound method to apply to the curve.
+    type_class : type[Any] | None
+        Optional class to instantiate before calling its method.
+    func_kwargs : dict[str, Any]
+        Keyword arguments accepted by the processing function.
+    class_kwargs : dict[str, Any]
+        Keyword arguments accepted by the optional class constructor.
+    has_curve_in_func_sig : bool
+        Whether the processing function accepts the curve explicitly.
+
+    Returns
+    -------
+    Any
+        Value returned by the processing function for this curve.
+    """
     if type_class is not None:
         # Instantiate the class with curve if it's a parameter, otherwise just with class_kwargs
         instance = type_class(curve=curve, **class_kwargs) if "curve" in class_kwargs else type_class(**class_kwargs)
@@ -251,6 +295,10 @@ def all_curves(
         The number of worker processes to use for parallel processing, by default None (cpu_count).
     **kwargs : dict
         Additional keyword arguments to pass to the function or class.
+    h5file : Any | None
+        Open HDF5 destination used when the function returns corrected curves.
+    new_volume_name : str | None
+        Name for the corrected curve volume written to the HDF5 file.
 
     Returns
     -------
@@ -317,7 +365,19 @@ def all_curves(
             image_map = np.empty((shape_y, shape_x), dtype=type(actual_value))
 
     def _all_curves_worker(curve: dict[str, dict[str, np.ndarray]]) -> Any:
-        """Worker function for parallel curve processing."""
+        """
+        Worker function for parallel curve processing.
+
+        Parameters
+        ----------
+        curve : dict[str, dict[str, np.ndarray]]
+            Individual curve dictionary to process
+
+        Returns
+        -------
+        Any
+            Value returned for the curve.
+        """
         return_value = _all_curves_raw_worker(curve, func, type_class, func_kwargs, class_kwargs, has_curve_in_func_sig)
         return return_value
 

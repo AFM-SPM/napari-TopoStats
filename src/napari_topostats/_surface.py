@@ -16,7 +16,8 @@ def image_to_surface(
     vertical_exaggeration: float = 1.0,
     triangle_size: Annotated[int, {"min": 1}] = 1,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Convert a 2D AFM image or image stack into napari surface data.
+    """
+    Convert a 2D AFM image or image stack into napari surface data.
 
     A 3D ``(frame, y, x)`` stack produces a four-dimensional
     ``(z, frame, y, x)`` surface. This aligns its frame, y, and x axes with
@@ -98,7 +99,8 @@ def image_to_surface(
 
 
 def make_faces(shape_y: int, shape_x: int) -> np.ndarray:
-    """Generate triangular faces for a grid of vertices.
+    """
+    Generate triangular faces for a grid of vertices.
 
     Parameters
     ----------
@@ -134,12 +136,15 @@ def create_dynamic_surface(
     return_value: tuple[np.ndarray, np.ndarray, np.ndarray],
     name: str,
 ):
-    """Create a dynamic surface layer that updates with the current frame of a source image layer.
+    """
+    Create a dynamic surface layer that updates with the current frame of a source image layer.
 
     Parameters
     ----------
     viewer : napari.Viewer
         The napari viewer instance.
+    return_value : tuple[np.ndarray, np.ndarray, np.ndarray]
+        Vertices, face indices, and sampled height data from ``image_to_surface``.
     name : str
         Name of the surface layer.
     """
@@ -175,7 +180,8 @@ def create_dynamic_surface(
 
 
 class DynamicSurfaceController:
-    """Update a surface layer when the selected viewer frame changes.
+    """
+    Update a surface layer when the selected viewer frame changes.
 
     Parameters
     ----------
@@ -192,7 +198,8 @@ class DynamicSurfaceController:
     """
 
     def __init__(self, viewer, surface_layer, stack, vertices, faces):
-        """Initialises DynamicSurfaceController.
+        """
+        Initialises DynamicSurfaceController.
 
         Parameters
         ----------
@@ -218,10 +225,19 @@ class DynamicSurfaceController:
         viewer.layers.events.removed.connect(self._handle_layer_removed)
 
     def _request_update(self, event=None):  # pylint: disable=unused-argument
+        """
+        Queue a surface refresh for the newly selected frame.
+
+        Parameters
+        ----------
+        event : Any
+            Frame-change event emitted by napari.
+        """
         self.pending_frame = self.viewer.dims.current_step[-3]
         self._update_surface()
 
     def _update_surface(self):
+        """Update surface data to a new frame."""
         frame = self.pending_frame
 
         if frame is None or frame < 0 or frame >= self.stack.shape[0]:
@@ -258,5 +274,13 @@ class DynamicSurfaceController:
         self.pending_frame = None
 
     def _handle_layer_removed(self, event):
+        """
+        Release the controller when its surface layer is removed.
+
+        Parameters
+        ----------
+        event : Any
+            Layer-removal event emitted by napari.
+        """
         if event.value is self.surface_layer:
             self.close()

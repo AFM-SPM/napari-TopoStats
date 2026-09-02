@@ -38,7 +38,14 @@ from napari_topostats.utils import unflatten_dict
 
 
 def _filled_cross_symbol() -> QPainterPath:
-    """Create a filled cross symbol for analysis result markers."""
+    """
+    Create a filled cross symbol for analysis result markers.
+
+    Returns
+    -------
+    QPainterPath
+        The painting path representing a filled cross
+    """
     path = QPainterPath()
     path.addRect(-0.5, -0.1, 1.0, 0.2)
     path.addRect(-0.1, -0.5, 0.2, 1.0)
@@ -64,7 +71,14 @@ def open_curve_viewer(viewer: Viewer) -> "CurveViewer":
 
 
 class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
-    """Custom docked widget for displaying force curves"""
+    """
+    Custom docked widget for displaying force curves
+
+    Parameters
+    ----------
+    viewer : napari.Viewer
+        The napari viewer to attach the curve viewer to.
+    """
 
     # pylint: disable=too-many-statements
     def __init__(self, viewer: Viewer):
@@ -204,7 +218,14 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         self.parameter_dialog.populate_parameters(self.metadata)
 
     def update_curve(self, selected_curve_dict: dict = None):
-        """Updates the plot with the selected curve dict"""
+        """
+        Updates the plot with the selected curve dict
+
+        Parameters
+        ----------
+        selected_curve_dict : dict
+            The dictionary representation of the selected curve
+        """
         if selected_curve_dict:
             self.selected_curve_dict = selected_curve_dict
         if self.selected_curve_dict is None:
@@ -221,7 +242,16 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         self.info_label.setText(f"Plotting curve for pixel (x={self.x_coord}, y={self.y_coord}).")
 
     def update_channels(self, x_channel: str | None = None, y_channel: str | None = None):
-        """Updates the channels of the plot and refreshes curve to match"""
+        """
+        Updates the channels of the plot and refreshes curve to match
+
+        Parameters
+        ----------
+        x_channel : str | None
+            The current x-axis channel
+        y_channel : str | None
+            The current y-axis channel
+        """
         if x_channel:
             self.x_channel = x_channel
             unit = self.channels_units.get(self.x_channel, "m")
@@ -234,7 +264,14 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         self.update_analysis_results()
 
     def update_volume(self, volume_name: str):
-        """Updates the volume of the plot and refreshes curve to match"""
+        """
+        Updates the volume of the plot and refreshes curve to match
+
+        Parameters
+        ----------
+        volume_name : str
+            The name of the new volume to be set
+        """
         if not volume_name:
             return
 
@@ -282,7 +319,14 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             self.volume_selector.setCurrentText(selected_curves.default_volume_name)
 
     def update_segments(self, selected_segments: list[str]):
-        """Updates the segments of the plot based on user checking boxes"""
+        """
+        Updates the segments of the plot based on user checking boxes
+
+        Parameters
+        ----------
+        selected_segments : list[str]
+            The new segments to be set and displayed
+        """
         for segment_name in selected_segments:
             self.ensure_segment_line(segment_name)
 
@@ -293,7 +337,14 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         self.update_curve()
 
     def update_analysis_results(self, analysis_results: dict[str, int] | None = None):
-        """Update visible analysis result markers for the current curve."""
+        """
+        Update visible analysis result markers for the current curve.
+
+        Parameters
+        ----------
+        analysis_results : dict[str, int] | None
+            The analysis results to be displayed on the plot
+        """
         if isinstance(analysis_results, dict):
             previous_result_names = set(self.current_analysis_results.keys())
             current_result_names = set(analysis_results.keys())
@@ -348,12 +399,32 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 result_value_x = self.selected_curve_dict[self.x_channel][marker_segment][result_value]
                 result_value_y = self.selected_curve_dict[self.y_channel][marker_segment][result_value]
 
+                # pylint: disable=unused-argument
                 def result_tip(
                     x: float,
                     y: float,
                     data: dict[str, Any] | None = None,
                     result_name: str = result_name,
-                ) -> str:  # pylint: disable=unused-argument
+                ) -> str:
+                    """
+                    Build the hover text for an analysis-result marker.
+
+                    Parameters
+                    ----------
+                    x : float
+                        Marker x-coordinate supplied by pyqtgraph.
+                    y : float
+                        Marker y-coordinate supplied by pyqtgraph.
+                    data : dict[str, Any] | None
+                        Marker metadata containing the result index to display.
+                    result_name : str
+                        Analysis-result name used as the tooltip label.
+
+                    Returns
+                    -------
+                    str
+                        Tooltip containing the formatted result name and index.
+                    """
                     idx = data.get("index", "") if data is not None else ""
                     return f"{result_name.title().replace('_', ' ')}: {idx}"
 
@@ -373,13 +444,27 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 self.plot_widget.addItem(marker)
 
     def showEvent(self, event: QShowEvent):
-        """Register the mouse callback when the widget is shown."""
+        """
+        Register the mouse callback when the widget is shown.
+
+        Parameters
+        ----------
+        event : QShowEvent
+            Qt event raised when the curve viewer is shown.
+        """
         if self.extract_curve not in self.viewer.mouse_drag_callbacks:
             self.viewer.mouse_drag_callbacks.append(self.extract_curve)
         super().showEvent(event)
 
     def hideEvent(self, event: QHideEvent):
-        """Clean up the mouse callback and selection cross layer when hidden/closed."""
+        """
+        Clean up the mouse callback and selection cross layer when hidden/closed.
+
+        Parameters
+        ----------
+        event : QHideEvent
+            Qt event raised when the curve viewer is hidden.
+        """
         if self.extract_curve in self.viewer.mouse_drag_callbacks:
             self.viewer.mouse_drag_callbacks.remove(self.extract_curve)
         if "Selected Curve" in self.viewer.layers:
@@ -387,7 +472,21 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         super().hideEvent(event)
 
     def extract_curve(self, viewer: Viewer, event: Any) -> Generator[None, None, None]:
-        """Generator that runs when the user clicks and drags the mouse in the viewer."""
+        """
+        Generator that runs when the user clicks and drags the mouse in the viewer.
+
+        Parameters
+        ----------
+        viewer : Viewer
+            Viewer in which the mouse interaction occurred.
+        event : Any
+            Napari mouse event containing the position, type, and active modifiers.
+
+        Yields
+        ------
+        Generator[None, None, None]
+            Control yielded to napari between mouse-drag updates.
+        """
         if "Shift" not in event.modifiers:
             return
 
@@ -406,21 +505,42 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             yield
 
     def assign_colours(self, analysis_results: dict):
-        """Assign colours to the channel selector and plot widget"""
+        """
+        Assign colours to the channel selector and plot widget
+
+        Parameters
+        ----------
+        analysis_results : dict
+            Available analysis results whose names require plot colours.
+        """
         colours = get_analysis_result_colours()
         for result in analysis_results:
             if result not in colours:
                 add_colour_for_analysis_result(result, list(analysis_results.keys()), VIBRANT_PALETTE)
 
     def assign_segment_colours(self, segments: list[str]):
-        """Assign colours to curve segments."""
+        """
+        Assign colours to curve segments.
+
+        Parameters
+        ----------
+        segments : list[str]
+            Curve segment names whose plot colours should be assigned.
+        """
         colours = get_curve_segment_colours()
         for segment in segments:
             if segment not in colours:
                 add_colour_for_curve_segment(segment, list(segments), SEGMENT_COLOURS)
 
     def ensure_segment_line(self, segment_name: str):
-        """Create the plot line for a curve segment if it does not exist yet."""
+        """
+        Create the plot line for a curve segment if it does not exist yet.
+
+        Parameters
+        ----------
+        segment_name : str
+            Curve segment for which a plot line should exist.
+        """
         if segment_name in self.segment_lines:
             return
         self.segment_lines[segment_name] = self.plot_widget.plot(
@@ -430,7 +550,16 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         )
 
     def _process_event_coords(self, viewer: Viewer, event: Any):
-        """The core logic to extract and plot the curve at the current mouse position."""
+        """
+        The core logic to extract and plot the curve at the current mouse position.
+
+        Parameters
+        ----------
+        viewer : Viewer
+            Viewer containing the selected force-curve layer.
+        event : Any
+            Mouse event whose position identifies the curve to extract.
+        """
         layer = viewer.layers.selection.active
         reader_id = layer.metadata.get("afmreader_id") if layer and layer.metadata else None
         loaded_image = get_loaded_image(reader_id) if reader_id is not None else None
@@ -584,9 +713,28 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
 
 class ParameterDialog(QDialog):
-    """Custom parameters dialog to show values for selected curves"""
+    """
+    Custom parameters dialog to show values for selected curves
+
+    Parameters
+    ----------
+    metadata : dict[str, Any] | None, optional
+        Experimental parameters to display.
+    parent : QWidget | None, optional
+        Parent widget for the dialog.
+    """
 
     def __init__(self, metadata: dict[str, Any] | None = None, parent: QWidget | None = None):
+        """
+        Initialises ParameterDialog.
+
+        Parameters
+        ----------
+        metadata : dict[str, Any] | None, optional
+            Experimental parameters to display.
+        parent : QWidget | None, optional
+            Parent widget for the dialog.
+        """
         super().__init__(parent)
         self.setWindowTitle("Experimental Parameters")
         self.resize(500, 600)
@@ -602,13 +750,35 @@ class ParameterDialog(QDialog):
         self.layout().addWidget(self.scroll_area)
 
     def populate_parameters(self, metadata: dict[str, Any]):
-        """Populate the parameters viewing dialog with the metadata"""
+        """
+        Populate the parameters viewing dialog with the metadata
+
+        Parameters
+        ----------
+        metadata : dict[str, Any]
+            Flattened experimental metadata to display in the dialog.
+        """
         self.metadata = metadata
         parameters_dict = unflatten_dict(self.metadata)
         self.info_widget.update(parameters_dict)
 
 
 def _get_parameters_widget(dict_data: dict[str, Any], title: str = "Parameters") -> CollapsibleBox:
+    """
+    Build a collapsible widget from nested experimental parameters/ metadata.
+
+    Parameters
+    ----------
+    dict_data : dict[str, Any]
+        Parameter names and values, which may contain nested dictionaries.
+    title : str
+        Heading displayed on the collapsible section.
+
+    Returns
+    -------
+    CollapsibleBox
+        Collapsible hierarchy displaying the supplied parameter values.
+    """
     collapsible_box = CollapsibleBox(title=title)
     for key, value in dict_data.items():
         if isinstance(value, dict):
