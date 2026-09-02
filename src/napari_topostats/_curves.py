@@ -102,7 +102,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         top_row_layout = QHBoxLayout(top_row_widget)
         top_row_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Create and add info label to the layout
+        # Create and add info label to the layout to provide user instructions for viewing force curves
         self.info_label = QLabel("Hold 'Shift' and click a pixel to view its force curve.")
         self.volume_selector = QComboBox()
         self.volume_selector.currentTextChanged.connect(self.update_volume)
