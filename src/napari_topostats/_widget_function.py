@@ -20,19 +20,10 @@ from AFMReader.h5_saver import H5Saver, find_unused_filename
 from magicgui import magicgui
 from magicgui.widgets import Container, FunctionGui, PushButton
 from napari import current_viewer  # pylint: disable=no-name-in-module
-from napari.layers import Image, Labels, Layer
-from napari.layers.labels._labels_constants import Mode
+from napari.layers import Image, Layer
 from napari.viewer import Viewer
 from napari_afmreader._reader import get_loaded_image
-from qtpy.QtWidgets import (
-    QCheckBox,
-    QFileDialog,
-    QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+from qtpy.QtWidgets import QWidget
 from scipy.ndimage import label
 from topostats.classes import TopoStats
 
@@ -53,6 +44,7 @@ from napari_topostats._io import (
     unsave_scripts,
 )
 from napari_topostats._parallel_processing import ProcessWorker
+from napari_topostats._table import render_label_matched_table
 from napari_topostats._state import WidgetManager, get_running_function, set_running_function
 from napari_topostats._surface import create_dynamic_surface
 from napari_topostats.utils import _eval, all_curves, calculate_contrast_limits, is_binary_image, remove_all_but_last
@@ -1338,191 +1330,20 @@ class WidgetFunction:
                 )
                 viewer.dims.ndisplay = self.ndims
         elif isinstance(return_value, pd.DataFrame):
-            df = return_value
             container = QWidget()
-            layout = QVBoxLayout(container)
-            nm_checkbox = QCheckBox("Convert to nm")
-            nm_checkbox.setChecked(False)
 
-            # Create table widget
-            table = QTableWidget()
-            table.setRowCount(len(df))
-            table.setColumnCount(len(df.columns))
-            table.setHorizontalHeaderLabels(df.columns.tolist())
-
-            if isinstance(original, Labels):
-                # Create a copy of the dataframe with an extra row for the background for proper alignmemt of labels
-                # This will not affect the original dataframe used for the table
-                features_df = df.copy()
-                features_df.index = features_df.index + 1
-                if 0 not in features_df.index:
-                    # Get the first row to copy the columns and dtypes
-                    bg_row = features_df.iloc[[0]].copy()
-                    bg_row.index = [0]
-                    # Fill the row with NaN
-                    bg_row.loc[0] = np.nan
-                    if "grain_number" in bg_row.columns:
-                        # Set grain_number to -1 for the background row so it is different from real grains (0-indexed)
-                        bg_row["grain_number"] = -1
-                    features_df = pd.concat([bg_row, features_df])
-                features_df["label_id"] = features_df.index
-                original.features = features_df
-            original.mode = Mode.PICK
-            is_updating = False
-
-            def convert_to_nm(df_m: pd.DataFrame) -> pd.DataFrame:
-                """
-                Convert the pd.DataFrame from m to nm.
-
-                Parameters
-                ----------
-                df_m : pd.DataFrame
-                    Grain measurements expressed in metre-based units.
-
-                Returns
-                -------
-                pd.DataFrame
-                    Copy of the measurements converted to nanometre-based units.
-                """
-                df_nm = df_m.copy()
-                m_to_nm = 1e9
-                for col in df_nm.select_dtypes(include=[np.number]).columns:
-                    if df_nm[col].max() == 0:
-                        continue
-                    if df_nm[col].max() < 1e-23:  # Volume in m^3
-                        df_nm[col] = df_nm[col] * (m_to_nm**3)
-                    elif df_nm[col].max() < 1e-14:  # Area in m^2
-                        df_nm[col] = df_nm[col] * (m_to_nm**2)
-                    elif df_nm[col].max() < 1e-5:  # Length in m
-                        df_nm[col] = df_nm[col] * m_to_nm
-                return df_nm
-
-            def on_checkbox_changed(checked: bool):
-                """
-                Switch the displayed table values between metres and nanometres.
-
-                Parameters
-                ----------
-                checked : bool
-                    Whether nanometre-based values should be displayed.
-                """
-                # Convert table from m to nm
-                if checked:
-                    df_nm = convert_to_nm(df)
-
-                    # Update table
-                    for i in range(len(df_nm)):
-                        for j in range(df_nm.shape[1]):
-                            item = QTableWidgetItem(str(df_nm.iat[i, j]))
-                            table.setItem(i, j, item)
-                else:
-                    df_m = df.copy()
-                    # Update table
-                    for i in range(len(df_m)):
-                        for j in range(df_m.shape[1]):
-                            item = QTableWidgetItem(str(df_m.iat[i, j]))
-                            table.setItem(i, j, item)
-
-            # pylint: disable=unused-argument
-            def on_row_clicked(row: int, column: int):
-                """
-                Triggered when a table row is clicked to also select that label in the viewer.
-
-                Parameters
-                ----------
-                row : int
-                    Table row containing the selected grain.
-                column : int
-                    Clicked table column; selection is applied to the entire row.
-                """
-                nonlocal is_updating
-                # Get the grain number (or label id) from the dataframe
-                grain_id = df.iloc[row]["grain_number"]
-
-                # Find coordinates of that label in the image
-                mask = original.data == int(grain_id) + 1
-                if mask.any() and isinstance(original, Labels):
-                    coords = np.argwhere(mask)
-                    if coords.size > 0:
-                        centroid = coords.mean(axis=0)
-                        # Ensure we're only using (y, x) order for 2D
-                        y, x = centroid[-2], centroid[-1]
-                        # Set the camera center in world coordinates
-                        viewer.camera.center = (y, x)
-                    original.show_selected_label = True
-                    original.selected_label = int(grain_id) + 1
-                    original.mode = Mode.PICK
-                    viewer.layers.selection.active = original
-                    is_updating = True
-
-            # pylint: disable=unused-argument
-            def on_label_selected(event: Any):
-                """
-                Select the table row corresponding to the picked label.
-
-                Parameters
-                ----------
-                event : Any
-                    Napari label-selection event.
-                """
-                nonlocal is_updating
-                if is_updating:
-                    is_updating = False
-                    return
-                selected = original.selected_label
-                if selected == 0:  # 0 means background
-                    original.show_selected_label = False
-                    return
-
-                # Find matching row
-                match = df.index[df["grain_number"] + 1 == selected]
-                if len(match):
-                    row = int(match[0])
-                    table.selectRow(row)
-                    table.scrollToItem(table.item(row, 0), QTableWidget.PositionAtCenter)
-                    original.show_selected_label = True
-
-            nm_checkbox.toggled.connect(on_checkbox_changed)
-            nm_checkbox.setObjectName("nm_checkbox")
-            layout.addWidget(nm_checkbox)
-            original.events.selected_label.connect(on_label_selected)
-
-            # Populate table
-            for i in range(len(df)):
-                for j in range(df.shape[1]):
-                    item = QTableWidgetItem(str(df.iat[i, j]))
-                    table.setItem(i, j, item)
-
-            layout.addWidget(table)
-
-            save_button = QPushButton("Save to CSV")
-            layout.addWidget(save_button)
-
-            def save_to_csv():
-                """Prompt for a path and export the displayed grain statistics as CSV."""
-                # Open a file dialog to choose where to save
-                file_path, _ = QFileDialog.getSaveFileName(
-                    table,
-                    "Save Table as CSV",
-                    f"{original.name.lower().replace(' ', '_')}_stats.csv",
-                    "CSV Files (*.csv)",
-                )
-                if file_path:
-                    df_to_save = convert_to_nm(df) if nm_checkbox.isChecked() else df
-                    df_to_save.to_csv(file_path, index=False)
-                    print(f"Saved CSV to: {file_path}")
-
-            save_button.clicked.connect(save_to_csv)
-            table.cellClicked.connect(on_row_clicked)
-
-            # Keep tables for different source layers as tabs
-            table_group = self.function_key.title()
-            table_name = f"{table_group}: {original.name}"
-            widget_manager = self.function_manager.widget_manager
+            table_name, table_group = render_label_matched_table(
+                viewer,
+                original,
+                return_value,
+                self.function_key,
+                container,
+            )
 
             # Replace if the table already exists for this layer, otherwise add a new one
-            widget_manager.remove_docked_widget(table_name)
-            widget_manager.add_docked_widget(container, area="right", name=table_name, group=table_group)
+            self.function_manager.widget_manager.remove_docked_widget(table_name)
+            self.function_manager.widget_manager.add_docked_widget(container, area="right", name=table_name, group=table_group)
+    
         else:
             show_error_dialog(
                 f"Function {self.function_key} returned an unsupported type: {type(return_value)}.",
