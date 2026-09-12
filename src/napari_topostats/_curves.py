@@ -3,6 +3,7 @@
 from collections.abc import Generator
 from typing import Any
 
+from napari_topostats._alerts import show_error_dialog
 import numpy as np
 import pyqtgraph as pg
 from AFMReader.data_classes import CurvesDataset
@@ -34,6 +35,7 @@ from napari_topostats._styles import (
     SEGMENT_COLOURS,
     VIBRANT_PALETTE,
 )
+from napari_topostats._state import get_widget_manager
 from napari_topostats.utils import unflatten_dict
 
 
@@ -92,6 +94,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         """
         super().__init__()
         self.viewer = viewer
+        self.widget_manager = get_widget_manager()
 
         # Setup the layout to be arranged vertically
         self.setLayout(QVBoxLayout())
@@ -104,9 +107,11 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
         # Create and add info label to the layout to provide user instructions for viewing force curves
         self.info_label = QLabel("Hold 'Shift' and click a pixel to view its force curve.")
+        top_row_layout.addWidget(self.info_label)
+
+        # Create a volume selector combo box for choosing the volume to display
         self.volume_selector = QComboBox()
         self.volume_selector.currentTextChanged.connect(self.update_volume)
-        top_row_layout.addWidget(self.info_label)
         top_row_layout.addWidget(self.volume_selector)
         self.layout().addWidget(top_row_widget)
 
@@ -207,14 +212,17 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         if self.parameter_dialog is None:
             self.parameter_dialog = ParameterDialog(self.metadata)
 
+        # If the parameter dialog was previous created but has now been minimised or otherwise made invisible,
+        # bring it to the front and make it visible
         if not self.parameter_dialog.isVisible():
             try:
                 self.parameter_dialog.show()
                 self.parameter_dialog.raise_()
                 self.parameter_dialog.activateWindow()
             except RuntimeError:
-                self.parameter_dialog.deleteLater()
+                self.widget_manager.ensure_valid()
                 self.parameter_dialog = None
+        
         self.parameter_dialog.populate_parameters(self.metadata)
 
     def update_curve(self, selected_curve_dict: dict = None):
@@ -645,9 +653,9 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                     viewer.layers.selection.active = active_layer
             else:
                 selected_curve_layer = viewer.layers["Selected Curve"]
+                selected_curve_layer.edge_color = COLOR_SELECTED_CURVE
                 selected_curve_layer.data = cross_data
                 selected_curve_layer.edge_width = max(y_scale, x_scale) * 0.5
-                selected_curve_layer.edge_color = COLOR_SELECTED_CURVE
 
             current_index = viewer.layers.index(selected_curve_layer)
             if current_index < len(viewer.layers) - 1:
@@ -657,6 +665,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
         except Exception as e:  # noqa: BLE001 -- keep plotting failures within the GUI callback
             self.info_label.setText(f"Error plotting curve: {str(e)}")
+            show_error_dialog(raise_exception=True, exception=e)
 
     def set_available_channels(self, available_channels: list):
         """
