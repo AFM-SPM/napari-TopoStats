@@ -69,6 +69,7 @@ def load_guide() -> tuple[str, Path]:
     with open(guide_path, encoding="utf-8") as f:
         text = f.read()
 
+    # Convert the markdown text to HTML to maintain formatting
     html_sections = [markdown.markdown(text, extensions=["extra", "codehilite", "tables"])]
 
     # If ForceStats is installed, load its optional guide section
@@ -114,6 +115,7 @@ def show_guide(viewer: Viewer):
     layout = QVBoxLayout()
     layout.setContentsMargins(0, 0, 0, 0)
 
+    # Text browser for displaying the guide content as it's html
     text_browser = QTextBrowser()
     text_browser.setOpenExternalLinks(True)
 
@@ -139,15 +141,18 @@ def check_guide(viewer: Viewer):
     """
     user_settings_path = Path(user_config_dir("TopoStats", "Napari")) / "settings.json"
     user_settings_path.parent.mkdir(parents=True, exist_ok=True)
+    # If no plugin settings exist yet, create them with plugin version and show the guide (as first launch)
     if not user_settings_path.exists():
         settings = {"plugin-version": version("napari-topostats")}
         with open(user_settings_path, "w", encoding="utf-8") as f:
             json.dump(settings, f)
         show_guide(viewer)
     else:
+        # Load existing settings if the settings file exists
         with open(user_settings_path, encoding="utf-8") as f:
             settings = json.load(f)
 
+        # Show the guide if the plugin version has changed, then record new version
         if settings.get("plugin-version") != version("napari-topostats"):
             settings["plugin-version"] = version("napari-topostats")
             with open(user_settings_path, "w", encoding="utf-8") as f:

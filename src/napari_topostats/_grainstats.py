@@ -19,24 +19,25 @@ def grainstats(image: Labels) -> pd.DataFrame:
     pd.DataFrame
         Grain measurements, including pixel-space centres when available.
     """
-    cfg = image.metadata["config"]["grainstats"]
-    if "run" in cfg:
-        cfg.pop("run")
-    if "class_names" in cfg:
-        cfg.pop("class_names")
+    # Extract and coerce the grainstats configuration
+    config = image.metadata["config"]["grainstats"]
+    if "run" in config:
+        config.pop("run")
+    if "class_names" in config:
+        config.pop("class_names")
     topostats_object = image.metadata["topostats_object"]
     stats = GrainStats(
         topostats_object,
         base_output_dir="grains",
-        **cfg,
+        **config,
     )
     stats.calculate_stats()
     df = get_grainstats_df(stats)
 
-    # Get scaling factors from metadata
 
     # Convert centre coordinates back to pixels if they exist
     if "centre_x" in df.columns and "centre_y" in df.columns:
+        # Get scaling factors from metadata
         pixel_to_nm_scaling = image.metadata.get("px2nm", 1.0)
         metre_scaling_factor = image.metadata.get("metre_scaling_factor", 1e-9)
         length_scaling_factor = pixel_to_nm_scaling * metre_scaling_factor
@@ -65,7 +66,7 @@ def get_grainstats_df(stats: GrainStats) -> pd.DataFrame:
     """
     rows = []
 
-    # 1. Check if grains exist
+    # Check if grains exist
     if not stats.grain_crops:
         # Return empty DF with expected columns if no grains (optional, mimics old behavior)
         return pd.DataFrame()

@@ -234,14 +234,22 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         selected_curve_dict : dict
             The dictionary representation of the selected curve
         """
+
+        # Update the currently selected curve with new data if a new selection is provided
         if selected_curve_dict:
             self.selected_curve_dict = selected_curve_dict
+
         if self.selected_curve_dict is None:
             return
+        # Ensure some channels are selected before plotting
         self.set_default_channels()
+
         if self.x_channel not in self.selected_curve_dict or self.y_channel not in self.selected_curve_dict:
+            # This could happen if selected channels were present elsewhere in the data but not for the current segment
             self.info_label.setText("Could not find channels to plot for this curve.")
             return
+        
+        # Plot the data for each selected segment
         for selected_segment in self.segment_selector.get_checked_items():
             self.ensure_segment_line(selected_segment)
             x_data = self.selected_curve_dict[self.x_channel][selected_segment]
@@ -260,6 +268,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         y_channel : str | None
             The current y-axis channel
         """
+        # Update the plot with the new channel name and unit
         if x_channel:
             self.x_channel = x_channel
             unit = self.channels_units.get(self.x_channel, "m")
@@ -268,6 +277,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             self.y_channel = y_channel
             unit = self.channels_units.get(self.y_channel, "N")
             self.plot_widget.setLabel("left", self.y_channel, units=unit)
+        # Then refresh the curve and analysis results
         self.update_curve()
         self.update_analysis_results()
 
@@ -283,12 +293,16 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         if not volume_name:
             return
 
+        # Attempt to retrieve the selected volume from the currently selected layer
         selected_curves = get_selected_curves(self.viewer)
         selected_volume = selected_curves.get_volume(volume_name)
         if selected_volume is None:
             return
+
+        # Segments may have been updated in the new volume, so we need to refresh the segment colours and selector
         self.assign_segment_colours(selected_volume.metadata.segment_names)
         if self.segment_selector.selector_items:
+            # If there are already selected segments, keep them if they still exist in the new volume
             starting_segments = [
                 name
                 for name in self.segment_selector.get_checked_items()
@@ -297,20 +311,25 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         else:
             starting_segments = selected_volume.metadata.segment_names
         if not starting_segments:
+            # If no overlap between previously selected segments and the new volume, select all segments
             starting_segments = selected_volume.metadata.segment_names
+
         self.segment_selector.set_items(
             selected_volume.metadata.segment_names,
             starting_items=starting_segments,
             item_colors=get_curve_segment_colours(),
         )
+        # Get the curve from the current volume with the previously selected coordinates
         self.selected_curve_dict = selected_volume[self.y_coord, self.x_coord]
 
+        # Update the segment lines with the new volume data
         self.update_segments(self.segment_selector.get_checked_items())
+
         self.update_analysis_results(selected_volume.get_analysis_results(self.y_coord, self.x_coord))
 
     def refresh_volumes(self):
-        """Refresh available curve volumes and update the currently plotted curve."""
-        selected_curves = get_selected_curves(self.viewer, suppress_errors=True)
+        """Refresh available curve volumes when a new layer is selected."""
+        selected_curves: CurvesDataset = get_selected_curves(self.viewer, suppress_errors=True)
         if selected_curves is None:
             return
 
@@ -319,11 +338,14 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         if not volume_names:
             return
 
+        # Clear and refill the volume selector with the available volumes for the selected layer
         self.volume_selector.clear()
         self.volume_selector.addItems(volume_names)
         if previous_volume_name in selected_curves.volumes:
+            # Restore the selected volume from the previous layer if it still exists
             self.volume_selector.setCurrentText(previous_volume_name)
         else:
+            # If the previously selected volume is not available, default to the layer's default volume
             self.volume_selector.setCurrentText(selected_curves.default_volume_name)
 
     def update_segments(self, selected_segments: list[str]):
@@ -335,13 +357,18 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         selected_segments : list[str]
             The new segments to be set and displayed
         """
+        # Make sure all the selected segments have corresponding lines in the plot (if already there
+        # they will be reused and simply have their data updated)
         for segment_name in selected_segments:
             self.ensure_segment_line(segment_name)
 
+        # Remove any segment lines that are no longer selected
         for segment_name in list(self.segment_lines.keys()):
             if segment_name not in selected_segments:
                 self.plot_widget.removeItem(self.segment_lines[segment_name])
                 del self.segment_lines[segment_name]
+                
+        # Finally, update the curve to reflect the current selection of segments
         self.update_curve()
 
     def update_analysis_results(self, analysis_results: dict[str, int] | None = None):
@@ -353,27 +380,33 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         analysis_results : dict[str, int] | None
             The analysis results to be displayed on the plot
         """
+        # If analysis_results is a dictionary (and not None), update the internal state and UI accordingly
         if isinstance(analysis_results, dict):
             previous_result_names = set(self.current_analysis_results.keys())
             current_result_names = set(analysis_results.keys())
             self.current_analysis_results = analysis_results
 
+            # If the set of result names has changed, assign colours to the new results
             if previous_result_names != current_result_names:
                 self.assign_colours(analysis_results)
 
+                # And update the analysis results selector with the new items and their colors
                 self.analysis_results_selector.set_items(
                     items=list(analysis_results.keys()),
                     starting_items=[name for name in self.active_analysis_markers if name in analysis_results],
                     item_colors=get_analysis_result_colours(),
                 )
-        selected_analysis_names = self.analysis_results_selector.get_checked_items()
 
+        # Get the selected analysis result names from the analysis results selector (guarded against stale entries)
+        selected_analysis_names = self.analysis_results_selector.get_checked_items()
         selected_analysis_results = {
             name: self.current_analysis_results[name]
             for name in selected_analysis_names
             if name in self.current_analysis_results
         }
 
+        # If no curve is selected or the required channels are missing, clear the active analysis markers and return as
+        # valid data cannot be plotted
         if (
             self.selected_curve_dict is None
             or self.x_channel not in self.selected_curve_dict
@@ -384,26 +417,38 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             self.active_analysis_markers.clear()
             return
 
+        # TODO: Currently markers can only be associated with the first segment of the selected curve
         marker_segment = next(iter(self.selected_curve_dict[self.x_channel]))
 
+        # Update the positions of the active analysis markers based on the selected analysis results
         for result_name in list(self.active_analysis_markers.keys()):
             active_analysis_marker = self.active_analysis_markers[result_name]
             if result_name in selected_analysis_results:
+                # Analysis results are stored as indices into the curve data
                 result_value = selected_analysis_results[result_name]
+                # Extract the x and y values corresponding to the result index so we know where to place the marker
                 result_value_x = self.selected_curve_dict[self.x_channel][marker_segment][result_value]
                 result_value_y = self.selected_curve_dict[self.y_channel][marker_segment][result_value]
+                # Update the marker position with the extracted coordinates
                 active_analysis_marker.setData(
                     x=[result_value_x],
                     y=[result_value_y],
                     data=[{"index": result_value}],
                 )
             else:
+                # If a marker is no longer selected, remove it from the plot and the active markers dictionary
                 self.plot_widget.removeItem(active_analysis_marker)
                 self.active_analysis_markers.pop(result_name)
+
         analysis_result_colours = get_analysis_result_colours()
+
+        # If new analysis results have been selected, create and add markers for them
         for result_name, result_value in selected_analysis_results.items():
             if result_name not in self.active_analysis_markers:
                 result_colour = analysis_result_colours[result_name]
+
+                # Extract the x and y coordinates for the new analysis result marker (the result value should be an
+                # index into the curve data)
                 result_value_x = self.selected_curve_dict[self.x_channel][marker_segment][result_value]
                 result_value_y = self.selected_curve_dict[self.y_channel][marker_segment][result_value]
 
@@ -416,6 +461,9 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 ) -> str:
                     """
                     Build the hover text for an analysis-result marker.
+
+                    Scatter plot item takes a function rather than a constant string so it can update automatically 
+                    based on the marker's data such as if it moves.
 
                     Parameters
                     ----------
@@ -436,6 +484,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                     idx = data.get("index", "") if data is not None else ""
                     return f"{result_name.title().replace('_', ' ')}: {idx}"
 
+                # Create the cross shaped scatter plot marker for the analysis result
                 marker = pg.ScatterPlotItem(
                     x=[result_value_x],
                     y=[result_value_y],
@@ -453,7 +502,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
     def showEvent(self, event: QShowEvent):
         """
-        Register the mouse callback when the widget is shown.
+        Register the mouse callback when the widget is shown (created or made visible).
 
         Parameters
         ----------
@@ -501,7 +550,8 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         # Trigger the initial plot on click
         self._process_event_coords(viewer, event)
 
-        yield  # Yield control back to napari to wait for drag events
+        # Yield control back to napari to wait for drag events
+        yield  
 
         while event.type == "mouse_move":
             # Optional: stop tracking if the user lets go of Shift while dragging
@@ -514,7 +564,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
     def assign_colours(self, analysis_results: dict):
         """
-        Assign colours to the channel selector and plot widget
+        Assign colours for the channel selector and plot widget
 
         Parameters
         ----------
@@ -528,7 +578,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
     def assign_segment_colours(self, segments: list[str]):
         """
-        Assign colours to curve segments.
+        Assign colours for curve segments.
 
         Parameters
         ----------
@@ -568,9 +618,11 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         event : Any
             Mouse event whose position identifies the curve to extract.
         """
+        # Extract data references from selected layer
         layer = viewer.layers.selection.active
         reader_id = layer.metadata.get("afmreader_id") if layer and layer.metadata else None
         loaded_image = get_loaded_image(reader_id) if reader_id is not None else None
+        # If no loaded image or curves data is available, display an info message and return early
         if loaded_image is None or loaded_image.curves_data is None:
             self.info_label.setText("No force curves found in active layer.")
             return
@@ -585,18 +637,23 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         if coords[-2] == self.y_coord and coords[-1] == self.x_coord:
             return
 
+        # Update the stored coordinates for the current mouse position
         self.y_coord = coords[-2]
         self.x_coord = coords[-1]
-        shape_x = layer.data.shape[-1]
 
+        # Compute the linear index of the curve based on the x and y coordinates
+        shape_x = layer.data.shape[-1]
         curve_num = shape_x * self.y_coord + self.x_coord
 
         curves_data: CurvesDataset = loaded_image.curves_data
         global_metadata = curves_data.metadata
         if self.volume_selector.currentText() not in curves_data.volumes:
+            # If the currently selected volume is not in the available volumes, refresh the volume selector
             self.volume_selector.clear()
             self.volume_selector.addItems(curves_data.volumes.keys())
+            # And use the default volume as the current selection so a curve can still be displayed
             self.volume_selector.setCurrentText(curves_data.get_default_volume().name)
+
         current_volume = (
             curves_data.get_volume(self.volume_selector.currentText())
             if self.volume_selector.currentText()
@@ -604,8 +661,10 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         )
 
         self.channels_units = current_volume.metadata.channel_units
+        # Attempt to retrieve and display data for the selected curve
         try:
             analysis_results = current_volume.get_analysis_results(self.y_coord, self.x_coord)
+            # Update the metadata for the selected curve
             self.metadata = {
                 "global": global_metadata,
                 f"curve_{curve_num}": current_volume.metadata[self.y_coord, self.x_coord],
@@ -618,8 +677,12 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                     for segment_name in current_volume.metadata.segment_names
                 }
             )
+            # Update the gui for the new metadata
+            # TODO: Updates for the metadata in the GUI doesn't work perfectly
             if self.parameter_dialog is not None:
                 self.parameter_dialog.populate_parameters(self.metadata)
+
+            # Retrieve the curve data for the selected coordinates
             curve_dict = current_volume[self.y_coord, self.x_coord]
 
             self.set_available_channels(curve_dict.keys())
@@ -628,13 +691,19 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
             # Update the cross on the viewer at the selected pixel position
             selected_position = layer.data_to_world(coords)
-            y_pos, x_pos = selected_position[-2:]
+            
+            centre_y, centre_x = selected_position[-2:]
+
+            # The cross should extend 3 pixels from the centre in each direction
             y_scale, x_scale = np.abs(layer.scale[-2:])
             half_size = max(y_scale, x_scale) * 3
+
+            # X and Y coordinates are the centre of the cross use the half_size to determine the end points
+            # of the cross lines
             cross_data = np.array(
                 [
-                    [[y_pos - half_size, x_pos - half_size], [y_pos + half_size, x_pos + half_size]],
-                    [[y_pos - half_size, x_pos + half_size], [y_pos + half_size, x_pos - half_size]],
+                    [[centre_y - half_size, centre_x - half_size], [centre_y + half_size, centre_x + half_size]],
+                    [[centre_y - half_size, centre_x + half_size], [centre_y + half_size, centre_x - half_size]],
                 ]
             )
             if "Selected Curve" in viewer.layers and not hasattr(viewer.layers["Selected Curve"], "edge_width"):
@@ -642,24 +711,33 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
             if "Selected Curve" not in viewer.layers:
                 active_layer = viewer.layers.selection.active
+                # Add the cross layer to the viewer to indicate the selected curve if not already present
                 selected_curve_layer = viewer.add_shapes(
                     data=cross_data,
                     name="Selected Curve",
                     shape_type="line",
                     edge_color=COLOR_SELECTED_CURVE,
+                    # Line width for the cross should be half a pixel
                     edge_width=max(y_scale, x_scale) * 0.5,
                 )
+                # Need to keep the layer with the actual data selected (adding a layer, including the shapes layer,
+                # automatically selects the new layer)
                 if active_layer is not None:
                     viewer.layers.selection.active = active_layer
             else:
                 selected_curve_layer = viewer.layers["Selected Curve"]
+                # Edge colour can get messed up so set it here before updating the data (can cause errors otherwise)
                 selected_curve_layer.edge_color = COLOR_SELECTED_CURVE
+                # Update the location of the cross to match the newly selected curve
                 selected_curve_layer.data = cross_data
                 selected_curve_layer.edge_width = max(y_scale, x_scale) * 0.5
 
+            # Bring the selected curve layer to the top of the layer stack so its visible
             current_index = viewer.layers.index(selected_curve_layer)
             if current_index < len(viewer.layers) - 1:
                 viewer.layers.move(current_index, len(viewer.layers))
+
+        # Only catch IndexError separately to provide a specific message for clicks outside the image bounds
         except IndexError:
             self.info_label.setText("Clicked outside the image bounds.")
 
@@ -677,18 +755,22 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             The list of available channels.
         """
         available_channels = list(available_channels)
+        # If the available channels haven't changed, ensure a channel is set, defaulting if necessary
         if self.available_channels == available_channels:
             self.set_default_channels()
             return
         self.available_channels = available_channels
+        # Temporarily store the current x and y channels so they potentially can be restored
         temp_x_channel = self.x_channel
         temp_y_channel = self.y_channel
 
+        # Replace the items in the channel selectors with the updated list of available channels
         self.x_channel_selector.clear()
         self.y_channel_selector.clear()
         self.x_channel_selector.addItems(self.available_channels)
         self.y_channel_selector.addItems(self.available_channels)
 
+        # Restore the previously selected channels if they are still available
         if temp_x_channel in available_channels:
             self.x_channel = temp_x_channel
         else:
@@ -697,7 +779,11 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             self.y_channel = temp_y_channel
         else:
             self.y_channel = None
+
+        # Ensure that there are default channels set if the previous ones were not available
         self.set_default_channels()
+
+        # Update the plot widget labels to reflect the current x and y channels
         if self.x_channel is not None:
             unit = (self.channels_units or {}).get(self.x_channel, "m")
             self.plot_widget.setLabel("bottom", self.x_channel, units=unit)
@@ -707,16 +793,20 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
     def set_default_channels(self):
         """Select usable default x and y channels when the current selection is unavailable."""
+        # Return if both x and y channels are already set or if there are no available channels to default within
         if None not in (self.x_channel, self.y_channel) or not self.available_channels:
             return
+        # Try and set the default channels to show a standard Force-Distance curve 
         if self.x_channel is None and self.available_channels and "Height (Measured)" in self.available_channels:
             self.x_channel = "Height (Measured)"
         if self.y_channel is None and self.available_channels and "Vertical Deflection" in self.available_channels:
             self.y_channel = "Vertical Deflection"
+        # If the preferred default channels are not available, fall back to the first available channels
         if self.x_channel is None:
             self.x_channel = self.available_channels[0]
         if self.y_channel is None:
             self.y_channel = self.available_channels[0]
+        # Update the channel selectors to reflect new channels
         self.y_channel_selector.setCurrentText(self.y_channel)
         self.x_channel_selector.setCurrentText(self.x_channel)
 
@@ -745,6 +835,7 @@ class ParameterDialog(QDialog):
             Parent widget for the dialog.
         """
         super().__init__(parent)
+        # Create the main layout and scroll area for displaying the experimental parameters
         self.setWindowTitle("Experimental Parameters")
         self.resize(500, 600)
         self.setLayout(QVBoxLayout())
@@ -754,6 +845,7 @@ class ParameterDialog(QDialog):
         self.scroll_area.setWidget(self.info_widget)
         if metadata is None:
             metadata = {}
+        # Set the metadata to its starting state and populate the parameters dialog with it
         self.metadata = metadata
         self.populate_parameters(self.metadata)
         self.layout().addWidget(self.scroll_area)
@@ -791,6 +883,7 @@ def _get_parameters_widget(dict_data: dict[str, Any], title: str = "Parameters")
     collapsible_box = CollapsibleBox(title=title)
     for key, value in dict_data.items():
         if isinstance(value, dict):
+            # Recursively build a collapsible widget for the nested dictionary
             w = _get_parameters_widget(value, title=key)
         else:
             w = QLabel(f"{key.title().replace('_', ' ')} : {value}")
