@@ -462,8 +462,8 @@ def load_config_impl(
     config_path={
         "label": "Config file",
         "mode": "r",
-        "filter": "*.yaml;*.json",
-    },  # Added .json filter
+        "filter": "Config Files (*.yaml *.yml *.json)",
+    },
     config_type={"label": "Config type"},
     call_button="Load Config",
 )
