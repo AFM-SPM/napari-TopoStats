@@ -5,7 +5,6 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
-import time
 import markdown
 from napari import Viewer
 from platformdirs import user_config_dir
@@ -283,23 +282,19 @@ class _AnimatedGuideBrowser(QTextBrowser):
             elif not animated_image.is_visible and animated_image.movie.state() != QMovie.NotRunning:
                 animated_image.movie.stop()
 
-        if self._first_update:
-            self._first_update = False
-            self.document().markContentsDirty(0, self.document().characterCount())
-
     def _replace_gif_frame(self, resource_key: str) -> None:
         """Replace a GIF resource with its movie's current decoded frame."""
         animated_image = self._animated_images[resource_key]
         document = self.document()
+
         # Replace the GIF resource with the current frame of its movie.
         document.addResource(
             QTextDocument.ImageResource,
             animated_image.resource_url,
             animated_image.movie.currentImage(),
         )
-        # Marking as dirty so that the document knows this portion needs to be repainted.
-        document.markContentsDirty(*animated_image.position)
 
+        # Update what the user can see of the window to reflect the new frame.
         self.viewport().update()
 
 
@@ -320,6 +315,7 @@ def show_guide(viewer: Viewer):
         _guide_dialog.activateWindow()
         return
 
+    # Load the guide sections from the markdown file/files including private repositories
     try:
         guide_sections = _load_guide_sections()
     except FileNotFoundError:
