@@ -2,7 +2,6 @@
 
 import pandas as pd
 from napari.layers import Labels
-from topostats.grainstats import GrainStats
 
 
 def grainstats(image: Labels) -> pd.DataFrame:
@@ -19,6 +18,8 @@ def grainstats(image: Labels) -> pd.DataFrame:
     pd.DataFrame
         Grain measurements, including pixel-space centres when available.
     """
+    # Import topostats within the function so it is only imported if it is needed
+    from topostats.grainstats import GrainStats
     # Extract and coerce the grainstats configuration
     config = image.metadata["config"]["grainstats"]
     if "run" in config:
@@ -49,7 +50,7 @@ def grainstats(image: Labels) -> pd.DataFrame:
     return df
 
 
-def get_grainstats_df(stats: GrainStats) -> pd.DataFrame:
+def get_grainstats_df(stats: "GrainStats") -> pd.DataFrame:
     """
     Reconstructs the 'grainstats' DataFrame from the nested
     grain_crops.stats attributes.

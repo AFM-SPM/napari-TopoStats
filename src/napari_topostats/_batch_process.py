@@ -15,7 +15,6 @@ from pathlib import Path
 from magicgui import magicgui
 from napari import current_viewer  # pylint: disable=no-name-in-module
 from qtpy.QtWidgets import QFileDialog
-from topostats.run_modules import process
 
 from napari_topostats._alerts import attach_status_label, show_error_dialog
 from napari_topostats._io import config_loaded, get_current_config, get_current_config_path, load_config_impl
@@ -101,6 +100,10 @@ def batch_process(
 
     # Start the batch processing in a separate thread to keep the GUI responsive
     widget.set_status_message("⏳ Starting batch processing in the background. View command line for progress.")
+
+    # Import from topostats outside of top level so it is only imported when needed
+    from topostats.run_modules import process
+    
     worker = ProcessWorker(process, args)
     worker.finished.connect(lambda: widget.set_status_message("✅ Batch processing complete."))
     worker.finished.connect(worker.deleteLater)

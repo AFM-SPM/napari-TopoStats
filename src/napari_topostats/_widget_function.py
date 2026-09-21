@@ -25,7 +25,6 @@ from napari.viewer import Viewer
 from napari_afmreader._reader import get_loaded_image
 from qtpy.QtWidgets import QWidget
 from scipy.ndimage import label
-from topostats.classes import TopoStats
 
 import napari_topostats._io as io
 from napari_topostats._alerts import LoadingWidget, attach_status_label, construct_error_args, show_error_dialog
@@ -295,6 +294,7 @@ class WidgetFunction:
         passes_full_config: bool = False,
         handle_return_callback: Callable[..., None] | None = None,
         function_manager: "WidgetFunctionManager | None" = None,
+        lazy_load: bool = False,
     ):
         """Initialises WidgetFunction."""
         self.name = name
@@ -310,6 +310,7 @@ class WidgetFunction:
         self.run_immediately = run_immediately
         self.passes_full_config = passes_full_config
         self.handle_return_callback = handle_return_callback
+        self.lazy_load = lazy_load
         if function_to_run is not None and isinstance(function_to_run, list):
             self.is_group = True
             self.group_functions = {f.name: f for f in function_to_run}
@@ -555,6 +556,16 @@ class WidgetFunction:
                     self.path_to_data = "obj"
                 else:
                     self.path_to_data = "return"
+
+            # If the function is set to lazy load (because it has a heavy import), instantiate it now
+            if self.lazy_load:
+                self.function_to_run = self.function_to_run()
+                if isinstance(self.type_class, Callable):
+                    self.type_class = self.type_class()
+                # Mark the function as no longer lazy-loaded so future calls use already instantiated function
+                self.lazy_load = False
+            
+
             # Get all the parameters from the function (excluding 'self')
             parameters_from_function = {
                 name: parameter
@@ -911,6 +922,7 @@ class WidgetFunction:
                         if selected_image.metadata.get("topostats_object") is not None:
                             topostats_object = selected_image.metadata["topostats_object"]
                         else:
+                            from topostats.classes import TopoStats
                             topostats_object = TopoStats(
                                 image_original=selected_image.data,
                                 image=selected_image.data,

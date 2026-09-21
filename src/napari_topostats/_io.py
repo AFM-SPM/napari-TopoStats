@@ -29,7 +29,6 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from topostats import __version__ as topostats_version
 
 from napari_topostats._alerts import attach_status_label, show_error_dialog
 from napari_topostats._components import CollapsibleBox
@@ -48,13 +47,7 @@ ConfigType = (
 )
 
 # pylint: disable=ungrouped-imports
-try:
-    from topostats.config import write_config_with_comments as write_config_with_comments_topostats
-except ImportError:
-    show_error_dialog(
-        f"TopoStats version {topostats_version} is not supported. Please install the latest version of TopoStats"
-        f"or if that fails, install version {MIN_TOPOSTATS_VERSION}."
-    )
+
 
 
 MISC_TITLE = "Batch Settings"
@@ -353,6 +346,14 @@ def write_new_default_config(config_path: Path, config_type: str = "topostats"):
     args.output_dir = config_path.parent
     args.module = config_type
     if config_type == "topostats":
+        try:
+            from topostats.config import write_config_with_comments as write_config_with_comments_topostats
+        except ImportError:
+            from topostats import __version__ as topostats_version
+            show_error_dialog(
+                f"TopoStats version {topostats_version} is not supported. Please install the latest version of TopoStats"
+                f"or if that fails, install version {MIN_TOPOSTATS_VERSION}."
+            )
         write_config_with_comments_topostats(args)
     elif config_type == "forcestats":
         if write_config_with_comments_forcestats is None:
