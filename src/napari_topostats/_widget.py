@@ -16,43 +16,12 @@ Replace code below according to your needs.
 # ns-rse 2025-12-08 - We seem to need to allow ungrouped imports so that LoadingWidget() can be used
 # pylint: disable=ungrouped-imports
 
-import time as _import_timing_time
-
-_IMPORT_TIMING_STARTED = _import_timing_time.perf_counter()
-print("[widget import timing] imported time (timing starts now)", flush=True)
-
-
-def _print_import_timing(import_name, import_started):
-    now = _import_timing_time.perf_counter()
-    print(
-        f"[widget import timing] {import_name}: {now - import_started:.6f}s "
-        f"(total: {now - _IMPORT_TIMING_STARTED:.6f}s)",
-        flush=True,
-    )
-
-
-_import_started = _import_timing_time.perf_counter()
 import inspect
-
-_print_import_timing("inspect", _import_started)
-_import_started = _import_timing_time.perf_counter()
 import os
-
-_print_import_timing("os", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from pathlib import Path
 
-_print_import_timing("pathlib.Path", _import_started)
-
-_import_started = _import_timing_time.perf_counter()
 import numpy as np
-
-_print_import_timing("numpy", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari import current_viewer  # pylint: disable=no-name-in-module
-
-_print_import_timing("napari.current_viewer", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from qtpy.QtWidgets import (
     QApplication,
     QComboBox,
@@ -65,110 +34,43 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-_print_import_timing("qtpy.QtWidgets", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._alerts import LoadingWidget, attach_status_label
-
-_print_import_timing("napari_topostats._alerts.LoadingWidget, attach_status_label", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._components import get_selected_layer
 
-_print_import_timing("napari_topostats._components.get_selected_layer", _import_started)
 try:
-    _import_started = _import_timing_time.perf_counter()
     from forcestats.analysis import find_trigger_point_map
-
-    _print_import_timing("forcestats.analysis.find_trigger_point_map", _import_started)
-    _import_started = _import_timing_time.perf_counter()
     from forcestats.contact import create_3d_approach_map, find_contact_point_map
-
-    _print_import_timing("forcestats.contact.create_3d_approach_map, find_contact_point_map", _import_started)
-    _import_started = _import_timing_time.perf_counter()
     from forcestats.curve_correction import correct_curve
-
-    _print_import_timing("forcestats.curve_correction.correct_curve", _import_started)
 except ModuleNotFoundError as error:
-    _print_import_timing(f"forcestats import failed ({error.name})", _import_started)
     if error.name != "forcestats":
         raise
     FORCESTATS_AVAILABLE = False
 else:
     FORCESTATS_AVAILABLE = True
 
-_import_started = _import_timing_time.perf_counter()
 from napari.layers import Image, Labels
-
-_print_import_timing("napari.layers.Image, Labels", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari.viewer import Viewer
-
-_print_import_timing("napari.viewer.Viewer", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from packaging.version import parse as parse_version
-
-_print_import_timing("packaging.version.parse", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from platformdirs import user_config_dir
 
-_print_import_timing("platformdirs.user_config_dir", _import_started)
-
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._alerts import show_error_dialog
-
-_print_import_timing("napari_topostats._alerts.show_error_dialog", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._batch_process import batch_process
-
-_print_import_timing("napari_topostats._batch_process.batch_process", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._button_grid import ButtonGrid
-
-_print_import_timing("napari_topostats._button_grid.ButtonGrid", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._curves import open_curve_viewer
-
-_print_import_timing("napari_topostats._curves.open_curve_viewer", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._grainstats import grainstats
-
-_print_import_timing("napari_topostats._grainstats.grainstats", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._guide import check_guide, show_guide
-
-_print_import_timing("napari_topostats._guide.check_guide, show_guide", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._io import (
     load_config,
     load_config_impl,
     open_config_editor,
     write_new_default_config,
 )
-
-_print_import_timing("napari_topostats._io", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._profile_viewer import start_drawing
-
-_print_import_timing("napari_topostats._profile_viewer.start_drawing", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._script_handler import get_loaded_functions
-
-_print_import_timing("napari_topostats._script_handler.get_loaded_functions", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._state import MIN_TOPOSTATS_VERSION, WidgetManager, get_running_function, set_topostats_widget
-
-_print_import_timing("napari_topostats._state", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._styles import CONFIG_OPTIONS_LABEL_STYLE
-
-_print_import_timing("napari_topostats._styles.CONFIG_OPTIONS_LABEL_STYLE", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._surface import image_to_surface
-
-_print_import_timing("napari_topostats._surface.image_to_surface", _import_started)
-_import_started = _import_timing_time.perf_counter()
 from napari_topostats._widget_function import WidgetFunction, WidgetFunctionManager
-
-_print_import_timing("napari_topostats._widget_function", _import_started)
 
 check_guide(current_viewer())
 
@@ -181,10 +83,8 @@ def start_loading_topostats():
     return None
 
 def check_topostats_version():
-    import_started = _import_timing_time.perf_counter()
     from topostats import __version__ as topostats_version
 
-    _print_import_timing("topostats.__version__", import_started)
     if parse_version(parse_version(topostats_version).base_version) < parse_version(MIN_TOPOSTATS_VERSION):
         show_error_dialog(
             f"TopoStats version {topostats_version} is outdated and does not work with this plugin."
@@ -195,10 +95,8 @@ def check_topostats_version():
 def get_filter_image_func():
     loading_spinner = start_loading_topostats()
     check_topostats_version()
-    import_started = _import_timing_time.perf_counter()
     from topostats.filters import Filters
 
-    _print_import_timing("topostats.filters.Filters", import_started)
     if loading_spinner is not None:
         loading_spinner.stop()
     return Filters.filter_image
@@ -206,30 +104,24 @@ def get_filter_image_func():
 def get_find_grains_func():
     loading_spinner = start_loading_topostats()
     check_topostats_version()
-    import_started = _import_timing_time.perf_counter()
     from topostats.grains import Grains
 
-    _print_import_timing("topostats.grains.Grains", import_started)
     if loading_spinner is not None:
         loading_spinner.stop()
     return Grains.find_grains
 
 def get_filters_class():
     loading_spinner = start_loading_topostats()
-    import_started = _import_timing_time.perf_counter()
     from topostats.filters import Filters
 
-    _print_import_timing("topostats.filters.Filters", import_started)
     if loading_spinner is not None:
         loading_spinner.stop()
     return Filters
 
 def get_grains_class():
     loading_spinner = start_loading_topostats()
-    import_started = _import_timing_time.perf_counter()
     from topostats.grains import Grains
 
-    _print_import_timing("topostats.grains.Grains", import_started)
     if loading_spinner is not None:
         loading_spinner.stop()
     return Grains
