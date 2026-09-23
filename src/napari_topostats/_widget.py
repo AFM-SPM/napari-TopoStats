@@ -476,7 +476,7 @@ class TopoStatsRootWidget(RootWidget):
 
         def export_layer_to_csv():
             """Export the selected image layer to a CSV file"""
-            image = get_selected_layer(self._viewer, of_type=Image)
+            image = get_selected_layer(self._viewer, of_type=[Image])
             csv_filepath, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save Table as CSV",
