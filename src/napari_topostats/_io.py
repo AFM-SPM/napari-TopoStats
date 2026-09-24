@@ -48,12 +48,73 @@ ConfigType = (
 
 # pylint: disable=ungrouped-imports
 
+class ConfigWrapper:
+    """
+    A wrapper for configuration dictionaries to provide a flat view and unflattening functionality.
+
+    Parameters
+    ----------
+    config : dict
+        The configuration dictionary.
+    """
+
+    def __init__(self, config: dict):
+        """
+        Initializes the ConfigWrapper.
+
+        Parameters
+        ----------
+        config : dict
+            The configuration dictionary.
+        """
+        self.original = config
+        self.flat = self._flatten(config)
+
+    def _flatten(self, d: dict, parent_key: str = "", sep: str = ".") -> dict:
+        """
+        A recursive function to flatten a nested dictionary.
+
+        Parameters
+        ----------
+        d : dict
+            The dictionary to flatten.
+        parent_key : str, optional
+            The parent key, by default ""
+        sep : str, optional
+            The separator to use, by default "."
+
+        Returns
+        -------
+        dict
+            The flattened dictionary.
+        """
+        items = {}
+        for k, v in d.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, dict):
+                items.update(self._flatten(v, new_key, sep=sep))
+            else:
+                items[new_key] = v
+        return items
+
+    def unflatten(self) -> dict:
+        """
+        Function used for reverting to the dict form where keys can correspond to dict values like json format
+
+        Returns
+        -------
+        dict
+            The unflattened dictionary.
+        """
+        return unflatten_dict(self.flat)
+
 
 
 MISC_TITLE = "Batch Settings"
 START_OPEN = {"filter", "grains"}
+
 # Globals store currently loaded config and UI state so dialogs/widgets can reuse them.
-config_wrappers = {}
+config_wrappers: dict[str, ConfigWrapper] = {}
 comment_descriptions = {}
 current_config_paths = {}
 updated_values = {}
@@ -97,71 +158,12 @@ def _format_config_tooltip(key: str, description: str = "") -> str:
     return key
 
 
-class ConfigWrapper:
-    """
-    A wrapper for configuration dictionaries to provide a flat view and unflattening functionality.
-
-    Parameters
-    ----------
-    config : dict
-        The configuration dictionary.
-    """
-
-    def __init__(self, config: dict):
-        """
-        Initializes the ConfigWrapper.
-
-        Parameters
-        ----------
-        config : dict
-            The configuration dictionary.
-        """
-        self.original = config
-        self.flat = self._flatten(config)
-
-    def _flatten(self, d: dict, parent_key: str = "", sep: str = ".") -> dict:
-        """
-        Flattens a nested dictionary.
-
-        Parameters
-        ----------
-        d : dict
-            The dictionary to flatten.
-        parent_key : str, optional
-            The parent key, by default ""
-        sep : str, optional
-            The separator to use, by default "."
-
-        Returns
-        -------
-        dict
-            The flattened dictionary.
-        """
-        items = {}
-        for k, v in d.items():
-            new_key = f"{parent_key}{sep}{k}" if parent_key else k
-            if isinstance(v, dict):
-                items.update(self._flatten(v, new_key, sep=sep))
-            else:
-                items[new_key] = v
-        return items
-
-    def unflatten(self) -> dict:
-        """
-        Function used for reverting to the dict form where keys can correspond to dict values like json format
-
-        Returns
-        -------
-        dict
-            The unflattened dictionary.
-        """
-        return unflatten_dict(self.flat)
-
 
 def should_use_line_edit_for_float(value: float) -> bool:
     """
     Determine if a float value should be edited with a LineEdit instead of a FloatSpinBox.
-    This is to prevent data being lost during rounding
+
+    This is to prevent data being lost during rounding as float spin boxes only support a limited precision.
 
     Parameters
     ----------
@@ -178,7 +180,7 @@ def should_use_line_edit_for_float(value: float) -> bool:
 
 def on_config_value_changed(key: str, val: Any, config_type: str = "topostats"):
     """
-    Update the config wrapper when a value changes
+    Update the configuration dictionary when a value changes.
 
     Parameters
     ----------
@@ -198,6 +200,7 @@ def on_config_value_changed(key: str, val: Any, config_type: str = "topostats"):
             # pylint: disable=import-outside-toplevel
             import ast
 
+            # Try parsing as a list or other literal structure
             with contextlib.suppress(ValueError, SyntaxError):
                 val = ast.literal_eval(stripped)
         else:
@@ -205,7 +208,10 @@ def on_config_value_changed(key: str, val: Any, config_type: str = "topostats"):
             with contextlib.suppress(ValueError):
                 val = float(stripped)
     if key.split(".")[0] == MISC_TITLE:
+        # Remove the MISC_TITLE prefix from the key
         key = ".".join(key.split(".")[1:])
+
+    # Update the global dictionary with the new configuration value
     if config_type not in updated_values:
         updated_values[config_type] = {}
     updated_values[config_type][key] = val
@@ -240,10 +246,14 @@ def build_dynamic_widget(
         The generated widget.
     """
     config_to_display = config.copy()
+    # If not in a recursive call, create the root container and handle miscellaneous config items
     if running_reference is None:
+        # Create the root container widget
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setAlignment(Qt.AlignTop)
+
+        # Group top level config items into a miscellaneous section
         misc_config = {}
         for key, value in config.items():
             if not isinstance(value, dict):
@@ -253,20 +263,22 @@ def build_dynamic_widget(
             config_to_display[MISC_TITLE] = misc_config
 
     else:
+        # Create a collapsible container for the current config section
         title = _format_config_label(running_reference.split(".")[-1]).title()
-
         container = CollapsibleBox(title=title, start_open=running_reference in START_OPEN, subtle=True)
 
     for key, value in config_to_display.items():
 
         desc_text = ""
         sub_desc = None
+        # Retrieve the description for the current config key
         if descriptions and isinstance(descriptions, dict):
             desc_text = descriptions.get(key, "")
             if isinstance(desc_text, dict):
                 sub_desc = desc_text
                 desc_text = ""
 
+        # If the value is a nested dictionary, recursively build its widget
         if isinstance(value, dict):
             new_running_reference = key if running_reference is None else f"{running_reference}.{key}"
             sub_widget = build_dynamic_widget(
@@ -280,12 +292,14 @@ def build_dynamic_widget(
 
             continue
 
+        # Determine the appropriate widget type based on the value's data type if not a nested dictionary
         w = None
         if isinstance(value, bool):
             w = create_widget(name="", widget_type="CheckBox", value=value)
         elif isinstance(value, int):
             w = create_widget(name="", widget_type="SpinBox", value=value)
         elif isinstance(value, float):
+            # Very small or precise float values might be better represented with a LineEdit to avoid precision loss
             if should_use_line_edit_for_float(value):
                 w = create_widget(name="", widget_type="LineEdit", value=repr(value))
             else:
@@ -293,11 +307,14 @@ def build_dynamic_widget(
         elif isinstance(value, (str, list)) or value is None:
             w = create_widget(name="", widget_type="LineEdit", value=str(value))
 
+        # Unsupported data types will be skipped
         if w is None:
             continue
+        # Update the global configuration dictionary when the widget value changes
         w.changed.connect(
             lambda val, k=key: on_config_value_changed(f"{running_reference}.{k}", val, config_type=config_type)
         )
+        # Set the tooltip for the widget based on its description
         tooltip_text = _format_config_tooltip(key, desc_text)
         w.native.setToolTip(tooltip_text)
 
@@ -308,6 +325,8 @@ def build_dynamic_widget(
         label_widget = QLabel(_format_config_label(key))
         label_widget.setTextInteractionFlags(Qt.TextSelectableByMouse)
         label_widget.setToolTip(tooltip_text)
+
+        # Add the label and widget to the row layout
         row_layout.addWidget(label_widget)
         row_layout.addWidget(w.native)
         row_layout.setStretch(1, 1)
@@ -340,6 +359,7 @@ def write_new_default_config(config_path: Path, config_type: str = "topostats"):
     config_type : str
         The module (usually topostats) to create the default config for.
     """
+    # Prepare the arguments for writing the default config file
     args = Namespace()
     args.config = None
     args.filename = config_path.name
@@ -347,6 +367,7 @@ def write_new_default_config(config_path: Path, config_type: str = "topostats"):
     args.module = config_type
     if config_type == "topostats":
         try:
+            # Import topostats outside of top level to avoid heavy imports when not needed
             from topostats.config import write_config_with_comments as write_config_with_comments_topostats
         except ImportError:
             from topostats import __version__ as topostats_version
@@ -356,6 +377,7 @@ def write_new_default_config(config_path: Path, config_type: str = "topostats"):
             )
         write_config_with_comments_topostats(args)
     elif config_type == "forcestats":
+        # Shouldn't get here unless ForceStats is installed
         if write_config_with_comments_forcestats is None:
             raise RuntimeError("ForceStats must be installed to create a ForceStats configuration.")
         write_config_with_comments_forcestats(args)
@@ -386,7 +408,7 @@ def load_config_impl(
     report_errors: bool = True,
 ) -> bool:
     """
-    Loads config file using default if no path is provided and asking for data from user as required
+    Loads config file using default if no path is provided and asking for data from user as required.
 
     Parameters
     ----------
@@ -408,8 +430,10 @@ def load_config_impl(
     """
     if config_path is None:
         if use_default:
+            # Use the default config path within the user's config directory
             config_dir = Path(user_config_dir("TopoStats", "Napari"))
             config_path = config_dir / f"{config_type}_config.yaml"
+            # Create a config file using the module's default configuration if it doesn't exist
             if not config_path.exists():
                 config_dir.mkdir(parents=True, exist_ok=True)
                 write_new_default_config(config_path, config_type=config_type)
@@ -424,11 +448,13 @@ def load_config_impl(
                 # User cancelled the file selection; do nothing.
                 return False
             config_path = Path(file_path)
+            # Set the widget using the selected config path and viewer
             widget = load_config
             widget.viewer.value = viewer
             widget.config_path.value = config_path
 
     try:
+        # Load the config file based on its format once the path is determined
         with open(config_path, encoding="utf-8") as f:
             if config_path.suffix.lower() in [".yaml", ".yml"]:
                 config = yaml.safe_load(f)
@@ -448,7 +474,10 @@ def load_config_impl(
         if report_errors:
             show_error_dialog(f"Failed to load config: {e}")
         return False
+    # Update the config path for the module
     current_config_paths[config_type] = str(config_path)
+
+    # Extract the inline comments for use as tooltips in the dynamic widget
     comment_descriptions[config_type] = extract_inline_comments(config_path)
     if config is None:
         if report_errors:
@@ -471,6 +500,7 @@ def load_config_impl(
 def load_config(viewer: Viewer, config_path: Path | None = None, config_type: ConfigType = "topostats") -> bool:
     """
     Load a configuration file and build a dynamic widget to edit it.
+
     This is a magicgui function that can be called directly from the napari GUI and is an example of a hardcoded
     function being implemented using the dynamic function widget system.
 
@@ -546,6 +576,7 @@ def add_save_as_default_button(widget: QWidget):
     widget : magicgui.widgets.FunctionGui
         The widget to add the button to.
     """
+    # Create a horizontal layout for the save button and add it to the widget
     button_row = QHBoxLayout()
     save_button = QPushButton("Save as Default Config")
     save_button.setToolTip("Save the currently loaded configuration as the default config.")
@@ -556,13 +587,16 @@ def add_save_as_default_button(widget: QWidget):
         if config_wrappers is None or config_type not in config_wrappers:
             show_error_dialog("No configuration loaded to save.")
             return
+        # Retrieve the full configuration dictionary from the wrapper
         full_config = config_wrappers[config_type].unflatten()
         save_as_default_config(full_config, config_type=config_type)
         widget.set_status_message("✅ New default configuration saved!")
 
     save_button.clicked.connect(on_save_clicked)
 
+    # Add the save button to the layout of the widget
     button_row.addWidget(save_button)
+    # Insert the button row into the widget's layout so that it is above the run button with the other options
     widget.native.layout().insertLayout(3, button_row)
 
 
@@ -596,9 +630,11 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> dict[
         for line in f:
             stripped_line = line.strip()
 
+            # Skip lines that are empty or comments (only extracting inline comments from key-value pairs)
             if not stripped_line or stripped_line.startswith("#"):
                 continue
 
+            # Split the line into the white space indent, the key name, and the inline comment (if any)
             match = re.match(r"^(\s*)([a-zA-Z0-9_]+):\s*(?:[^#\n]*?)(?:#\s*(.*))?$", line)
 
             if match:
