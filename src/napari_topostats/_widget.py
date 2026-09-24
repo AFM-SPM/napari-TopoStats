@@ -41,6 +41,7 @@ try:
     from forcestats.analysis import find_trigger_point_map
     from forcestats.contact import create_3d_approach_map, find_contact_point_map
     from forcestats.curve_correction import correct_curve
+    from forcestats.models import find_youngs_modulus
 except ModuleNotFoundError as error:
     if error.name != "forcestats":
         raise
@@ -232,6 +233,15 @@ if FORCESTATS_AVAILABLE:
                 path_to_data="return",
                 function_to_run=correct_curve,
                 tooltip=inspect.getdoc(correct_curve),
+                run_immediately=False,
+                config_type="forcestats",
+            ),
+            WidgetFunction(
+                name="find_youngs_modulus",
+                function_key="find_youngs_modulus",
+                path_to_data="return",
+                function_to_run=find_youngs_modulus,
+                tooltip=inspect.getdoc(find_youngs_modulus),
                 run_immediately=False,
                 config_type="forcestats",
             ),
