@@ -200,7 +200,7 @@ if FORCESTATS_AVAILABLE:
     EXTRA_FUNCTIONS.extend(
         [
             WidgetFunction(
-                name="find_trigger_point",
+                name="Find trigger point",
                 function_key="find_trigger_point",
                 path_to_data="return",
                 function_to_run=find_trigger_point_map,
@@ -210,7 +210,7 @@ if FORCESTATS_AVAILABLE:
                 run_immediately=False,
             ),
             WidgetFunction(
-                name="find_contact_point",
+                name="Find contact point",
                 function_key="find_contact_point",
                 path_to_data="return",
                 function_to_run=find_contact_point_map,
@@ -219,7 +219,7 @@ if FORCESTATS_AVAILABLE:
                 config_type="forcestats",
             ),
             WidgetFunction(
-                name="create_3d_approach_map",
+                name="Create 3d approach map",
                 function_key="create_3d_approach_map",
                 path_to_data="return",
                 function_to_run=create_3d_approach_map,
@@ -228,7 +228,7 @@ if FORCESTATS_AVAILABLE:
                 config_type="forcestats",
             ),
             WidgetFunction(
-                name="correct_curve",
+                name="Correct curve",
                 function_key="correct_curve",
                 path_to_data="return",
                 function_to_run=correct_curve,
@@ -237,13 +237,14 @@ if FORCESTATS_AVAILABLE:
                 config_type="forcestats",
             ),
             WidgetFunction(
-                name="find_youngs_modulus",
+                name="Find youngs modulus",
                 function_key="find_youngs_modulus",
                 path_to_data="return",
                 function_to_run=find_youngs_modulus,
                 tooltip=inspect.getdoc(find_youngs_modulus),
                 run_immediately=False,
                 config_type="forcestats",
+                passes_full_config=True,
             ),
         ]
     )

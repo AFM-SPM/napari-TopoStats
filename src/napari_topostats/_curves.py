@@ -3,12 +3,12 @@
 from collections.abc import Generator
 from typing import Any
 
-from napari_topostats._alerts import show_error_dialog
 import numpy as np
 import pyqtgraph as pg
 from AFMReader.data_classes import CurvesDataset
 from napari import Viewer
 from napari_afmreader._reader import get_loaded_image
+from qtpy.QtCore import Qt
 from qtpy.QtGui import QHideEvent, QPainterPath, QShowEvent, QTransform
 from qtpy.QtWidgets import (
     QComboBox,
@@ -21,12 +21,14 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
+from napari_topostats._alerts import show_error_dialog
 from napari_topostats._components import CollapsibleBox, SelectionDropdown, get_selected_curves
 from napari_topostats._state import (
     add_colour_for_analysis_result,
     add_colour_for_curve_segment,
     get_analysis_result_colours,
     get_curve_segment_colours,
+    get_widget_manager,
 )
 from napari_topostats._styles import (
     COLOR_SELECTED_CURVE,
@@ -35,7 +37,6 @@ from napari_topostats._styles import (
     SEGMENT_COLOURS,
     VIBRANT_PALETTE,
 )
-from napari_topostats._state import get_widget_manager
 from napari_topostats.utils import unflatten_dict
 
 
@@ -127,6 +128,10 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         plot_layout.addWidget(self.plot_graphics_widget)
         self.layout().addLayout(plot_layout)
 
+        # Label showing current pixel's contact point
+        self.contact_point_label = QLabel()
+        self.layout().addWidget(self.contact_point_label)
+
         self.available_channels = []
 
         # Create a new settings widget to hold the channel selectors and segment checkboxes
@@ -207,6 +212,8 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         # Create the plots with empty data for approach and retract segments
         self.segment_lines = {}
 
+        self._update_contact_point_label(None)
+
     def open_experimental_parameters(self):
         """Open the experimental parameters dialog"""
         if self.parameter_dialog is None:
@@ -222,7 +229,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             except RuntimeError:
                 self.widget_manager.ensure_valid()
                 self.parameter_dialog = None
-        
+
         self.parameter_dialog.populate_parameters(self.metadata)
 
     def update_curve(self, selected_curve_dict: dict = None):
@@ -248,7 +255,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             # This could happen if selected channels were present elsewhere in the data but not for the current segment
             self.info_label.setText("Could not find channels to plot for this curve.")
             return
-        
+
         # Plot the data for each selected segment
         for selected_segment in self.segment_selector.get_checked_items():
             self.ensure_segment_line(selected_segment)
@@ -256,6 +263,10 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             y_data = self.selected_curve_dict[self.y_channel][selected_segment]
             self.segment_lines[selected_segment].setData(x_data, y_data)
         self.info_label.setText(f"Plotting curve for pixel (x={self.x_coord}, y={self.y_coord}).")
+
+        # Update the contact point label
+        contact_point_idx = self.current_analysis_results.get("Contact Point (Triangular Scoring)")
+        self._update_contact_point_label(contact_point_idx)
 
     def update_channels(self, x_channel: str | None = None, y_channel: str | None = None):
         """
@@ -367,7 +378,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             if segment_name not in selected_segments:
                 self.plot_widget.removeItem(self.segment_lines[segment_name])
                 del self.segment_lines[segment_name]
-                
+
         # Finally, update the curve to reflect the current selection of segments
         self.update_curve()
 
@@ -462,7 +473,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                     """
                     Build the hover text for an analysis-result marker.
 
-                    Scatter plot item takes a function rather than a constant string so it can update automatically 
+                    Scatter plot item takes a function rather than a constant string so it can update automatically
                     based on the marker's data such as if it moves.
 
                     Parameters
@@ -551,7 +562,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         self._process_event_coords(viewer, event)
 
         # Yield control back to napari to wait for drag events
-        yield  
+        yield
 
         while event.type == "mouse_move":
             # Optional: stop tracking if the user lets go of Shift while dragging
@@ -691,7 +702,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
 
             # Update the cross on the viewer at the selected pixel position
             selected_position = layer.data_to_world(coords)
-            
+
             centre_y, centre_x = selected_position[-2:]
 
             # The cross should extend 3 pixels from the centre in each direction
@@ -796,7 +807,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         # Return if both x and y channels are already set or if there are no available channels to default within
         if None not in (self.x_channel, self.y_channel) or not self.available_channels:
             return
-        # Try and set the default channels to show a standard Force-Distance curve 
+        # Try and set the default channels to show a standard Force-Distance curve
         if self.x_channel is None and self.available_channels and "Height (Measured)" in self.available_channels:
             self.x_channel = "Height (Measured)"
         if self.y_channel is None and self.available_channels and "Vertical Deflection" in self.available_channels:
@@ -810,6 +821,20 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         self.y_channel_selector.setCurrentText(self.y_channel)
         self.x_channel_selector.setCurrentText(self.x_channel)
 
+    def _update_contact_point_label(self, contact_point_idx: float | None) -> None:
+        """Show the contact point of the current curve, or a placeholder if there isn't one."""
+        x_values = None
+        if self.selected_curve_dict is not None and self.x_channel is not None:
+            x_values = self.selected_curve_dict.get(self.x_channel, {}).get("Extend")
+
+        if contact_point_idx is None or x_values is None or not 0 <= contact_point_idx < len(x_values):
+            self.contact_point_label.setText("<b>Contact point:</b> None")
+            return
+
+        contact_point = x_values[int(contact_point_idx)]
+        unit = (self.channels_units or {}).get(self.x_channel, "")
+        formatted = pg.siFormat(contact_point, precision=3, suffix=unit)
+        self.contact_point_label.setText(f"<b>Contact point:</b> {formatted}")
 
 class ParameterDialog(QDialog):
     """

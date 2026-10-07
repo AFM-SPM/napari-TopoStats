@@ -12,7 +12,7 @@ from magicgui.widgets import Container, create_widget
 from napari import Viewer
 from napari.layers import Layer
 from napari_afmreader._reader import LoadedImage, get_loaded_image
-from qtpy.QtCore import Qt
+from qtpy.QtCore import QEvent, QPoint, Qt
 from qtpy.QtGui import QColor, QStandardItem, QStandardItemModel
 from qtpy.QtWidgets import (
     QAbstractItemView,
@@ -359,6 +359,9 @@ class SelectionDropdown(QComboBox):
         self.setEditable(True)
         self.lineEdit().setReadOnly(True)
         self.lineEdit().setText(f"Loading {self.type_text}...")
+        self.lineEdit().installEventFilter(self)
+        self._popup_container = self.view().parentWidget()
+        self._popup_container.installEventFilter(self)
 
         self.model = QStandardItemModel(self)
         self.setModel(self.model)
@@ -368,6 +371,18 @@ class SelectionDropdown(QComboBox):
 
         # Update the text when a box is checked/unchecked
         self.model.itemChanged.connect(self.on_selection_change)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.MouseButtonPress:
+            if obj is self.lineEdit():
+                self.showPopup()
+                return True
+            if obj is self._popup_container and self.rect().contains(self.mapFromGlobal(_global_pos(event))):
+                # Click landed back on the combo while open: let the popup close as normal,
+                # but stop Qt replaying the click to the line edit (which would reopen it).
+                obj.setAttribute(Qt.WA_NoMouseReplay)
+        return super().eventFilter(obj, event)
+
 
     def set_items(self, items: list, starting_items: list = None, item_colors: dict = None):
         """
@@ -672,6 +687,13 @@ class MultiPlotWidget(QWidget):
             # If there are no more lines for this unit, remove the unit from the profile_lines dictionary
             if not self.profile_lines[unit]:
                 self.profile_lines.pop(unit, None)
+
+
+def _global_pos(event) -> QPoint:
+    """Qt6 renamed globalPos() to globalPosition() (returning QPointF)."""
+    if hasattr(event, "globalPosition"):
+        return event.globalPosition().toPoint()
+    return event.globalPos()
 
 
 def get_selected_layer(

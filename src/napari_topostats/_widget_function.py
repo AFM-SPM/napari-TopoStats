@@ -10,7 +10,7 @@ import os
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, get_origin, get_type_hints
+from typing import Annotated, Any, get_origin, get_type_hints
 
 import h5py
 import numpy as np
@@ -311,6 +311,7 @@ class WidgetFunction:
         self.passes_full_config = passes_full_config
         self.handle_return_callback = handle_return_callback
         self.lazy_load = lazy_load
+        self._panel_names: set[str] = set()
         if function_to_run is not None and isinstance(function_to_run, list):
             self.is_group = True
             self.group_functions = {f.name: f for f in function_to_run}
@@ -564,7 +565,6 @@ class WidgetFunction:
                     self.type_class = self.type_class()
                 # Mark the function as no longer lazy-loaded so future calls use already instantiated function
                 self.lazy_load = False
-            
 
             # Get all the parameters from the function (excluding 'self')
             parameters_from_function = {
@@ -1101,6 +1101,11 @@ class WidgetFunction:
                     new_p = p.replace(annotation=Image)
                 elif p.name == "pixel_to_nm_scaling":
                     new_p = p.replace(default=1.0)
+                elif p.name == "config" and not self.passes_full_config:
+                    new_p = p.replace(
+                        annotation=Annotated[Path, {"mode": "r", "filter": "*.yaml *.yml", "label": "config file"}],
+                        default=Path(),
+                    )
                 elif p.name == "filename":
                     new_p = p.replace(default="image")
                 else:
@@ -1355,7 +1360,7 @@ class WidgetFunction:
             # Replace if the table already exists for this layer, otherwise add a new one
             self.function_manager.widget_manager.remove_docked_widget(table_name)
             self.function_manager.widget_manager.add_docked_widget(container, area="right", name=table_name, group=table_group)
-    
+
         else:
             show_error_dialog(
                 f"Function {self.function_key} returned an unsupported type: {type(return_value)}.",

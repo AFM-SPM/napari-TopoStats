@@ -8,7 +8,7 @@ import contextlib
 
 from magicgui.widgets import FunctionGui
 from napari.viewer import Viewer
-from qtpy.QtWidgets import QWidget
+from qtpy.QtWidgets import QLabel, QWidget
 
 docked_widgets = []
 topostats_widget = None
@@ -120,7 +120,18 @@ class WidgetManager:
 
         # Only add the new widget if there isn't already a valid and visible widget with the same name
         if name not in self.docked_widgets:
-            dock = self.viewer.window.add_dock_widget(widget, area=area, name=name)
+            # Open GUI in a new tab rather than forcing other functions off the screen
+            dock = self.viewer.window.add_dock_widget(
+                widget,
+                name=name,
+                area=area,
+                tabify=(group == "functions")
+            )
+
+            # Increase font size of function tab title
+            title_label = dock.titleBarWidget().findChild(QLabel, "QTitleBarLabel")
+            if title_label is not None:
+                title_label.setStyleSheet("font-size: 14pt; font-weight: bold;")
 
             # Create the references for the docked widget and its raw widget
             self.docked_widgets[name] = dock
