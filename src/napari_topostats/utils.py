@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import inspect
+from itertools import islice
 import multiprocessing
 import time
 from collections.abc import Callable
@@ -257,6 +258,13 @@ def _all_curves_raw_worker(
     return func(curve=curve, **func_kwargs)
 
 
+def _chunked(iterable, size: int):
+    """Yield lists of up to `size` items."""
+    it = iter(iterable)
+    while chunk := list(islice(it, size)):
+        yield chunk
+
+
 # pylint: disable=too-many-arguments,too-many-locals
 def all_curves(
     curves: Any,
@@ -268,6 +276,7 @@ def all_curves(
     num_workers: int | None = None,
     h5file: Any | None = None,
     new_volume_name: str | None = None,
+    chunk_size: int = 500,
     **kwargs: Any,
 ) -> tuple[np.ndarray, str] | bool:
     """
@@ -410,45 +419,82 @@ def all_curves(
         num_workers = max(1, multiprocessing.cpu_count() - 2)
 
     if parallel and num_workers > 1:
-        # Use joblib.Parallel with a generator expression to keep it lazy.
-        if curve_correcting:
-            processed_generator = Parallel(n_jobs=num_workers, return_as="generator")(
-                delayed(_all_curves_worker)(curve) for curve in curves.iter_curves(flip_image=False)
-            )
-            for idx, curve_out in enumerate(
-                tqdm(processed_generator, total=len(curves), desc=f"Running {func.__name__} (Parallel)")
-            ):
-                saver.save_curve(
-                    curve_data=curve_out,
-                    volume_name=new_volume_name,
-                    num_of_curves=len(processed_volume),
-                    curve_num=idx,
-                    segment_names=processed_volume.metadata.segment_names,
-                )
-        else:
-            results = Parallel(n_jobs=num_workers)(
-                delayed(_all_curves_worker)(curve)
-                for curve in tqdm(
-                    curves.iter_curves(flip_image=False), total=len(curves), desc=f"Running {func.__name__} (Parallel)"
-                )
-            )
-            # Reshape results into the image map
-            for i, result in enumerate(results):
-                y = i // shape_x
-                x = i % shape_x
-                if isinstance(result, tuple) and len(result) > 1:
-                    extracted_result = result[0]
-                    if len(result) > 2 and isinstance(result[2], dict):
-                        for key, value in result[2].items():
-                            curves.analysis_results[key][y][x] = value
-                else:
-                    extracted_result = result
-                if result_is_array:
-                    # image_map is initialised whenever curve_correcting is false, as it is in this branch.
-                    # pylint: disable-next=used-before-assignment
-                    image_map[:, y, x] = extracted_result
-                else:
-                    image_map[y][x] = extracted_result
+        offset = 0
+        with Parallel(n_jobs=num_workers) as pool, tqdm(
+            total=len(curves), desc=f"Running {func.__name__} (Parallel)"
+        ) as pbar:
+            for chunk in _chunked(curves.iter_curves(flip_image=False), chunk_size):
+                results = pool(delayed(_all_curves_worker)(curve) for curve in chunk)
+
+                for i, result in enumerate(results, start=offset):
+                    if curve_correcting:
+                        saver.save_curve(
+                            curve_data=result,
+                            volume_name=new_volume_name,
+                            num_of_curves=len(processed_volume),
+                            curve_num=i,
+                            segment_names=processed_volume.metadata.segment_names,
+                        )
+                        continue
+
+                    y = i // shape_x
+                    x = i % shape_x
+                    if isinstance(result, tuple) and len(result) > 1:
+                        extracted_result = result[0]
+                        if len(result) > 2 and isinstance(result[2], dict):
+                            for key, value in result[2].items():
+                                curves.analysis_results[key][y][x] = value
+                    else:
+                        extracted_result = result
+                    if result_is_array:
+                        # pylint: disable-next=used-before-assignment
+                        image_map[:, y, x] = extracted_result
+                    else:
+                        image_map[y][x] = extracted_result
+
+                offset += len(chunk)
+                pbar.update(len(chunk))
+
+    # if parallel and num_workers > 1:
+    #     # Use joblib.Parallel with a generator expression to keep it lazy.
+    #     if curve_correcting:
+    #         processed_generator = Parallel(n_jobs=num_workers, return_as="generator")(
+    #             delayed(_all_curves_worker)(curve) for curve in curves.iter_curves(flip_image=False)
+    #         )
+    #         for idx, curve_out in enumerate(
+    #             tqdm(processed_generator, total=len(curves), desc=f"Running {func.__name__} (Parallel)")
+    #         ):
+    #             saver.save_curve(
+    #                 curve_data=curve_out,
+    #                 volume_name=new_volume_name,
+    #                 num_of_curves=len(processed_volume),
+    #                 curve_num=idx,
+    #                 segment_names=processed_volume.metadata.segment_names,
+    #             )
+    #     else:
+    #         results = Parallel(n_jobs=num_workers)(
+    #             delayed(_all_curves_worker)(curve)
+    #             for curve in tqdm(
+    #                 curves.iter_curves(flip_image=False), total=len(curves), desc=f"Running {func.__name__} (Parallel)"
+    #             )
+    #         )
+    #         # Reshape results into the image map
+    #         for i, result in enumerate(results):
+    #             y = i // shape_x
+    #             x = i % shape_x
+    #             if isinstance(result, tuple) and len(result) > 1:
+    #                 extracted_result = result[0]
+    #                 if len(result) > 2 and isinstance(result[2], dict):
+    #                     for key, value in result[2].items():
+    #                         curves.analysis_results[key][y][x] = value
+    #             else:
+    #                 extracted_result = result
+    #             if result_is_array:
+    #                 # image_map is initialised whenever curve_correcting is false, as it is in this branch.
+    #                 # pylint: disable-next=used-before-assignment
+    #                 image_map[:, y, x] = extracted_result
+    #             else:
+    #                 image_map[y][x] = extracted_result
 
     else:
         if curve_correcting:

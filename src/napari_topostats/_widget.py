@@ -41,6 +41,7 @@ try:
     from forcestats.analysis import find_trigger_point_map
     from forcestats.contact import create_3d_approach_map, find_contact_point_map
     from forcestats.curve_correction import correct_curve
+    from forcestats.filter_trench import filter_trench_centres
     from forcestats.models import find_youngs_modulus
 except ModuleNotFoundError as error:
     if error.name != "forcestats":
@@ -242,6 +243,16 @@ if FORCESTATS_AVAILABLE:
                 path_to_data="return",
                 function_to_run=find_youngs_modulus,
                 tooltip=inspect.getdoc(find_youngs_modulus),
+                run_immediately=False,
+                config_type="forcestats",
+                passes_full_config=True,
+            ),
+            WidgetFunction(
+                name="Filter trench centres",
+                function_key="filter_trench_centres",
+                path_to_data="return",
+                function_to_run=filter_trench_centres,
+                tooltip=inspect.getdoc(filter_trench_centres),
                 run_immediately=False,
                 config_type="forcestats",
                 passes_full_config=True,

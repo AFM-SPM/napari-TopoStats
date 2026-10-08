@@ -382,10 +382,10 @@ class WidgetFunction:
                     if saved_files:
                         if len(saved_files) > 3:
                             self.function_to_run.set_status_message(
-                                f"✅ Saved: {', '.join(saved_files[:3])} and {len(saved_files) - 3} more"
+                                f"Saved: {', '.join(saved_files[:3])} and {len(saved_files) - 3} more"
                             )
                         else:
-                            self.function_to_run.set_status_message(f"✅ Saved: {', '.join(saved_files)}")
+                            self.function_to_run.set_status_message(f"Saved: {', '.join(saved_files)}")
                     else:
                         self.function_to_run.set_status_message("No scripts saved.")
 
@@ -1279,7 +1279,7 @@ class WidgetFunction:
 
         if isinstance(return_value, bool) and return_value:
             display_name = self.name.replace("_", " ").title()
-            message = f"✅ {display_name} successful."
+            message = f"{display_name} successful."
             if hasattr(self, "function_gui") and self.function_gui and hasattr(self.function_gui, "set_status_message"):
                 self.function_gui.set_status_message(message)
             return
@@ -1319,12 +1319,18 @@ class WidgetFunction:
 
             # If the return value is a binary image, add it as a labels layer
             if is_binary_image(return_value):
-                labels, num_labels = label(return_value.astype(bool))
+                # Don't label when filtering for valid trench centres
+                if self.function_key == "filter_trench_centres":
+                    labels = return_value.astype(np.uint8)
+                    num_labels = 1
+                else:
+                    labels, num_labels = label(return_value.astype(bool))
+                    labels = labels.astype(np.uint16)
                 label_ids = list(range(1, num_labels + 1))
                 properties = {"label_id": label_ids}
 
                 viewer.add_labels(
-                    labels.astype(np.uint16),
+                    labels,
                     name=f"{original.name} {self.function_key.replace('_', ' ').title()} Mask",
                     properties=properties,
                     metadata=combined_metadata,
