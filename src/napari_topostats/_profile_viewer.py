@@ -189,6 +189,7 @@ class ProfileViewer(QWidget):
         """
         if self.profile_line_events_connected and self.shapes_layer is shapes_layer:
             return
+        # Remove the old connection callback to prevent redundant duplication (which would throttle performance)
         self.disconnect_profile_line_events()
         self.shapes_layer = shapes_layer
         self.profile_line_events_connected = True
@@ -247,13 +248,19 @@ class ProfileViewer(QWidget):
 
     def sync_channel_selection_to_visible_lines(self):
         """Keep dropdown channel selection consistent with the plotted lines."""
+
+        # We can only show two units on the axis so remove the third unit (least recently selected) and the channel
+        # lines associated with it
         channels_to_deselect = set(self.plot_widget.remove_unshown_lines())
+
+        # Update the dropdown to deselect the lines which have been removed
         if channels_to_deselect:
             selected_channels = [
                 channel for channel in self.channel_selector.get_checked_items() if channel not in channels_to_deselect
             ]
             self.channel_selector.set_checked_items(selected_channels)
 
+        # Remove any profile lines that are no longer selected by the user
         selected_channels = set(self.channel_selector.get_checked_items())
         for profile_unit, lines in list(self.plot_widget.get_profile_lines().items()):
             for channel in list(lines):
@@ -390,6 +397,7 @@ def close_profile_viewer(viewer: Viewer, shapes_layer: Shapes, widget_manager: W
         profile_viewer.disconnect_profile_line_events()
     widget_manager.remove_docked_widget("Profile Viewer")
     profile_viewer = None
+    # Remove the shapes layer which shows the profile line
     if shapes_layer and "Profile Line" in viewer.layers:
         viewer.layers.remove(shapes_layer)
 
@@ -420,6 +428,7 @@ def start_drawing(viewer: Viewer):
 
     # Reuse or create the shapes layer for drawing the profile line to prevent OpenGL state corruption
     if "Profile Line" in viewer.layers:
+        # Clear any existing profile lines before starting a new one
         shapes_layer = viewer.layers["Profile Line"]
         shapes_layer.data = []
         shapes_layer.edge_width = edge_width
@@ -428,6 +437,7 @@ def start_drawing(viewer: Viewer):
         if current_index < len(viewer.layers) - 1:
             viewer.layers.move(current_index, len(viewer.layers))
     else:
+        # Create a new shapes helper layer if it doesn't exist aready
         shapes_layer = viewer.add_shapes(
             name="Profile Line",
             shape_type="line",
@@ -438,6 +448,7 @@ def start_drawing(viewer: Viewer):
     widget_manager = get_widget_manager()
     widget_manager.ensure_valid("Profile Viewer")
 
+    # Add the profile viewer if it doesn't exist or reveal it if it does
     if profile_viewer is None or "Profile Viewer" not in widget_manager.get_docked_widgets():
         profile_viewer = ProfileViewer(viewer, shapes_layer=shapes_layer, widget_manager=widget_manager)
         widget_manager.add_docked_widget(profile_viewer, area="right", name="Profile Viewer")

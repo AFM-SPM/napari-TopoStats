@@ -58,7 +58,7 @@ def image_to_surface(
     normalised_z_units = str(input_z_units).strip().lower()
     if normalised_z_units not in unit_to_nanometres:
         raise ValueError(f"Unsupported image height unit: {input_z_units}")
-
+    # Ensure the image and parameters are valid
     if image.ndim not in (2, 3):
         raise ValueError("Input image must be 2D or 3D.")
     if isinstance(triangle_size, bool) or not isinstance(triangle_size, int):
@@ -66,15 +66,20 @@ def image_to_surface(
     if triangle_size < 1:
         raise ValueError("Triangle size must be at least 1.")
 
+    # Apply unit conversion to nanometres and vertical exaggeration to the image
     image = image * unit_to_nanometres[normalised_z_units] * vertical_exaggeration
 
+    # Generate the y and x indices for the vertices based on the triangle size
     y_indices = np.arange(0, image.shape[-2], triangle_size)
     x_indices = np.arange(0, image.shape[-1], triangle_size)
+
+    # Add the final vertex index 
     if y_indices[-1] != image.shape[-2] - 1:
         y_indices = np.append(y_indices, image.shape[-2] - 1)
     if x_indices[-1] != image.shape[-1] - 1:
         x_indices = np.append(x_indices, image.shape[-1] - 1)
 
+    # Create the meshgrid of vertex coordinates
     y, x = np.meshgrid(
         y_indices,
         x_indices,

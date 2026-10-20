@@ -47,4 +47,5 @@ def reader_function(path: str | list[str]) -> list[tuple[Any, ...]]:
     """
     viewer = current_viewer()
     load_py_files(paths=[path] if isinstance(path, str) else path, viewer=viewer)
+    # Return none so marked as a successful read but without creating a layer
     return [(None,)]
