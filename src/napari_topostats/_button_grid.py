@@ -97,10 +97,10 @@ class ButtonGrid(QListWidget):
         super().__init__(parent=parent)
         # Set style and properties for the QListWidget
         self.setMovement(self.Static)  # The items cannot be moved by the user.
-        self.setViewMode(self.IconMode)  # make items icons
+        self.setViewMode(self.ListMode)  # make items list
         self.setResizeMode(self.Adjust)  # relayout when view is resized.
         self.setUniformItemSizes(True)  # better performance
-        self.setIconSize(QSize(90, 40))  # set icon size
+        self.setIconSize(QSize(45, 20))  # set icon size
         self.setWordWrap(True)  # allow text to wrap
         self.setStyleSheet(BUTTON_GRID_STYLE)  # set the style sheet
         self.setSpacing(2)  # set spacing between items

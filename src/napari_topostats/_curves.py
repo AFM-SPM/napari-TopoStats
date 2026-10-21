@@ -7,6 +7,7 @@ import numpy as np
 import pyqtgraph as pg
 from AFMReader.data_classes import CurvesDataset
 from napari import Viewer
+from napari.layers import Image
 from napari_afmreader._reader import get_loaded_image
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QHideEvent, QPainterPath, QShowEvent, QTransform
@@ -128,9 +129,13 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         plot_layout.addWidget(self.plot_graphics_widget)
         self.layout().addLayout(plot_layout)
 
-        # Label showing current pixel's contact point
+        # Label showing current pixel's contact point (`N/A` unless 'find contact point' function has been run)
         self.contact_point_label = QLabel()
         self.layout().addWidget(self.contact_point_label)
+
+        # Label showing the validity of the pixel (`N/A` unless 'filter trench centres' function has been run)
+        self.pixel_validity_label = QLabel()
+        self.layout().addWidget(self.pixel_validity_label)
 
         self.available_channels = []
 
@@ -213,6 +218,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         self.segment_lines = {}
 
         self._update_contact_point_label(None)
+        self._update_pixel_validity_label(None)
 
     def open_experimental_parameters(self):
         """Open the experimental parameters dialog"""
@@ -267,6 +273,18 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
         # Update the contact point label
         contact_point_idx = self.current_analysis_results.get("Contact Point (Triangular Scoring)")
         self._update_contact_point_label(contact_point_idx)
+
+        # Update the pixel validity label
+        loaded = get_loaded_image(self.current_reader_id)
+        ds = loaded.curves_data if loaded is not None else None
+        curves = ds.volumes.get(self.volume_selector.currentText()) if ds is not None else None
+        mask = getattr(curves, "pixel_valid", None)
+        pixel_valid = None
+        # Flip the mask data to match image/ overlay
+        if mask is not None:
+            row = mask.shape[0] - 1 - self.y_coord if curves.flip_image else self.y_coord
+            pixel_valid = bool(mask[row, self.x_coord])
+        self._update_pixel_validity_label(pixel_valid)
 
     def update_channels(self, x_channel: str | None = None, y_channel: str | None = None):
         """
@@ -721,7 +739,16 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 viewer.layers.remove("Selected Curve")
 
             if "Selected Curve" not in viewer.layers:
+                # Ensure the units match the original image. This does not change the shape but unit
+                # consistency across all layers is required for the scalebar to render
+                def reference_image(viewer):
+                    return next((layer for layer in viewer.layers if isinstance(layer, Image)), None)
+                ref = reference_image(viewer)
+                kwargs = {}
+                if ref is not None:
+                    kwargs = {"units": ref.units[-2:]}
                 active_layer = viewer.layers.selection.active
+
                 # Add the cross layer to the viewer to indicate the selected curve if not already present
                 selected_curve_layer = viewer.add_shapes(
                     data=cross_data,
@@ -730,6 +757,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                     edge_color=COLOR_SELECTED_CURVE,
                     # Line width for the cross should be half a pixel
                     edge_width=max(y_scale, x_scale) * 0.5,
+                    **kwargs
                 )
                 # Need to keep the layer with the actual data selected (adding a layer, including the shapes layer,
                 # automatically selects the new layer)
@@ -828,13 +856,21 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             x_values = self.selected_curve_dict.get(self.x_channel, {}).get("Extend")
 
         if contact_point_idx is None or x_values is None or not 0 <= contact_point_idx < len(x_values):
-            self.contact_point_label.setText("<b>Contact point:</b> None")
+            self.contact_point_label.setText("<b>Contact point:</b> N/A")
             return
 
         contact_point = x_values[int(contact_point_idx)]
         unit = (self.channels_units or {}).get(self.x_channel, "")
         formatted = pg.siFormat(contact_point, precision=3, suffix=unit)
         self.contact_point_label.setText(f"<b>Contact point:</b> {formatted}")
+
+    def _update_pixel_validity_label(self, pixel_valid: bool | None) -> None:
+        """Show the validity of the current curve/ pixel, or a placeholder if there isn't one."""
+        if pixel_valid is None:
+            self.pixel_validity_label.setText("<b>Valid pixel:</b> N/A")
+            return
+
+        self.pixel_validity_label.setText(f"<b>Valid pixel:</b> {pixel_valid}")
 
 class ParameterDialog(QDialog):
     """

@@ -28,26 +28,21 @@ VIBRANT_PALETTE = [
 ]
 
 BUTTON_GRID_STYLE = r"""
-    QListWidget{
-        min-width: 200;
-        background: none;
-        font-size: 14pt;
-        margin: 0;
-        padding: 0;
-        color: #eee;
+    QListWidget {
+    min-width: 200px;
+    background: none;
+    font-size: 10pt;
+    margin: 0px;
+    padding: 0px;
+    color: #eee;
     }
     QListWidget::item {
-        width: 80;
-        height: 100;
-        margin: 1;
-        padding: 4;
+        height: 22px;
+        margin: 1px;
+        padding: 2px 4px;
     }
-    QListWidget::item::hover {
+    QListWidget::item:hover {
         background: #8A929C;
-        width: 80;
-        height: 100;
-        margin: 1;
-        padding: 4;
     }
 
 """

@@ -43,9 +43,9 @@ from napari_topostats._io import (
     unsave_scripts,
 )
 from napari_topostats._parallel_processing import ProcessWorker
-from napari_topostats._table import render_label_matched_table
 from napari_topostats._state import WidgetManager, get_running_function, set_running_function
 from napari_topostats._surface import create_dynamic_surface
+from napari_topostats._table import render_label_matched_table
 from napari_topostats.utils import _eval, all_curves, calculate_contrast_limits, is_binary_image, remove_all_but_last
 
 CURVES_VOLUME_PARAM = "curves_volume_to_operate_on"
@@ -1054,7 +1054,14 @@ class WidgetFunction:
                                     z_units=z_units,
                                 )
                             else:
-                                show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
+                                if self.function_key == "filter_trench_centres":
+                                    show_error_dialog(
+                                        f"Function {self.function_key} returned None: "
+                                        "Please ensure contact points for the correct curves volume have been calculated and try again.",
+                                        raise_exception=False,
+                                    )
+                                else:
+                                    show_error_dialog(f"Function {self.function_to_run.__name__} returned None.")
                             self.refresh_curve_viewer()
                         finally:
                             _cleanup()
@@ -1297,9 +1304,25 @@ class WidgetFunction:
         elif isinstance(return_value, np.ndarray):
             # Get the scale from the original layer; default to (1, 1) if not found
             current_scale = original.scale if original else (1, 1)
+            current_units = original.units if original else None
             # If the return value has a different number of dimensions to the original, use only existing dimensions
+            # Convert pixel to nm
+            px2nm = (original.metadata or {}).get("px2nm") if original else None
+
+            if px2nm:
+                current_scale = (px2nm, px2nm)
+                current_units = ("nm", "nm")
+            elif original:
+                current_scale = original.scale
+                current_units = original.units
+            else:
+                current_scale = (1, 1)
+                current_units = None
+
             if len(current_scale) != self.ndims:
-                current_scale = current_scale[-self.ndims :]
+                current_scale = current_scale[-self.ndims:]
+                if current_units is not None:
+                    current_units = current_units[-self.ndims:]
 
             reader_id = original.metadata.get("afmreader_id", None) if original and original.metadata else None
             if reader_id is not None:
@@ -1319,7 +1342,7 @@ class WidgetFunction:
 
             # If the return value is a binary image, add it as a labels layer
             if is_binary_image(return_value):
-                # Don't label when filtering for valid trench centres
+                # Don't label when filtering for valid trench centres - all one colour
                 if self.function_key == "filter_trench_centres":
                     labels = return_value.astype(np.uint8)
                     num_labels = 1
@@ -1335,6 +1358,7 @@ class WidgetFunction:
                     properties=properties,
                     metadata=combined_metadata,
                     scale=current_scale,
+                    units=current_units,
                 )
             # If the return value is a greyscale image array, add it as an image layer
             else:
@@ -1350,8 +1374,10 @@ class WidgetFunction:
                     contrast_limits=calculate_contrast_limits(return_value, percentage=0.5),
                     metadata=combined_metadata,
                     scale=current_scale,
+                    units=current_units
                 )
                 viewer.dims.ndisplay = self.ndims
+
         elif isinstance(return_value, pd.DataFrame):
             container = QWidget()
 

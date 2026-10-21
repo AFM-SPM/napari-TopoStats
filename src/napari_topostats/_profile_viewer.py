@@ -6,7 +6,7 @@ from typing import Any
 # pylint: disable=too-many-branches
 import numpy as np
 from napari import Viewer
-from napari.layers import Shapes
+from napari.layers import Image, Shapes
 from napari_afmreader._reader import get_loaded_image
 from qtpy.QtWidgets import (
     QHBoxLayout,
@@ -418,6 +418,13 @@ def start_drawing(viewer: Viewer):
     y_scale, x_scale = np.abs(active_layer.scale[-2:])
     edge_width = max(y_scale, x_scale) * 1.0
 
+    def reference_image(viewer):
+        return next((layer for layer in viewer.layers if isinstance(layer, Image)), None)
+    ref = reference_image(viewer)
+    kwargs = {}
+    if ref is not None:
+        kwargs = {"scale": ref.scale[-2:], "units": ref.units[-2:]}
+
     # Reuse or create the shapes layer for drawing the profile line to prevent OpenGL state corruption
     if "Profile Line" in viewer.layers:
         shapes_layer = viewer.layers["Profile Line"]
@@ -433,6 +440,7 @@ def start_drawing(viewer: Viewer):
             shape_type="line",
             edge_color=COLOR_PROFILE_LINE,
             edge_width=edge_width,
+            **kwargs
         )
 
     widget_manager = get_widget_manager()
