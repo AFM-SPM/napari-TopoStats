@@ -409,8 +409,10 @@ def add_colour_for_channel(channel_name: str, current_channels: list[str], palet
     if len(channel_colours) >= len(palette):
         for key in channel_colours:
             if key not in current_channels:
+                # Remove the colour assignment for results no longer displayed if the palette is full
                 channel_colours.pop(key)
                 break
+    # If the colour options have filled, wrap round to reuse colours from the palette
     channel_colours[channel_name] = palette[channel_colour_idx % len(palette)]
     channel_colour_idx += 1
 
@@ -432,8 +434,10 @@ def add_colour_for_analysis_result(result_name: str, current_results: list[str],
     if len(analysis_result_colours) >= len(palette):
         for key in analysis_result_colours:
             if key not in current_results:
+                # Remove the colour assignment for results no longer displayed if the palette is full
                 analysis_result_colours.pop(key)
                 break
+    # If the colour options have filled, wrap round to reuse colours from the palette
     analysis_result_colours[result_name] = palette[analysis_result_colour_idx % len(palette)]
     analysis_result_colour_idx += 1
 
@@ -455,8 +459,10 @@ def add_colour_for_curve_segment(segment_name: str, current_segments: list[str],
     if len(curve_segment_colours) >= len(palette):
         for key in curve_segment_colours:
             if key not in current_segments:
+                # Remove the colour assignment for results no longer displayed if the palette is full
                 curve_segment_colours.pop(key)
                 break
+    # If the colour options have filled, wrap round to reuse colours from the palette
     curve_segment_colours[segment_name] = palette[curve_segment_colour_idx % len(palette)]
     curve_segment_colour_idx += 1
 

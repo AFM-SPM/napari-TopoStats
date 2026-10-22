@@ -620,6 +620,7 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> dict[
         A dictionary of comments.
     """
     comment_map = {}
+    # A running reference of where we are in the nested dictionary yaml structure
     key_stack = []
 
     if not yaml_path.exists():
@@ -642,18 +643,23 @@ def extract_inline_comments(yaml_path: Path, top_level_key: str = None) -> dict[
                 # Infer hierarchy depth from indentation; YAML uses 2 spaces per level here.
                 indent_level = len(indent_str.replace("\t", "  ")) // 2
 
+                # Reset the keystack to the level we are at (relevant if we have gone up one or more levels since the
+                # last key we read)
                 key_stack = key_stack[:indent_level]
+
                 key_stack.append(key_name)
 
                 full_yaml_key_path = ".".join(key_stack)
                 final_key_for_map = full_yaml_key_path
 
+                # Remove the top level key from the combined key
                 if top_level_key:
                     if full_yaml_key_path == top_level_key:
                         final_key_for_map = ""
                     elif full_yaml_key_path.startswith(top_level_key + "."):
                         final_key_for_map = full_yaml_key_path[len(top_level_key) + 1 :]
 
+                # Save the comment text once it's been identified
                 if comment_text is not None and final_key_for_map:
                     comment_map[final_key_for_map] = comment_text.strip()
     return unflatten_dict(comment_map)
@@ -754,7 +760,9 @@ class ConfigEditorWidget(QWidget):
             self.main_layout.removeWidget(self.form)
             self.form.deleteLater()
         self.config_type = config_type
+        # Reset the unapplied updated values on rebuild
         updated_values.pop(config_type, None)
+        # Recursively build the nested structure 
         self.form = build_dynamic_widget(
             get_current_config(config_type=config_type),
             comment_descriptions.get(config_type, {}),
@@ -785,6 +793,7 @@ class ConfigEditorWidget(QWidget):
     def save_to_file(self):
         """Save the edited configuration to a selected file."""
         self.apply()
+        # Open a dialog so the user can select their file path to save to
         file_path, _ = QFileDialog.getSaveFileName(
             parent=self, caption="Save Configuration As", filter="YAML Files (*.yaml *.yml);;JSON Files (*.json)"
         )
@@ -819,8 +828,10 @@ def open_config_editor(viewer: Viewer, main_widget: QWidget, config_type: str = 
         return
     manager = get_widget_manager()
     manager.ensure_valid("Edit Configuration")
+    # Get the widget and its reference in the dock
     config_editor_widget = manager.get_widget("Edit Configuration", raw=True)
     config_editor_dock = manager.get_widget("Edit Configuration")
+    # Build the widget and add it if it doesn't exist yet
     if config_editor_widget is None:
         config_editor_widget = ConfigEditorWidget(config_type)
         config_editor_dock = manager.add_docked_widget(config_editor_widget, area="right", name="Edit Configuration")
@@ -829,6 +840,7 @@ def open_config_editor(viewer: Viewer, main_widget: QWidget, config_type: str = 
     main_dock = main_widget.parentWidget()
     while main_dock is not None and not hasattr(main_dock, "toggleViewAction"):
         main_dock = main_dock.parentWidget()
+    # Add the config editor as a tab over the button grid
     if main_dock is not None:
         viewer.window._qt_window.tabifyDockWidget(main_dock, config_editor_dock)  # pylint: disable=protected-access
     config_editor_dock.show()
@@ -992,6 +1004,7 @@ def _write_yaml_with_inline_comments(file_path: Path, config: dict[str, Any], co
 def save_current_config_as_temp(overides: dict[str, Any] | None = None, config_type: str = "topostats"):
     """
     Saves the current config as a temporary file with optional overides.
+
     This is used for maintaining an up to date config file and path for TopoStats backend functions.
 
     Parameters
@@ -1006,9 +1019,11 @@ def save_current_config_as_temp(overides: dict[str, Any] | None = None, config_t
     if overides:
         for key, value in overides.items():
             config_wrappers[config_type].flat[key] = value
+    # Temp config file exists in the user's config directory
     config_dir = Path(user_config_dir("TopoStats", "Napari"))
     config_path = config_dir / f"_temp_{config_type}_config.yaml"
     config_dir.mkdir(parents=True, exist_ok=True)
+    # Update the temp file (or create it if it hasn't been created yet)
     save_config_to_file(config_path, full_current_config, config_type=config_type)
     current_config_paths[config_type] = str(config_path)
 
@@ -1112,6 +1127,7 @@ def save_scripts(selected_scripts: list[str]) -> set[str]:
     save_dir = Path(user_config_dir("TopoStats", "Napari")) / "scripts"
     save_dir.mkdir(parents=True, exist_ok=True)
 
+    # User a json file to keep track of what the user has saved
     metadata_path = save_dir / "saved_scripts.json"
 
     if metadata_path.exists():
@@ -1128,6 +1144,7 @@ def save_scripts(selected_scripts: list[str]) -> set[str]:
             file_path = Path(file_path_str)
             if file_path.exists() and file_path.suffix == ".py":
                 dest_path = save_dir / file_path.name
+                # Copy the loaded py files to the user directory
                 if file_path.resolve() != dest_path.resolve():
                     shutil.copy(file_path, dest_path)
                 saved_files.add(file_path.name)
@@ -1145,14 +1162,17 @@ def save_scripts(selected_scripts: list[str]) -> set[str]:
     return saved_files
 
 
-def unsave_scripts(selected_scripts: list[str]) -> set[str]:
+def unsave_scripts(selected_functions: list[str]) -> set[str]:
     """
     Unsaves selected scripts from the TopoStats configuration directory.
 
+    This will also remove the saved script files from the config directory if none of their functions are being
+    used any more.
+
     Parameters
     ----------
-    selected_scripts : list of str
-        Names of the scripts/functions to unsave.
+    selected_functions : list of str
+        Names of the functions to unsave.
 
     Returns
     -------
@@ -1170,7 +1190,7 @@ def unsave_scripts(selected_scripts: list[str]) -> set[str]:
 
     unsaved_files = set()
 
-    for name in selected_scripts:
+    for name in selected_functions:
         file_path_str = get_loaded_function_path(name)
         if file_path_str:
             file_path = Path(file_path_str)
@@ -1180,15 +1200,17 @@ def unsave_scripts(selected_scripts: list[str]) -> set[str]:
                 and file_path.name in metadata
                 and name in metadata[file_path.name]
             ):
-                # Update metadata
+                # Remove the function from the metadata's list of functions for each file
                 metadata[file_path.name].remove(name)
 
-    for file_path, file_list in metadata.items():
+    for file_path, function_list in metadata.items():
         file_path = save_dir / file_path
-        if not file_list and file_path.exists():
+        # If a file no longer offers any saved functions, delete it from config
+        if not function_list and file_path.exists():
             file_path.unlink()
             unsaved_files.add(file_path)
     for file_path in unsaved_files:
+        # If a file no longer offers any saved functions, remove it from the metadata
         if file_path.name in metadata:
             del metadata[file_path.name]
     unsaved_files = {f.name for f in unsaved_files}
@@ -1202,7 +1224,7 @@ def unsave_scripts(selected_scripts: list[str]) -> set[str]:
 
 def fetch_saved_scripts() -> dict[str, list[str]]:
     """
-    Fetches the metadata of saved scripts.
+    Fetches a map of the saved python modules and the functions they offer (why have been selected)
 
     Returns
     -------

@@ -32,6 +32,7 @@ def load_py_files(paths: Iterable[str | Path], viewer: Any):
     """
     py_functions = {}
     function_to_filepath = {}
+    # Read the functions from each python file and map them to their source
     for py_file in paths:
         extracted = load_functions_from_file(py_file)
         py_functions.update(extracted)
@@ -40,7 +41,9 @@ def load_py_files(paths: Iterable[str | Path], viewer: Any):
 
     # pylint: disable=protected-access
     if not py_functions:
+        # No functions found in the provided files
         return
+    # Allow the user to select which functions to import
     dialog = SelectionDialog(
         available_items=py_functions.keys(), text="Select functions to import", parent=viewer.window._qt_window
     )
@@ -51,6 +54,7 @@ def load_py_files(paths: Iterable[str | Path], viewer: Any):
         return
     if selected_functions != {}:
         for func_name, func in selected_functions.items():
+            # Create a WidgetFunction instance for each selected function
             widget_function = WidgetFunction(
                 name=func_name,
                 function_key=func_name,
@@ -65,6 +69,7 @@ def load_py_files(paths: Iterable[str | Path], viewer: Any):
                 # Track the original file path
                 record_loaded_function_path(func_name, function_to_filepath[func_name])
             if topostats_widget is not None:
+                # Add the load function to the topostats widget
                 topostats_widget.add_function(widget_function, to_group=True)
 
 
@@ -86,6 +91,7 @@ def fetch_saved_functions() -> list[WidgetFunction]:
     with open(metadata_path, encoding="utf-8") as f:
         metadata = json.load(f)
 
+    # Iterate over the saved scripts and load the selected functions
     for filename, selected_funcs in metadata.items():
         py_file = save_dir / filename
         if not py_file.exists():
@@ -95,6 +101,7 @@ def fetch_saved_functions() -> list[WidgetFunction]:
         for func_name in selected_funcs:
             if func_name in extracted:
                 func = extracted[func_name]
+                # Create a WidgetFunction instance for each saved function
                 widget_function = WidgetFunction(
                     name=func_name,
                     function_key=func_name,
@@ -145,6 +152,7 @@ def load_functions_from_file(file_path: str | Path) -> dict[str, Callable[..., A
     path = Path(file_path)
     module_name = path.stem
 
+    # Dynamically import the module from the given file path
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
         show_error_dialog(f"Failed to load {file_path}")
@@ -165,6 +173,7 @@ def load_functions_from_file(file_path: str | Path) -> dict[str, Callable[..., A
             sig = inspect.signature(obj)
             valid_func = True
             for param_name, param in sig.parameters.items():
+                # Skip functions with parameters that are not allowable and have no default value
                 if (
                     param_name not in ALLOWABLE_PARAMETERS
                     and param.default is inspect.Parameter.empty
@@ -172,6 +181,7 @@ def load_functions_from_file(file_path: str | Path) -> dict[str, Callable[..., A
                 ):
                     valid_func = False
                     break
+            # If the function passed the validation, add it to the extracted functions
             if valid_func:
                 extracted_functions[name] = obj
 
