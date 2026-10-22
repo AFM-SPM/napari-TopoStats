@@ -55,7 +55,7 @@ The channel can be changed later after the image has been loaded.
 
 <img src="src/napari_topostats/guide_images/changing_channel.gif" width="800" alt="Change channel docked widget"/>
 
-Contrast limits, colour scale and other image options are adjustable in the left pannel.
+Contrast limits, colour scale and other image options are adjustable in the left panel.
 
 <img src="src/napari_topostats/guide_images/generic_image_options.gif" width="800" alt="Image options">
 
@@ -92,7 +92,7 @@ to the loaded config file but will be used in this instance of napari for future
 
 <img src="src/napari_topostats/guide_images/edit_config.gif" width="800" alt="Edit config window"/>
 
-When you run a function for the first time, a window will open with options to adjust for that function
+When you run a function for the first time, a tab will open with options to adjust for that function
 (which are applied next time the function is run) if that function has options which can be adjusted.
 There is also a run button in that window. This runs the function on the selected layer (it does exactly the
 same thing as clicking the function button in the grid). Note this window will only appear if there are options which
@@ -100,7 +100,7 @@ can be adjusted outside of those in the config file. Multiple functions will als
 
 **Make 3D** is a function that allows you to select a layer and create a 3D representation of it, a 'Surface' layer. You can adjust triangle size to reduce the resolution of the surface, note this must be an integer and 1 or greater. You can also apply vertical exaggeration to artificially increase or reduce the height for better viewing. A new surface layer will be created and the viewer will automatically switch to 3D mode. 
 
-<img src="src/napari_topostats/guide_images/making_3d.gif" width="800" alt="Make 3D function"/>
+<img src="src/napari_topostats/guide_images/make_3d.gif" width="800" alt="Make 3D function"/>
 
 **Note**, if the camera goes weird, like the axis of movement is suddenly very wide, this is likely because you have another surface layer that can be viewed in 3D and napari is trying to frame so you can see both. If this is not desired, deleting the surface layer you don't want to view then clicking the home button in the bottom left corner should fix the issue. You can also switch between 3D and 2D mode using the selector button also in the bottom left. 
 
@@ -129,7 +129,7 @@ mouse while holding shift updates the viewer to wherever your mouse is.
 
 Once a curve is selected, you can change the channel of each axis by selecting the dropdown menu below the graph and selecting the desired channel. You can select the segments you want to be displayed in the dropdown menu. You can also change the volume of your data if it has the file contains multiple volumes such as Trace and Retrace or if you have processed versions of the raw volumes stored in the same file. To view the metadata, click the **Experimental Parameters** button, which will open a window containing that information.
 
-<img src="src/napari_topostats/guide_images/adjusting_curve_viewing.gif" width="800" alt="Adjusting curve viewing"/>
+<img src="src/napari_topostats/guide_images/adjust_curve_viewing.gif" width="800" alt="Adjusting curve viewing"/>
 
 **Viewing profile line**
 Pressing and holding the 'A' key
@@ -137,10 +137,12 @@ activates the drawing line tool, note that a temporary "Profile Line" shapes lin
 open in the dock on the right, which will be updated with profile data as you draw a move the line. The channels
 being viewed can be changed by using the dropdown menu below the graph and selecting the desired channels. Images
 created by applying some function to the image will appear as channels in addition to the defaults. The left and right
-axis are independent to allow you to show up to 2 different units (notably this can include more than 2 channels; if multiple channels have the same unit they will be presented on the same axis and scale). 
+axis are independent to allow you to show up to 2 different units (notably this can include more than 2 channels; if multiple channels have the same unit they will be presented on the same axis and scale)
+
 <img src="src/napari_topostats/guide_images/profile_line_drawing.gif" width="800" alt="Line profile drawing"/>
 
 The scale should automatically adjust to give a clear view of all the data, however the left axis can be adjusted by scrolling on that axis or anywhere on the graph and the right axis can be adjusted by specifically scrolling the right axis. The view can be reset and set back to automatic scaling with the reset view button. This is likely to be necessary after manual scaling then changing the channel.
+
 <img src="src/napari_topostats/guide_images/profile_line_scaling.gif" width="800" alt="Line profile scaling"/>
 
 **Loading custom analysis scripts**
