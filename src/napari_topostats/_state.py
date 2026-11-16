@@ -125,7 +125,7 @@ class WidgetManager:
                 widget,
                 name=name,
                 area=area,
-                tabify=(group == "functions")
+                tabify=True,
             )
 
             # Increase font size of function tab title

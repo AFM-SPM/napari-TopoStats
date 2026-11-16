@@ -331,7 +331,7 @@ class RootWidget(QWidget):
 
         self.bottom_widget = QWidget()
         self.bottom_widget.setLayout(self.bottom_row)
-        self.bottom_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.bottom_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         # Attach status label to the status container instead of bottom_widget
         attach_status_label(status_container)

@@ -684,8 +684,8 @@ class WidgetFunction:
                         return_type = get_type_hints(self.function_to_run).get("return")
                         if return_type is dict or get_origin(return_type) is dict:
                             loaded_image = get_selected_loaded_image(viewer)
-                            current_afm_load = loaded_image.get_current_load()
-                            if loaded_image.curves_data is None or current_afm_load is None:
+                            current_afm_scan = loaded_image.get_current_load()
+                            if loaded_image.curves_data is None or current_afm_scan is None:
                                 _cleanup()
                                 show_error_dialog(
                                     "No curves found in the selected layer.",
@@ -709,7 +709,7 @@ class WidgetFunction:
                                 },
                             }
 
-                            is_afmreader = current_afm_load.metadata.get("created_by") == "AFMReader"
+                            is_afmreader = current_afm_scan.metadata.get("created_by") == "AFMReader"
                             if is_afmreader:
                                 new_params_config = {
                                     "add_to_current_file": {
