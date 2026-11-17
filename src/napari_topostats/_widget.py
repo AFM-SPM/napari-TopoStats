@@ -40,9 +40,9 @@ from napari_topostats._components import get_selected_layer
 try:
     from forcestats.analysis import find_trigger_point_map
     from forcestats.contact import create_3d_approach_map, find_contact_point_map
-    from forcestats.curve_correction import correct_curve
-    from forcestats.filter_trench import filter_trench_centres
-    from forcestats.models import find_youngs_modulus
+    # from forcestats.curve_correction import correct_curve
+    # from forcestats.filter_trench import filter_trench_centres
+    # from forcestats.models import find_youngs_modulus
 except ModuleNotFoundError as error:
     if error.name != "forcestats":
         raise
@@ -228,35 +228,35 @@ if FORCESTATS_AVAILABLE:
                 run_immediately=False,
                 config_type="forcestats",
             ),
-            WidgetFunction(
-                name="Correct curve",
-                function_key="correct_curve",
-                path_to_data="return",
-                function_to_run=correct_curve,
-                tooltip=inspect.getdoc(correct_curve),
-                run_immediately=False,
-                config_type="forcestats",
-            ),
-            WidgetFunction(
-                name="Find youngs modulus",
-                function_key="find_youngs_modulus",
-                path_to_data="return",
-                function_to_run=find_youngs_modulus,
-                tooltip=inspect.getdoc(find_youngs_modulus),
-                run_immediately=False,
-                config_type="forcestats",
-                passes_full_config=True,
-            ),
-            WidgetFunction(
-                name="Filter trench centres",
-                function_key="filter_trench_centres",
-                path_to_data="return",
-                function_to_run=filter_trench_centres,
-                tooltip=inspect.getdoc(filter_trench_centres),
-                run_immediately=False,
-                config_type="forcestats",
-                passes_full_config=True,
-            ),
+            # WidgetFunction(
+            #     name="Correct curve",
+            #     function_key="correct_curve",
+            #     path_to_data="return",
+            #     function_to_run=correct_curve,
+            #     tooltip=inspect.getdoc(correct_curve),
+            #     run_immediately=False,
+            #     config_type="forcestats",
+            # ),
+            # WidgetFunction(
+            #     name="Find youngs modulus",
+            #     function_key="find_youngs_modulus",
+            #     path_to_data="return",
+            #     function_to_run=find_youngs_modulus,
+            #     tooltip=inspect.getdoc(find_youngs_modulus),
+            #     run_immediately=False,
+            #     config_type="forcestats",
+            #     passes_full_config=True,
+            # ),
+            # WidgetFunction(
+            #     name="Filter trench centres",
+            #     function_key="filter_trench_centres",
+            #     path_to_data="return",
+            #     function_to_run=filter_trench_centres,
+            #     tooltip=inspect.getdoc(filter_trench_centres),
+            #     run_immediately=False,
+            #     config_type="forcestats",
+            #     passes_full_config=True,
+            # ),
         ]
     )
 
@@ -300,6 +300,16 @@ class RootWidget(QWidget):
         else:
             super().__init__()
         self._viewer = viewer
+
+        # Keep only the topmost visible image layer's colour bar showing
+        for layer in self._viewer.layers:
+            layer.events.visible.connect(self._update_colorbars)
+        self._viewer.layers.events.inserted.connect(self._on_layer_inserted)
+        self._viewer.layers.events.removed.connect(self._update_colorbars)
+        self._viewer.layers.events.moved.connect(self._update_colorbars)
+        self._viewer.layers.events.reordered.connect(self._update_colorbars)
+        self._update_colorbars()
+
         # Setup the key binding for the line tool to allow users to draw a line and view the profile
         self._viewer.bind_key("a", start_drawing, overwrite=True)
         # Make layout so children are arranged vertically
@@ -314,12 +324,14 @@ class RootWidget(QWidget):
         # Set the size policy to allow the widget to expand
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.function_grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
         # Set the layout margins and add the function grid
         self.vlayout.setContentsMargins(5, 5, 5, 5)
         self.vlayout.addWidget(self.function_grid)
 
         # Bottom-right button row
         self.bottom_row = QHBoxLayout()
+        self.bottom_row.setContentsMargins(0, 0, 0, 0)
 
         # Create a container for the status label that doesn't expand
         status_container = QWidget()
@@ -327,11 +339,11 @@ class RootWidget(QWidget):
         status_layout = QHBoxLayout(status_container)
         status_layout.setContentsMargins(0, 0, 0, 0)
         self.vlayout.addWidget(status_container)
-        self.bottom_row.addStretch()  # Push button to the right
+        # self.bottom_row.addStretch()  # Push button to the right
 
         self.bottom_widget = QWidget()
         self.bottom_widget.setLayout(self.bottom_row)
-        self.bottom_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.bottom_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         # Attach status label to the status container instead of bottom_widget
         attach_status_label(status_container)
@@ -413,6 +425,27 @@ class RootWidget(QWidget):
                 return
 
         self.function_grid.add_function(function_to_add, label=display_name)
+
+    def _update_colorbars(self, event=None) -> None:
+        """Show the colour bar and height units for the topmost visible image layer only."""
+        image_layers = [layer for layer in self._viewer.layers if isinstance(layer, Image)]
+
+        # The layer list is ordered bottom to top, so search from the end
+        top = next((layer for layer in reversed(image_layers) if layer.visible), None)
+
+        for layer in image_layers:
+            layer.colorbar.visible = layer is top
+
+        z_units = top.metadata.get("z_units") if top is not None else None
+        if z_units:
+            self._viewer.canvas.overlays.text.text = f"Height ({z_units})"
+            self._viewer.canvas.overlays.text.position = "top_right"
+        self._viewer.canvas.overlays.text.visible = bool(z_units)
+
+    def _on_layer_inserted(self, event) -> None:
+        """Track the new layer's visibility, then refresh the colour bars."""
+        event.value.events.visible.connect(self._update_colorbars)
+        self._update_colorbars()
 
 
 class TopoStatsRootWidget(RootWidget):
@@ -519,10 +552,12 @@ class TopoStatsRootWidget(RootWidget):
 
         # Add a text label to tell the user they can press 'a' to open the curve viewer and use the line tool
         line_tool_label = QLabel("Hold 'a' to draw a line and view the profile plot")
-        line_tool_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         line_tool_label.setWordWrap(True)
+        line_tool_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+        self.vlayout.addWidget(line_tool_label)
+
         self.bottom_row.addWidget(export_button)
-        self.bottom_row.addWidget(line_tool_label)
         self.bottom_row.addWidget(guide_button)
 
         config_options_label = QLabel("Config options")
