@@ -105,7 +105,6 @@ same thing as clicking the function button in the grid). Note this window will o
 can be adjusted outside of those in the config file. Multiple functions will also group together and become different
 'tabs' which are selectable at the bottom. The **Make 3D** function described and shown below is an example of this.
 
-<<<<<<< HEAD
 **Make 3D** is a function that allows you to select a layer and create a 3D representation of it, a 'Surface' layer.
 You can adjust triangle size to reduce the resolution of the surface, note this must be an integer and 1 or greater.
 You can also apply vertical exaggeration to artificially increase or reduce the height for better viewing. A new
@@ -117,13 +116,6 @@ surface layer will be created and the viewer will automatically switch to 3D mod
 another surface layer that can be viewed in 3D and napari is trying to frame so you can see both. If this is not
 desired, deleting the surface layer you don't want to view then clicking the home button in the bottom left corner
 should fix the issue. You can also switch between 3D and 2D mode using the selector button also in the bottom left.
-=======
-**Make 3D** is a function that allows you to select a layer and create a 3D representation of it, a 'Surface' layer. You can adjust triangle size to reduce the resolution of the surface, note this must be an integer and 1 or greater. You can also apply vertical exaggeration to artificially increase or reduce the height for better viewing. A new surface layer will be created and the viewer will automatically switch to 3D mode.
-
-<img src="src/napari_topostats/guide_images/making_3d.gif" width="800" alt="Make 3D function"/>
-
-**Note**, if the camera goes weird, like the axis of movement is suddenly very wide, this is likely because you have another surface layer that can be viewed in 3D and napari is trying to frame so you can see both. If this is not desired, deleting the surface layer you don't want to view then clicking the home button in the bottom left corner should fix the issue. You can also switch between 3D and 2D mode using the selector button also in the bottom left.
->>>>>>> b31b6ed8bf88165cc12b168d9a46f4b46cbd9f85
 
 <img src="src/napari_topostats/guide_images/3d_controls.gif" width="800" alt="3D controls in the bottom left"/>
 
@@ -166,12 +158,8 @@ activates the drawing line tool, note that a temporary "Profile Line" shapes lin
 open in the dock on the right, which will be updated with profile data as you draw a move the line. The channels
 being viewed can be changed by using the dropdown menu below the graph and selecting the desired channels. Images
 created by applying some function to the image will appear as channels in addition to the defaults. The left and right
-<<<<<<< HEAD
 axis are independent to allow you to show up to 2 different units (notably this can include more than 2 channels; if
 multiple channels have the same unit they will be presented on the same axis and scale).
-=======
-axis are independent to allow you to show up to 2 different units (notably this can include more than 2 channels; if multiple channels have the same unit they will be presented on the same axis and scale).
->>>>>>> b31b6ed8bf88165cc12b168d9a46f4b46cbd9f85
 <img src="src/napari_topostats/guide_images/profile_line_drawing.gif" width="800" alt="Line profile drawing"/>
 
 The scale should automatically adjust to give a clear view of all the data, however the left axis can be adjusted by
