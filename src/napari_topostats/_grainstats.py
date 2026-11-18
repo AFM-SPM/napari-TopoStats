@@ -1,7 +1,12 @@
 """Module for containing functions and widgets for running and displaying results from topostats grainstats"""
 
+from typing import TYPE_CHECKING
+
 import pandas as pd
 from napari.layers import Labels
+
+if TYPE_CHECKING:
+    from topostats.grainstats import GrainStats
 
 
 def grainstats(image: Labels) -> pd.DataFrame:
@@ -50,7 +55,7 @@ def grainstats(image: Labels) -> pd.DataFrame:
     return df
 
 
-def get_grainstats_df(stats: "GrainStats") -> pd.DataFrame:
+def get_grainstats_df(stats: GrainStats) -> pd.DataFrame:
     """
     Reconstructs the 'grainstats' DataFrame from the nested
     grain_crops.stats attributes.
