@@ -5,11 +5,20 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
+
 import markdown
 from napari import Viewer
 from platformdirs import user_config_dir
 from qtpy.QtCore import QRectF, QTimer, QUrl
-from qtpy.QtGui import QMovie, QResizeEvent, QTextBlock, QTextCursor, QTextDocument, QTextDocumentFragment, QTextFragment
+from qtpy.QtGui import (
+    QMovie,
+    QResizeEvent,
+    QTextBlock,
+    QTextCursor,
+    QTextDocument,
+    QTextDocumentFragment,
+    QTextFragment,
+)
 from qtpy.QtWidgets import QDialog, QTextBrowser, QVBoxLayout, QWidget
 
 from napari_topostats._alerts import show_error_dialog
@@ -105,7 +114,7 @@ def _iter_image_fragments(
         while not iterator.atEnd():
             # Each block can contain multiple fragments (text or components that have the same formatting)
             fragment = iterator.fragment()
-            # Fragments are basically assumed to be text, with bold and italic text in the same line being separate 
+            # Fragments are basically assumed to be text, with bold and italic text in the same line being separate
             # fragments, but images are basically treated as some special text component with special formatting
             if fragment.isValid() and fragment.charFormat().isImageFormat():
                 if return_blocks:
@@ -236,17 +245,14 @@ class _AnimatedGuideBrowser(QTextBrowser):
             animated_images[resource_key] = animated_image
 
             # Connect the frameChanged signal to update the GIF frame in the document.
-            movie.frameChanged.connect(
-                lambda _frame_number, key=resource_key: self._replace_gif_frame(key)
-            )
-
+            movie.frameChanged.connect(lambda _frame_number, key=resource_key: self._replace_gif_frame(key))
 
         return animated_images
 
     def _schedule_visibility_update(self, *_args) -> None:
         """
         Schedule visibility checks while the guide is scrolling or resizing.
-        
+
         The start method resets the timer if it is already running, this means the check will wait until 50
         milliseconds after the user finishes scrolling.
         """

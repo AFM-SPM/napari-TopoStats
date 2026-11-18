@@ -103,7 +103,7 @@ def batch_process(
 
     # Import from topostats outside of top level so it is only imported when needed
     from topostats.run_modules import process
-    
+
     worker = ProcessWorker(process, args)
     worker.finished.connect(lambda: widget.set_status_message("✅ Batch processing complete."))
     worker.finished.connect(worker.deleteLater)

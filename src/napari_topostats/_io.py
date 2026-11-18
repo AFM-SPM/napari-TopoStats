@@ -48,6 +48,7 @@ ConfigType = (
 
 # pylint: disable=ungrouped-imports
 
+
 class ConfigWrapper:
     """
     A wrapper for configuration dictionaries to provide a flat view and unflattening functionality.
@@ -109,7 +110,6 @@ class ConfigWrapper:
         return unflatten_dict(self.flat)
 
 
-
 MISC_TITLE = "Batch Settings"
 START_OPEN = {"filter", "grains"}
 
@@ -156,7 +156,6 @@ def _format_config_tooltip(key: str, description: str = "") -> str:
     if description:
         return f"{key}\n\n{description}"
     return key
-
 
 
 def should_use_line_edit_for_float(value: float) -> bool:
@@ -371,6 +370,7 @@ def write_new_default_config(config_path: Path, config_type: str = "topostats"):
             from topostats.config import write_config_with_comments as write_config_with_comments_topostats
         except ImportError:
             from topostats import __version__ as topostats_version
+
             show_error_dialog(
                 f"TopoStats version {topostats_version} is not supported. Please install the latest version of TopoStats"
                 f"or if that fails, install version {MIN_TOPOSTATS_VERSION}."

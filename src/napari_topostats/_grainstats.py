@@ -25,6 +25,7 @@ def grainstats(image: Labels) -> pd.DataFrame:
     """
     # Import topostats within the function so it is only imported if it is needed
     from topostats.grainstats import GrainStats
+
     # Extract and coerce the grainstats configuration
     config = image.metadata["config"]["grainstats"]
     if "run" in config:
@@ -39,7 +40,6 @@ def grainstats(image: Labels) -> pd.DataFrame:
     )
     stats.calculate_stats()
     df = get_grainstats_df(stats)
-
 
     # Convert centre coordinates back to pixels if they exist
     if "centre_x" in df.columns and "centre_y" in df.columns:
