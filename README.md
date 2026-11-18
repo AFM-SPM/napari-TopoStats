@@ -116,7 +116,7 @@ layer will be created and the viewer will automatically switch to 3D mode
 another surface layer that can be viewed in 3D and napari is trying to frame so you can see both. If this is not
 desired, deleting the surface layer you don't want to view then clicking the home button in the bottom left corner
 should fix the issue. You can also switch between 3D and 2D mode using the selector button also in the bottom
-left. 
+left.
 
 <img src="src/napari_topostats/guide_images/3d_controls.gif" width="800" alt="3D controls in the bottom left"/>
 
@@ -141,7 +141,7 @@ can been seen in the command line). You can carry on using napari while this hap
 **Viewing Curves** is a function which allows the viewing of the force-distance curves for a point on loaded AFM
 data. Once the viewing curves widget has been opened by clicking on its button in the button grid, an individual
 force curve can be viewed by holding shift and clicking on the point in the image. Clicking and dragging with the
-mouse while holding shift updates the viewer to wherever your mouse is. 
+mouse while holding shift updates the viewer to wherever your mouse is.
 
 <img src="src/napari_topostats/guide_images/viewing_curves.gif" width="800" alt="Viewing curves"/>
 
