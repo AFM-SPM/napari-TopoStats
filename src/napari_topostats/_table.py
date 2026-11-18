@@ -1,8 +1,8 @@
 from typing import Any
 
-from napari import Viewer
 import numpy as np
 import pandas as pd
+from napari import Viewer
 from napari.layers import Labels
 from napari.layers.labels._labels_constants import Mode
 from qtpy.QtWidgets import (
@@ -208,7 +208,7 @@ def render_label_matched_table(
 
     save_button = QPushButton("Save to CSV")
     layout.addWidget(save_button)
-    attach_status_label(container) 
+    attach_status_label(container)
 
     def save_to_csv():
         """Prompt for a path and export the displayed grain statistics as CSV."""

@@ -420,6 +420,7 @@ def start_drawing(viewer: Viewer):
 
     def reference_image(viewer):
         return next((layer for layer in viewer.layers if isinstance(layer, Image)), None)
+
     ref = reference_image(viewer)
     kwargs = {}
     if ref is not None:
@@ -436,11 +437,7 @@ def start_drawing(viewer: Viewer):
             viewer.layers.move(current_index, len(viewer.layers))
     else:
         shapes_layer = viewer.add_shapes(
-            name="Profile Line",
-            shape_type="line",
-            edge_color=COLOR_PROFILE_LINE,
-            edge_width=edge_width,
-            **kwargs
+            name="Profile Line", shape_type="line", edge_color=COLOR_PROFILE_LINE, edge_width=edge_width, **kwargs
         )
 
     widget_manager = get_widget_manager()

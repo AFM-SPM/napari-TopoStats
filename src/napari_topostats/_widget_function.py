@@ -923,6 +923,7 @@ class WidgetFunction:
                             topostats_object = selected_image.metadata["topostats_object"]
                         else:
                             from topostats.classes import TopoStats
+
                             topostats_object = TopoStats(
                                 image_original=selected_image.data,
                                 image=selected_image.data,
@@ -1320,9 +1321,9 @@ class WidgetFunction:
                 current_units = None
 
             if len(current_scale) != self.ndims:
-                current_scale = current_scale[-self.ndims:]
+                current_scale = current_scale[-self.ndims :]
                 if current_units is not None:
-                    current_units = current_units[-self.ndims:]
+                    current_units = current_units[-self.ndims :]
 
             reader_id = original.metadata.get("afmreader_id", None) if original and original.metadata else None
             if reader_id is not None:
@@ -1374,7 +1375,7 @@ class WidgetFunction:
                     contrast_limits=calculate_contrast_limits(return_value, percentage=0.5),
                     metadata=combined_metadata,
                     scale=current_scale,
-                    units=current_units
+                    units=current_units,
                 )
                 viewer.dims.ndisplay = self.ndims
 
@@ -1391,7 +1392,9 @@ class WidgetFunction:
 
             # Replace if the table already exists for this layer, otherwise add a new one
             self.function_manager.widget_manager.remove_docked_widget(table_name)
-            self.function_manager.widget_manager.add_docked_widget(container, area="right", name=table_name, group=table_group)
+            self.function_manager.widget_manager.add_docked_widget(
+                container, area="right", name=table_name, group=table_group
+            )
 
         else:
             show_error_dialog(

@@ -5,10 +5,10 @@
 from __future__ import annotations
 
 import inspect
-from itertools import islice
 import multiprocessing
 import time
 from collections.abc import Callable
+from itertools import islice
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -420,9 +420,10 @@ def all_curves(
 
     if parallel and num_workers > 1:
         offset = 0
-        with Parallel(n_jobs=num_workers) as pool, tqdm(
-            total=len(curves), desc=f"Running {func.__name__} (Parallel)"
-        ) as pbar:
+        with (
+            Parallel(n_jobs=num_workers) as pool,
+            tqdm(total=len(curves), desc=f"Running {func.__name__} (Parallel)") as pbar,
+        ):
             for chunk in _chunked(curves.iter_curves(flip_image=False), chunk_size):
                 results = pool(delayed(_all_curves_worker)(curve) for curve in chunk)
 

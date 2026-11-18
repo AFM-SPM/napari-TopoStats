@@ -383,7 +383,6 @@ class SelectionDropdown(QComboBox):
                 obj.setAttribute(Qt.WA_NoMouseReplay)
         return super().eventFilter(obj, event)
 
-
     def set_items(self, items: list, starting_items: list = None, item_colors: dict = None):
         """
         Set the items in the dropdown and their checked state.

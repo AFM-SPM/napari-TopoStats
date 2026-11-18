@@ -9,7 +9,6 @@ from AFMReader.data_classes import CurvesDataset
 from napari import Viewer
 from napari.layers import Image
 from napari_afmreader._reader import get_loaded_image
-from qtpy.QtCore import Qt
 from qtpy.QtGui import QHideEvent, QPainterPath, QShowEvent, QTransform
 from qtpy.QtWidgets import (
     QComboBox,
@@ -743,6 +742,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                 # consistency across all layers is required for the scalebar to render
                 def reference_image(viewer):
                     return next((layer for layer in viewer.layers if isinstance(layer, Image)), None)
+
                 ref = reference_image(viewer)
                 kwargs = {}
                 if ref is not None:
@@ -757,7 +757,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
                     edge_color=COLOR_SELECTED_CURVE,
                     # Line width for the cross should be half a pixel
                     edge_width=max(y_scale, x_scale) * 0.5,
-                    **kwargs
+                    **kwargs,
                 )
                 # Need to keep the layer with the actual data selected (adding a layer, including the shapes layer,
                 # automatically selects the new layer)
@@ -871,6 +871,7 @@ class CurveViewer(QWidget):  # pylint: disable=too-many-instance-attributes
             return
 
         self.pixel_validity_label.setText(f"<b>Valid pixel:</b> {pixel_valid}")
+
 
 class ParameterDialog(QDialog):
     """

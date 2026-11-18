@@ -40,6 +40,7 @@ from napari_topostats._components import get_selected_layer
 try:
     from forcestats.analysis import find_trigger_point_map
     from forcestats.contact import create_3d_approach_map, find_contact_point_map
+
     # from forcestats.curve_correction import correct_curve
     # from forcestats.filter_trench import filter_trench_centres
     # from forcestats.models import find_youngs_modulus
@@ -76,6 +77,7 @@ from napari_topostats._widget_function import WidgetFunction, WidgetFunctionMana
 
 check_guide(current_viewer())
 
+
 def start_loading_topostats():
     if os.environ.get("QT_QPA_PLATFORM") != "offscreen" and QApplication.instance() is not None:
         loading_spinner = LoadingWidget(current_viewer())
@@ -83,6 +85,7 @@ def start_loading_topostats():
         QApplication.processEvents()
         return loading_spinner
     return None
+
 
 def check_topostats_version():
     from topostats import __version__ as topostats_version
@@ -94,6 +97,8 @@ def check_topostats_version():
             f"This can be done with `pip install topostats=={MIN_TOPOSTATS_VERSION}`",
             raise_exception=False,
         )
+
+
 def get_filter_image_func():
     loading_spinner = start_loading_topostats()
     check_topostats_version()
@@ -102,6 +107,7 @@ def get_filter_image_func():
     if loading_spinner is not None:
         loading_spinner.stop()
     return Filters.filter_image
+
 
 def get_find_grains_func():
     loading_spinner = start_loading_topostats()
@@ -112,6 +118,7 @@ def get_find_grains_func():
         loading_spinner.stop()
     return Grains.find_grains
 
+
 def get_filters_class():
     loading_spinner = start_loading_topostats()
     from topostats.filters import Filters
@@ -120,6 +127,7 @@ def get_filters_class():
         loading_spinner.stop()
     return Filters
 
+
 def get_grains_class():
     loading_spinner = start_loading_topostats()
     from topostats.grains import Grains
@@ -127,6 +135,8 @@ def get_grains_class():
     if loading_spinner is not None:
         loading_spinner.stop()
     return Grains
+
+
 # List of available functions to be displayed in the button grid.
 # Each function is represented as an instance of the WidgetFunction class defined in _widget_function.py,
 # which contains all the necessary information for rendering the function as a button and executing it when clicked.
