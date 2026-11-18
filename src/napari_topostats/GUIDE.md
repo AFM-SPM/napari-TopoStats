@@ -72,8 +72,9 @@ will be created and the viewer will automatically switch to 3D mode.
 **Note**, if the camera goes weird, like the axis of movement is suddenly very wide, this is likely because you have
 another surface layer that can be viewed in 3D and napari is trying to frame so you can see both. If this is not
 desired, deleting the surface layer you don't want to view then clicking the home button in the bottom left corner
-should fix the issue. You can also switch between 3D and 2D mode using the selector button also in the bottom left.
+should fix the issue. You can also switch between 3D and 2D mode using the selector button also in the bottom left
 =======
+
 **Make 3D** is a function that allows you to select a layer and create a 3D representation of it, a 'Surface' layer. You can adjust triangle size to reduce the resolution of the surface, note this must be an integer and 1 or greater. You can also apply vertical exaggeration to artificially increase or reduce the height for better viewing. A new surface layer will be created and the viewer will automatically switch to 3D mode.
 
 <img src="guide_images/making_3d.gif" width="800" alt="Make 3D function"/>
@@ -124,8 +125,9 @@ being viewed can be changed by using the dropdown menu below the graph and selec
 created by applying some function to the image will appear as channels in addition to the defaults. The left and right
 <<<<<<< HEAD
 axis are independent to allow you to show up to 2 different units (notably this can include more than 2 channels; if
-multiple channels have the same unit they will be presented on the same axis and scale).
+multiple channels have the same unit they will be presented on the same axis and scale)
 =======
+
 axis are independent to allow you to show up to 2 different units (notably this can include more than 2 channels; if multiple channels have the same unit they will be presented on the same axis and scale).
 >>>>>>> b31b6ed8bf88165cc12b168d9a46f4b46cbd9f85
 <img src="guide_images/profile_line_drawing.gif" width="800" alt="Line profile drawing"/>
