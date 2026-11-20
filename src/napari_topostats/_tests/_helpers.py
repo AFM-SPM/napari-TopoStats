@@ -4,6 +4,7 @@ test images, simulating button clicks, and opening configuration dialogs.
 """
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from napari import Viewer
@@ -12,7 +13,7 @@ from napari_afmreader._reader import reader_function
 from pytestqt.qtbot import QtBot
 from qtpy.QtCore import Qt
 
-from napari_topostats._widget import AVAILABLE_FUNCTIONS, TopoStatsRootWidget
+from napari_topostats._widget import MAIN_FUNCTIONS, TopoStatsRootWidget
 
 
 def load_test_image(napari_viewer: Viewer, image_path: str | Path) -> Image | None:
@@ -63,7 +64,7 @@ def run_functions_in_grid(
         Names of functions to run in the function grid.
     """
     if functions_to_run == ["all"]:
-        functions_to_run = [f.name for f in AVAILABLE_FUNCTIONS]
+        functions_to_run = [f.name for f in MAIN_FUNCTIONS]
         functions_to_run.remove("load_config")
     button_grid = topostats_widget.function_grid
 
@@ -95,7 +96,7 @@ def open_load_config_widget(qtbot: QtBot, topostats_widget: TopoStatsRootWidget)
     """
 
     # pylint: disable=unused-argument
-    def get_file_path(*args, **kwargs):
+    def get_file_path(*args: Any, **kwargs: Any) -> tuple[None, None]:
         return (None, None)
 
     with patch(

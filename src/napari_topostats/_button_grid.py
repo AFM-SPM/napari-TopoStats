@@ -7,49 +7,19 @@ and correctly linking the backend with those functions being clicked
 from contextlib import suppress
 from pathlib import Path
 
-from magicgui.widgets import FunctionGui
 from napari.viewer import Viewer
 from qtpy.QtCore import QSize
 from qtpy.QtGui import QBrush, QColor, QIcon
 from qtpy.QtWidgets import QListWidget, QListWidgetItem
 
-from napari_topostats._widget_function import (
-    WidgetFunction,
-    get_selected_image,
-)
+from napari_topostats._alerts import show_error_dialog
+from napari_topostats._styles import BUTTON_GRID_STYLE
+from napari_topostats._widget_function import WidgetFunction, WidgetFunctionManager
 
-from ._alerts import show_error_dialog
-from ._state import is_valid_widget, is_visible_widget
-
-RUN_IMMEDIATELY_EXEMPTIONS = {}
 ICON_ROOT = Path(__file__).parent / "icons"
-STYLES = r"""
-    QListWidget{
-        min-width: 200;
-        background: none;
-        font-size: 14pt;
-        margin: 0;
-        padding: 0;
-        color: #eee;
-    }
-    QListWidget::item {
-        width: 80;
-        height: 100;
-        margin: 1;
-        padding: 4;
-    }
-    QListWidget::item::hover {
-        background: #8A929C;
-        width: 80;
-        height: 100;
-        margin: 1;
-        padding: 4;
-    }
-
-"""
 
 
-def _get_background_brush():
+def _get_background_brush() -> QBrush:
     """
     Sets the background colour for each button in the grid.
 
@@ -66,7 +36,7 @@ def _get_background_brush():
     return background
 
 
-def _get_icon(name):
+def _get_icon(name: str) -> str:
     """
     Get the file path for the icon associated with a given function name.
 
@@ -90,139 +60,103 @@ class ButtonGrid(QListWidget):
     """
     A QListWidget that displays a grid of buttons, each representing a function.
     Each button can be clicked to execute the corresponding function, and open a docked widget in the viewer.
+
+    Parameters
+    ----------
+    parent : QListWidget | None, optional
+        Parent list widget.
+    functions : dict[str, WidgetFunction] | None, optional
+        Functions represented by buttons in the grid.
+    viewer : Viewer, optional
+        Napari viewer associated with the grid.
+    function_manager : WidgetFunctionManager, optional
+        Manager used to open function widgets.
     """
 
     def __init__(
         self,
-        parent=None,
+        parent: QListWidget | None = None,
         functions: dict[str, WidgetFunction] | None = None,
         viewer: Viewer = None,
+        function_manager: WidgetFunctionManager = None,
     ):
+        """
+        Initialises ButtonGrid.
+
+        Parameters
+        ----------
+        parent : QListWidget | None, optional
+            Parent list widget.
+        functions : dict[str, WidgetFunction] | None, optional
+            Functions represented by buttons in the grid.
+        viewer : Viewer, optional
+            Napari viewer associated with the grid.
+        function_manager : WidgetFunctionManager, optional
+            Manager used to open function widgets.
+        """
         super().__init__(parent=parent)
         # Set style and properties for the QListWidget
         self.setMovement(self.Static)  # The items cannot be moved by the user.
-        self.setViewMode(self.IconMode)  # make items icons
+        self.setViewMode(self.ListMode)  # make items list
         self.setResizeMode(self.Adjust)  # relayout when view is resized.
         self.setUniformItemSizes(True)  # better performance
-        self.setIconSize(QSize(90, 40))  # set icon size
+        self.setIconSize(QSize(45, 20))  # set icon size
         self.setWordWrap(True)  # allow text to wrap
-        self.setStyleSheet(STYLES)  # set the style sheet
+        self.setStyleSheet(BUTTON_GRID_STYLE)  # set the style sheet
         self.setSpacing(2)  # set spacing between items
 
         self.viewer = viewer
+        self.function_manager = function_manager
         # Initialize the list of functions
         self.update_functions(functions)
         # List to keep track of docked functions
         self.docked_functions = {}
 
-    def update_functions(self, functions: dict[str, WidgetFunction] | None):
+    def update_functions(self, functions: dict[str, WidgetFunction | list] | None):
         """
         Update the list of functions in the button grid.
+
         Parameters
         ----------
         functions : dict[str, WidgetFunction] | None
             A dictionary of function names and their corresponding WidgetFunction objects.
         """
+        # Add the functions to the grid, including the tooltip if it exists.
         self.functions = functions or {}
         for label, function in functions.items():
-            if isinstance(function, FunctionGui):
-                if is_valid_widget(function):
-                    self.addFunctionButton(label, function.tooltip)
-                else:
-                    self.addFunctionButton(label)
+            if function.tooltip:
+                self.add_function_button(label, function.tooltip)
             else:
-                if function.tooltip:
-                    self.addFunctionButton(label, function.tooltip)
-                else:
-                    self.addFunctionButton(label)
+                self.add_function_button(label)
+
+        # Remove any existing connections to the itemClicked signal to avoid duplicate connections
         with suppress(TypeError):
             self.itemClicked.disconnect()
-        self.itemClicked.connect(self.add_function_as_widget)
 
-    def add_function_as_widget(self, item):
+        # Then add the new connection to the itemClicked signal (there is a single connection for the whole grid
+        # which is passed the clicked item and determines which function to execute based on that item).
+        self.itemClicked.connect(self.on_function_click)
+
+    def on_function_click(self, item: QListWidgetItem):
         """
         Handle the click event on a list item.
+
         If the item corresponds to a WidgetFunction, it will be added as a docked widget
         in the viewer (if it is not already added). If the function is not in the RUN_IMMEDIATELY_EXEMPTIONS list,
         it will be executed with the appropriate parameters.
+
         Parameters
         ----------
         item : QListWidgetItem
             The item that was clicked.
         """
+        function = self.functions.get(item.text())
+        if function is None:
+            show_error_dialog(f"No function found for {item.text()}", raise_exception=True)
+            return
+        self.function_manager.add_function_as_widget(item.text(), function)
 
-        # Check if the widget is already docked and add it if not
-        if item.text() not in self.docked_functions:
-            widget = self.get_widget_from_function(item.text())
-            for param in widget:
-                if param.name != "call_button":
-                    self.viewer.window.add_dock_widget(widget, name=item.text())
-                    self.docked_functions[item.text()] = widget
-                    break
-        elif not is_valid_widget(self.docked_functions[item.text()]) or not is_visible_widget(
-            self.docked_functions[item.text()]
-        ):
-
-            # Widget exists in dict but is deleted or not visible - recreate it
-            widget = self.get_widget_from_function(item.text())
-
-            # Try to destroy the old widget if it still exists
-            try:
-                if hasattr(self.docked_functions[item.text()], "native"):
-                    self.docked_functions[item.text()].native.destroy()
-            except RuntimeError:
-                # Already deleted, that's fine
-                pass
-
-            # Add the new widget
-            self.viewer.window.add_dock_widget(widget, name=item.text())
-            self.docked_functions[item.text()] = widget
-        else:
-            widget = self.docked_functions[item.text()]
-
-        if item.text() not in RUN_IMMEDIATELY_EXEMPTIONS:
-            # If the function is not in the RUN_IMMEDIATELY_EXEMPTIONS list, run it with the appropriate parameters,
-            # using the selected image layer as the image parameter
-            if hasattr(widget, "image") and widget.image.value is None:
-                selected_image = get_selected_image(self.viewer)
-                if selected_image is not None:
-                    widget.image.value = selected_image
-            if hasattr(widget, "viewer"):
-                widget.viewer.value = self.viewer
-            widget()
-
-    def get_widget_from_function(self, function_name: str) -> FunctionGui | None:
-        """
-        Get the widget representation of the passed function by selecting between generating it or returning the
-        passed function if it is already a widget
-
-        Parameters
-        ----------
-        function_name : str
-            The name of the function to retrieve.
-
-        Returns
-        -------
-        FunctionGui or None
-            The widget for the function, or None if the function is not valid.
-        """
-        function_from_list = self.functions.get(function_name)
-        if isinstance(function_from_list, WidgetFunction):
-            # If the function is a WidgetFunction, get its GUI representation.
-            widget = function_from_list.get_function_gui()
-        elif isinstance(function_from_list, FunctionGui):
-            # If the function is already a FunctionGui, use it directly. This means it was created with magicgui and has
-            # been hard-coded to be a FunctionGui.
-            widget = function_from_list
-        else:
-            show_error_dialog(
-                f"Function {function_name} is not a valid WidgetFunction or FunctionGui.",
-                raise_exception=True,
-            )
-            return None
-        return widget
-
-    def addFunctionButton(self, label: str, tool_tip: str | None = None):
+    def add_function_button(self, label: str | QListWidgetItem, tool_tip: str | None = None):
         """
         Add a button to the grid with the specified label and tooltip.
 
@@ -231,19 +165,37 @@ class ButtonGrid(QListWidget):
         label : str | QListWidgetItem
             The label for the button. If a QListWidgetItem is provided, it will be used directly.
         tool_tip : str | None
-            The tooltip for the button. If None, no tooltip will be set."""
+            The tooltip for the button. If None, no tooltip will be set.
+        """
+        # If the label is already a QListWidgetItem, add it directly to the grid.
         if isinstance(label, QListWidgetItem):
             super().addItem(label)
+            return
 
+        # Otherwise, create a new QListWidgetItem with the specified label and get an icon where available
         item = QListWidgetItem(QIcon(_get_icon(label)), label)
         item.setBackground(_get_background_brush())
 
         if tool_tip is not None:
             item.setToolTip(tool_tip)
+
+        # Add the item to the grid
         super().addItem(item)
 
     def remove_all_items(self):
-        """
-        Remove all items from the QListWidget.
-        """
+        """Remove all items from the QListWidget."""
         self.clear()
+
+    def add_function(self, widget_function: WidgetFunction, label: str):
+        """
+        Add a function button to the button grid
+
+        Parameters
+        ----------
+        widget_function : WidgetFunction
+            Widget function to be added to the button grid
+        label : str
+            Label/ name of the function
+        """
+        self.functions[label] = widget_function
+        self.add_function_button(label, tool_tip=widget_function.tooltip)

@@ -90,10 +90,12 @@ disable=C0103,
         logging-fstring-interpolation,
         file-ignored,
         suppressed-message,
-        useless-suppression,
         deprecated-pragma,
         use-symbolic-message-instead,
         too-few-public-methods,
+        fixme,
+        broad-exception-caught,
+        too-many-positional-arguments,
 
 
 
@@ -546,6 +548,9 @@ ignored-parents=
 
 # Maximum number of arguments for function / method.
 max-args=7  # Raised this from 5
+
+# Maximum number of positional arguments for function / method.
+max-positional-arguments=10
 
 # Maximum number of attributes for a class (see R0902).
 max-attributes=15

@@ -1,8 +1,12 @@
 """
 Batch processing functionality for napari-TopoStats.
+
 This module provides a function for batch processing multiple AFM images in a selected folder using the current
 configuration. The batch processing is performed in a separate thread to keep the GUI responsive, and progress
-is communicated through status messages and command line output.
+is communicated through status messages and command line output. It functions effectively identically to running
+TopoStats from the command line, apart from using the current configuration as loaded/ edited in the napari GUI
+and providing the ability to select input and output directories through a dialog if the default is being used
+("./" for input and "./output" for output).
 """
 
 import argparse
@@ -11,11 +15,10 @@ from pathlib import Path
 from magicgui import magicgui
 from napari import current_viewer  # pylint: disable=no-name-in-module
 from qtpy.QtWidgets import QFileDialog
-from topostats.run_modules import process
 
-from ._alerts import attach_status_label, show_error_dialog
-from ._io import config_loaded, get_current_config, get_current_config_path, load_config_impl
-from ._parallel_processing import ProcessWorker
+from napari_topostats._alerts import attach_status_label, show_error_dialog
+from napari_topostats._io import config_loaded, get_current_config, get_current_config_path, load_config_impl
+from napari_topostats._parallel_processing import ProcessWorker
 
 
 # pylint: disable=protected-access
@@ -30,6 +33,7 @@ def batch_process(
 ):
     """
     Batch process multiple AFM images in a selected folder using the current configuration.
+
     Parameters
     ----------
     data_path : Path | None
@@ -37,14 +41,17 @@ def batch_process(
     output_path : Path | None
         The output directory where results will be saved. If None, a dialog will prompt for selection.
     """
+    config_type = "topostats"
     widget = batch_process
     if not hasattr(widget, "set_status_message"):
         attach_status_label(widget)
 
-    if not config_loaded():
-        load_config_impl(current_viewer(), use_default=True)
+    if not config_loaded(config_type=config_type):
+        load_config_impl(current_viewer(), config_type=config_type, use_default=True)
 
-    if get_current_config()["base_dir"] == "./":
+    # If the current configuration uses the default input/output directories, prompt the user to select them instead
+    # as ./ is assumed to be the default and not necessarily intentional.
+    if get_current_config(config_type=config_type)["base_dir"] == "./":
         if data_path is None:
             data_path = QFileDialog.getExistingDirectory(
                 parent=None,
@@ -60,7 +67,10 @@ def batch_process(
             )
             output_path = Path(output_path)
             widget.output_path.value = output_path
+
     # ruff: noqa: SIM102
+
+    # If the batch process is already running, do not start another one
     if hasattr(widget, "_batch_worker"):
         try:
             if widget._batch_worker.isRunning():
@@ -69,27 +79,37 @@ def batch_process(
         except RuntimeError:
             # Worker thread has been deleted and is therefore not running
             pass
-    print(f"Config path: {str(get_current_config_path())}")
     args = argparse.Namespace(
-        config_file=str(get_current_config_path()),
-        module="topostats",
+        config_file=str(get_current_config_path(config_type=config_type)),
+        module=config_type,
         summary_config=None,
     )
+
+    # If the user has just provided a data_path or output_path through the GUI, use those values.
+    # Otherwise, use the values from the current configuration.
+
     if data_path is not None:
         args.base_dir = str(data_path)
     else:
-        widget.data_path.value = get_current_config()["base_dir"]
+        widget.data_path.value = get_current_config(config_type=config_type)["base_dir"]
+
     if output_path is not None:
         args.output_dir = str(output_path)
     else:
-        widget.output_path.value = get_current_config()["output_dir"]
+        widget.output_path.value = get_current_config(config_type=config_type)["output_dir"]
 
+    # Start the batch processing in a separate thread to keep the GUI responsive
     widget.set_status_message("⏳ Starting batch processing in the background. View command line for progress.")
+
+    # Import from topostats outside of top level so it is only imported when needed
+    from topostats.run_modules import process
+
     worker = ProcessWorker(process, args)
     worker.finished.connect(lambda: widget.set_status_message("✅ Batch processing complete."))
     worker.finished.connect(worker.deleteLater)
     worker.error_signal.connect(handle_batch_process_error)
-    widget._batch_worker = worker  # prevent garbage collection
+    # Prevent garbage collection
+    widget._batch_worker = worker
     worker.start()
 
 

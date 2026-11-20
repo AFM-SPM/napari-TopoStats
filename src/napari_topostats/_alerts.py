@@ -1,7 +1,11 @@
 """Module used for providing error alerts in the gui and show/ handle loading messages"""
 
+from typing import Any
+
 from magicgui.widgets import FunctionGui
+from napari import Viewer
 from qtpy.QtCore import QTimer, Qt
+from qtpy.QtGui import QResizeEvent
 from qtpy.QtWidgets import (
     QApplication,
     QDialog,
@@ -13,8 +17,19 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from . import _state as state
-from ._state import is_valid_widget
+import napari_topostats._state as state
+from napari_topostats._state import is_valid_widget
+from napari_topostats._styles import (
+    ERROR_DIALOG_BUTTON_STYLE,
+    ERROR_DIALOG_LABEL_STYLE,
+    ERROR_DIALOG_STYLE,
+    LOADING_CONTAINER_STYLE,
+    LOADING_LABEL_STYLE,
+    LOADING_OVERLAY_STYLE,
+    STATUS_LABEL_HIDDEN_STYLE,
+    STATUS_LABEL_STYLE,
+    STATUS_LABEL_VISIBLE_STYLE,
+)
 
 NAPARI_TOPOSTATS_REPORT = "https://github.com/AFM-SPM/napari-TopoStats/issues/new?template=bug_report.yaml"
 
@@ -22,6 +37,11 @@ NAPARI_TOPOSTATS_REPORT = "https://github.com/AFM-SPM/napari-TopoStats/issues/ne
 class ErrorDialog(QDialog):
     """
     A simple dialog window to display error messages.
+
+    Parameters
+    ----------
+    message : str
+        The error message to display in the dialog.
     """
 
     def __init__(self, message: str):
@@ -41,16 +61,10 @@ class ErrorDialog(QDialog):
         layout = QVBoxLayout()
         layout.setSpacing(10)
 
-        # Error message
+        # Error message text itself
         self.label = QLabel(message)
         self.label.setWordWrap(True)
-        self.label.setStyleSheet("""
-            QLabel {
-                font-size: 13px;
-                color: #333333;
-                padding: 10px;
-            }
-        """)
+        self.label.setStyleSheet(ERROR_DIALOG_LABEL_STYLE)
         layout.addWidget(self.label)
 
         # OK button
@@ -58,22 +72,7 @@ class ErrorDialog(QDialog):
         button_layout.addStretch()
         ok_button = QPushButton("OK")
         ok_button.setMinimumWidth(80)
-        ok_button.setStyleSheet("""
-            QPushButton {
-                background-color: #0078d4;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-size: 13px;
-            }
-            QPushButton:hover {
-                background-color: #106ebe;
-            }
-            QPushButton:pressed {
-                background-color: #005a9e;
-            }
-        """)
+        ok_button.setStyleSheet(ERROR_DIALOG_BUTTON_STYLE)
         ok_button.clicked.connect(self.accept)
         button_layout.addWidget(ok_button)
         layout.addLayout(button_layout)
@@ -82,11 +81,7 @@ class ErrorDialog(QDialog):
         self.setModal(True)
 
         # Dialog styling
-        self.setStyleSheet("""
-            QDialog {
-                background-color: white;
-            }
-        """)
+        self.setStyleSheet(ERROR_DIALOG_STYLE)
 
 
 def show_error_dialog(
@@ -104,6 +99,10 @@ def show_error_dialog(
         The error message to display.
     raise_exception : bool, optional
         If True, raise a ValueError after showing the dialog. Used for errors that should halt execution.
+    topostats_error : bool
+        Whether or not the error was throw during the running of a backend topostats function
+    exception : Exception | None
+        The exception that triggered the dialog
     """
     if topostats_error:
         message += (
@@ -132,49 +131,17 @@ def show_error_dialog(
         raise ValueError(message)
 
 
-class LoadingDialog(QDialog):
-    """
-    A dialog window to indicate a loading or processing state.
-    """
-
-    def __init__(self, text="Loading..."):
-        """
-        Initialize the loading dialog with optional text.
-
-        Parameters
-        ----------
-        text : str, optional
-            The message to display in the loading dialog (default is "Loading...").
-        """
-        super().__init__()
-        self.setWindowTitle("Please wait")
-        layout = QVBoxLayout()
-
-        self.label_text = QLabel(text)
-        layout.addWidget(self.label_text)
-
-        self.spinner_label = QLabel()
-        layout.addWidget(self.spinner_label)
-
-        self.setLayout(layout)
-        self.setModal(True)
-
-        self.adjustSize()
-
-
 def attach_status_label(widget: FunctionGui | QWidget):
     """
     Add status label to passed in widget, which can be updated when then function associated with that widget runs.
-    """
 
+    Parameters
+    ----------
+    widget : FunctionGui | QWidget
+        Widget to attach the status label to
+    """
     label = QLabel("")
-    label.setStyleSheet("""
-        QLabel {
-            border: none;
-            padding: 0px;
-            margin: 0px;
-        }
-    """)
+    label.setStyleSheet(STATUS_LABEL_STYLE)
     label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
     label.setMinimumWidth(0)
     label.setMaximumWidth(300)  # Prevent excessive width
@@ -185,11 +152,13 @@ def attach_status_label(widget: FunctionGui | QWidget):
     else:
         widget.layout().addWidget(label)
 
-    widget.status_label = label  # Store label as widget property
+    # Store label as widget property so it can be accessed later for updates
+    widget.status_label = label
     label_timer = QTimer()
     label_timer.setSingleShot(True)
 
     def remove_label():
+        """Remove label by setting its text to an empty string and resetting geometry"""
         if is_valid_widget(widget):
             label.setText("")
             label.adjustSize()
@@ -200,22 +169,22 @@ def attach_status_label(widget: FunctionGui | QWidget):
             if to_adjust.parent():
                 to_adjust.parent().adjustSize()
                 to_adjust.parent().updateGeometry()
-            label.setStyleSheet("""
-                QLabel {
-                    font-size: 4px
-                }
-            """)
+            label.setStyleSheet(STATUS_LABEL_HIDDEN_STYLE)
 
     label_timer.timeout.connect(remove_label)
     widget.label_timer = label_timer
 
     def set_status_message(message: str):
+        """
+        Updates the status message
+
+        Parameters
+        ----------
+        message : str
+            The message the status label should display
+        """
         label.setText(message)
-        label.setStyleSheet("""
-            QLabel {
-                font-size: 12px
-            }
-        """)
+        label.setStyleSheet(STATUS_LABEL_VISIBLE_STYLE)
         label.adjustSize()
         to_adjust = widget.native if hasattr(widget, "native") else widget
         to_adjust.updateGeometry()
@@ -226,16 +195,31 @@ def attach_status_label(widget: FunctionGui | QWidget):
 
 
 class LoadingWidget(QWidget):
-    """A semi-transparent overlay for napari viewer."""
+    """
+    A semi-transparent overlay for napari viewer.
 
-    def __init__(self, viewer):
+    Parameters
+    ----------
+    viewer : napari.Viewer
+        The napari viewer to attach the loading widget to.
+    """
+
+    def __init__(self, viewer: Viewer):
+        """
+        Initialize the loading widget and attach it to the napari viewer.
+
+        Parameters
+        ----------
+        viewer : napari.Viewer
+            The napari viewer to attach the loading widget to.
+        """
         # Parent to the main napari window so it covers everything
         super().__init__(viewer.window._qt_window)
         self.viewer = viewer
 
         # Make overlay semi-transparent
         self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
-        self.setStyleSheet("background-color: rgba(0, 0, 0, 120);")
+        self.setStyleSheet(LOADING_OVERLAY_STYLE)
 
         # Center layout
         layout = QVBoxLayout()
@@ -243,26 +227,13 @@ class LoadingWidget(QWidget):
 
         # Create container with rounded background
         loading_container = QWidget()
-        loading_container.setStyleSheet("""
-            QWidget {
-                background-color: rgba(40, 40, 40, 240);
-                border-radius: 15px;
-                padding: 30px;
-            }
-        """)
+        loading_container.setStyleSheet(LOADING_CONTAINER_STYLE)
 
         loading_layout = QVBoxLayout()
         loading_layout.setAlignment(Qt.AlignCenter)
 
         self.loading_label = QLabel()
-        self.loading_label.setStyleSheet("""
-            QLabel {
-                color: white;
-                font-size: 18px;
-                font-weight: bold;
-                background-color: transparent;
-            }
-        """)
+        self.loading_label.setStyleSheet(LOADING_LABEL_STYLE)
         self.loading_label.setAlignment(Qt.AlignCenter)
 
         loading_layout.addWidget(self.loading_label)
@@ -271,29 +242,92 @@ class LoadingWidget(QWidget):
         layout.addWidget(loading_container)
         self.setLayout(layout)
 
+        # Start with the overlay hidden
         self.message = ""
-
         self.hide()
 
-    def start(self, message="Loading"):
-        """Show the dialog with a message."""
+    def start(self, message: str = "Loading"):
+        """
+        Show the dialog with a message.
+
+        Parameters
+        ----------
+        message : str
+            The loading message to show on the widget
+        """
         self.message = message
         self.loading_label.setText(f"{self.message}")
 
         # Cover the entire napari window
         self.setGeometry(self.parent().rect())
 
+        # Bring to front
         self.show()
-        self.raise_()  # Bring to front
+        self.raise_()
         QApplication.processEvents()
 
     def stop(self):
-        """Hide the widget."""
+        """Hide the single-use loading widget and schedule it for deletion."""
         self.hide()
+        self.deleteLater()
         QApplication.processEvents()
 
-    def resizeEvent(self, event):
-        """Keep overlay covering the parent when window resizes."""
+    def resizeEvent(self, event: QResizeEvent):
+        """
+        Keep overlay covering the parent when window resizes.
+
+        Parameters
+        ----------
+        event : QResizeEvent
+            Resize event emitted by the overlay's parent widget.
+        """
         if self.parent():
             self.setGeometry(self.parent().rect())
         super().resizeEvent(event)
+
+
+def construct_error_args(
+    exception: Exception = None,
+    message: str = None,
+    raise_exception: bool = False,
+    topostats_error: bool = False,
+    type_class: type[Any] | None = None,
+) -> dict:
+    """
+    Construct a dictionary of error arguments.
+
+    Parameters
+    ----------
+    message : str, optional
+        A custom error message to display (default is None). If None, a message will be constructed from the exception.
+    raise_exception : bool, optional
+        Whether to raise the exception after constructing the error arguments (default is False).
+    topostats_error : bool, optional
+        Whether the error is specific to Topostats (default is False).
+    type_class : type, optional
+        The class type associated with the error (default is None).
+    exception : Exception, optional
+        The exception that was caught.
+
+    Returns
+    -------
+    dict
+        A dictionary containing the error arguments.
+    """
+    error_args = {}
+    if message is not None:
+        error_args["message"] = message
+    else:
+        if topostats_error:
+            if type_class:
+                error_args["message"] = (
+                    f"Topostats is failing with {type_class.__name__}: {exception.__class__} {exception}."
+                )
+            else:
+                error_args["message"] = f"Topostats is failing with: {exception.__class__} {exception}."
+        else:
+            error_args["message"] = f"An error occurred: {exception.__class__} {exception}."
+    error_args["raise_exception"] = raise_exception
+    error_args["topostats_error"] = topostats_error
+    error_args["exception"] = exception
+    return error_args
