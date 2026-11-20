@@ -21,7 +21,7 @@ https://napari.org/stable/plugins/index.html
 
 ## Installation
 
-Activate your Python environment and make sure your Python version is >= 3.10 and < 3.12. An example
+Activate your Python environment and make sure your Python version is >= 3.11 and < 3.12. An example
 environment command would be:
 
     python3.11 -m venv .venv

@@ -1,5 +1,7 @@
 """Module for containing functions and widgets for running and displaying results from topostats grainstats"""
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 import pandas as pd
