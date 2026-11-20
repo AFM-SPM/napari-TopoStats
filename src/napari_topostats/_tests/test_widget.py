@@ -47,7 +47,7 @@ def test_load_image(napari_viewer: Viewer, image_path: str):
             [
                 "test image",
                 "test image Filter Image",
-                "test image Filter 3D Image",
+                "test image Filter Image 3D Surface",
                 "test image Filter Image Grains Mask",
             ],
             id="all the functions in standard order",
@@ -109,7 +109,8 @@ def test_grainstats_function(
     )
 
     # pylint: disable=protected-access
-    assert "Grainstats" in napari_viewer.window._dock_widgets, "Grainstats widget not found in dock widgets."
-    grainstats_widget = napari_viewer.window._dock_widgets["Grainstats"]
+    assert any(name.startswith("Grainstats") for name in napari_viewer.window.dock_widgets), "Grainstats widget not foundin dock widgets"
+    print(napari_viewer.window.dock_widgets)
+    grainstats_widget = napari_viewer.window.dock_widgets["Grainstats: test image Filter Image Grains Mask"]
     checkbox = grainstats_widget.findChild(QCheckBox, "nm_checkbox")
     qtbot.mouseClick(checkbox, Qt.LeftButton)
