@@ -109,7 +109,9 @@ def test_grainstats_function(
     )
 
     # pylint: disable=protected-access
-    assert any(name.startswith("Grainstats") for name in napari_viewer.window.dock_widgets), "Grainstats widget not foundin dock widgets"
+    assert any(
+        name.startswith("Grainstats") for name in napari_viewer.window.dock_widgets
+    ), "Grainstats widget not foundin dock widgets"
     print(napari_viewer.window.dock_widgets)
     grainstats_widget = napari_viewer.window.dock_widgets["Grainstats: test image Filter Image Grains Mask"]
     checkbox = grainstats_widget.findChild(QCheckBox, "nm_checkbox")
