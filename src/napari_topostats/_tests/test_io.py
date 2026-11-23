@@ -6,14 +6,16 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from napari import Viewer
 from pytestqt.qtbot import QtBot
 
 from napari_topostats import _io as io
+from napari_topostats._state import WidgetManager
+from napari_topostats._tests._helpers import open_load_config_widget
+from napari_topostats._widget import TopoStatsRootWidget
 
-from ._helpers import open_load_config_widget
 
-
-def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
+def test_load_config_widget(qtbot: QtBot, napari_viewer: Viewer, topostats_widget: TopoStatsRootWidget):
     """Test that the load config widget is created properly when it is clicked in the root widget."""
 
     open_load_config_widget(qtbot, topostats_widget)
@@ -47,8 +49,10 @@ def test_load_config_widget(qtbot: QtBot, napari_viewer, topostats_widget):
     ],
 )
 # ns-rse 2025-11-26 : See issue #72
+# pylint: disable=unused-argument
 def test_load_config(
-    napari_viewer,
+    napari_viewer: Viewer,
+    widget_manager: WidgetManager,
     test_config_path: Path,
     use_default: bool,
     expected_result: str,
@@ -71,15 +75,17 @@ def test_load_config(
         ),
     ):
         if use_default:
-            assert io.load_config_impl(napari_viewer, None, use_default=use_default), "Default config load failed"
-            full_current_config = io.config_wrapper.unflatten()
+            assert io.load_config_impl(
+                napari_viewer, None, config_type="topostats", use_default=use_default
+            ), "Default config load failed"
+            full_current_config = io.config_wrappers["topostats"].unflatten()
             assert full_current_config is not None, "Failed to retrieve current config after loading default."
 
         else:
             # Simulate selecting a config file (assuming a test config file path)
-            result = io.load_config_impl(napari_viewer, test_config_path)
+            result = io.load_config_impl(napari_viewer, test_config_path, config_type="topostats")
             if result:
-                full_current_config = io.config_wrapper.unflatten()
+                full_current_config = io.config_wrappers["topostats"].unflatten()
 
                 with open(test_config_path, encoding="utf-8") as f:
                     expected_config = io.yaml.safe_load(f)

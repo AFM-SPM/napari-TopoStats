@@ -1,0 +1,116 @@
+"""Module for containing functions and widgets for running and displaying results from topostats grainstats"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import pandas as pd
+from napari.layers import Labels
+
+if TYPE_CHECKING:
+    from topostats.grainstats import GrainStats
+
+
+def grainstats(image: Labels) -> pd.DataFrame:
+    """
+    Function used for running topostats grainstats function on a labels layer
+
+    Parameters
+    ----------
+    image : Labels
+        Labels layer whose grain measurements are calculated.
+
+    Returns
+    -------
+    pd.DataFrame
+        Grain measurements, including pixel-space centres when available.
+    """
+    # Import topostats within the function so it is only imported if it is needed
+    from topostats.grainstats import GrainStats
+
+    # Extract and coerce the grainstats configuration
+    config = image.metadata["config"]["grainstats"]
+    if "run" in config:
+        config.pop("run")
+    if "class_names" in config:
+        config.pop("class_names")
+    topostats_object = image.metadata["topostats_object"]
+    stats = GrainStats(
+        topostats_object,
+        base_output_dir="grains",
+        **config,
+    )
+    stats.calculate_stats()
+    df = get_grainstats_df(stats)
+
+    # Convert centre coordinates back to pixels if they exist
+    if "centre_x" in df.columns and "centre_y" in df.columns:
+        # Get scaling factors from metadata
+        pixel_to_nm_scaling = image.metadata.get("px2nm", 1.0)
+        metre_scaling_factor = image.metadata.get("metre_scaling_factor", 1e-9)
+        length_scaling_factor = pixel_to_nm_scaling * metre_scaling_factor
+        df["centre_x_px"] = df["centre_x"] / length_scaling_factor
+        df["centre_y_px"] = df["centre_y"] / length_scaling_factor
+
+        return df
+
+    return df
+
+
+def get_grainstats_df(stats: GrainStats) -> pd.DataFrame:
+    """
+    Reconstructs the 'grainstats' DataFrame from the nested
+    grain_crops.stats attributes.
+
+    Parameters
+    ----------
+    stats : GrainStats
+        Completed TopoStats grain-statistics object to flatten.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per measured grain or subgrain.
+    """
+    rows = []
+
+    # Check if grains exist
+    if not stats.grain_crops:
+        # Return empty DF with expected columns if no grains (optional, mimics old behavior)
+        return pd.DataFrame()
+
+    # Iterate through the nested structure
+    for grain_index, grain_crop in stats.grain_crops.items():
+
+        # Skip if stats haven't been calculated yet
+        if not hasattr(grain_crop, "stats") or not grain_crop.stats:
+            continue
+
+        for class_index, subgrains in grain_crop.stats.items():
+            for subgrain_index, stats_dict in subgrains.items():
+
+                # Create a copy of the stats to avoid modifying the object
+                row = stats_dict.copy()
+
+                # Inject the ID columns
+                row["grain_number"] = grain_index
+                row["class_number"] = class_index
+                row["subgrain_number"] = subgrain_index
+
+                # Handle Image Name
+                if hasattr(stats.topostats_object, "filename"):
+                    row["image"] = stats.topostats_object.filename
+                elif hasattr(stats.topostats_object, "image_name"):
+                    row["image"] = stats.topostats_object.image_name
+                else:
+                    row["image"] = "unknown"
+
+                # Handle 'threshold'
+                if hasattr(stats.topostats_object, "direction"):
+                    row["threshold"] = stats.topostats_object.direction
+
+                rows.append(row)
+
+    # Create DataFrame
+    df = pd.DataFrame(rows)
+    return df

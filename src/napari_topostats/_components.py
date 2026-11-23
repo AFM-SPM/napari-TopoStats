@@ -1,0 +1,1039 @@
+"""Module for containing custom and reusable gui components"""
+
+# pylint: disable=too-many-branches,too-many-lines
+
+from collections.abc import Iterable
+from typing import Any
+
+import numpy as np
+import pyqtgraph as pg
+from AFMReader.data_classes import CurvesDataset
+from magicgui.widgets import Container, create_widget
+from napari import Viewer
+from napari.layers import Layer
+from napari_afmreader._reader import LoadedImage, get_loaded_image
+from qtpy.QtCore import QEvent, QPoint, Qt
+from qtpy.QtGui import QColor, QStandardItem, QStandardItemModel
+from qtpy.QtWidgets import (
+    QAbstractItemView,
+    QComboBox,
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
+
+from napari_topostats._alerts import show_error_dialog
+from napari_topostats._state import get_channel_colours
+from napari_topostats._styles import (
+    COLLAPSIBLE_BOX_BUTTON_STYLE,
+    COLLAPSIBLE_BOX_SUBTLE_BUTTON_STYLE,
+    PARAMETER_WARNING_LABEL_STYLE,
+    PROFILE_VIEWER_MARGIN,
+)
+
+
+class CollapsibleBox(QWidget):
+    """
+    A widget to contain over widgets in a collapsible area
+
+    Parameters
+    ----------
+    title : str, optional
+        The title of the box, by default ""
+    parent : QWidget, optional
+        The parent widget, by default None
+    start_open : bool, optional
+        Whether the box should start open, by default False
+    cut_off_title : int
+        Number of characters to remove from the start of the title
+    subtle : bool, optional
+        Whether to use a quieter header style without a visible button bar, by default False
+    """
+
+    def __init__(
+        self,
+        title: str = "",
+        parent: QWidget | None = None,
+        start_open: bool = False,
+        cut_off_title: int = 0,
+        subtle: bool = False,
+    ):
+        """
+        Initializes the CollapsibleBox.
+
+        Parameters
+        ----------
+        title : str, optional
+            The title of the box, by default ""
+        parent : QWidget, optional
+            The parent widget, by default None
+        start_open : bool, optional
+            Whether the box should start open, by default False
+        cut_off_title : int
+            Number of characters to remove from the start of the title
+        subtle : bool, optional
+            Whether to use a quieter header style without a visible button bar, by default False
+        """
+        super().__init__(parent)
+
+        # Main layout
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
+
+        # Toggle Button (The Header)
+        self.toggle_button = QPushButton(f"   {title}")
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(start_open)
+        self.toggle_button.setFlat(subtle)
+        if subtle:
+            self.toggle_button.setStyleSheet(COLLAPSIBLE_BOX_SUBTLE_BUTTON_STYLE)
+        else:
+            self.toggle_button.setStyleSheet(COLLAPSIBLE_BOX_BUTTON_STYLE)
+        self.toggle_button.toggled.connect(self.on_toggle)
+        self.layout.addWidget(self.toggle_button)
+
+        # Content Area
+        self.content_area = QFrame()
+        self.content_area.setFrameShape(QFrame.NoFrame)
+        self.content_layout = QVBoxLayout(self.content_area)
+        if subtle:
+            self.content_layout.setContentsMargins(0, 5, 0, 0)
+        else:
+            self.content_layout.setContentsMargins(10, 10, 10, 10)
+        self.layout.addWidget(self.content_area)
+
+        self.widgets_dict = {}
+        self.current_dict = {}
+
+        self.cut_off_title = cut_off_title
+
+        # Start at given state
+        self.on_toggle(start_open)
+
+    def on_toggle(self, checked: bool):
+        """
+        Set behaviour for expanding/ collapsing when clicked
+
+        Parameters
+        ----------
+        checked : bool
+            The state toggle has been changed to
+        """
+        self.content_area.setVisible(checked)
+        arrow = "▼" if checked else "▶"
+        self.toggle_button.setText(f"{arrow}  {self.toggle_button.text()[3:]}")
+
+    def add_widget(self, widget: QWidget):
+        """
+        Adds the widget to the collapsable view
+
+        Parameters
+        ----------
+        widget : QWidget
+            The widget to add
+        """
+        self.content_layout.addWidget(widget)
+
+    def add_parameter(self, name: str, value: Any, editable: bool = False):
+        """
+        Adds a widget representing a given parameter to the collapsible box layout
+
+        Parameters
+        ----------
+        name : str
+            The name of the parameter
+        value : any
+            The value of the parameter
+        editable : bool, optional
+            Whether the parameter is editable, by default False
+        """
+        w = None
+        # Update the current dict with the new value
+        self.current_dict[name] = value
+        if isinstance(value, dict):
+            # If the value is a dict, create a new collapsible box for it
+            w = CollapsibleBox(title=name.title().replace("_", " "))
+            for k, v in value.items():
+                # Use recursion to add parameters for the nested dict to the new collapsible box
+                w.add_parameter(k, v)
+            self.widgets_dict[name] = w
+            # Add the new collapsible box widget to the layout
+            self.add_widget(w)
+
+        elif not editable:
+            # Create a simple label for the parameter and add it to the layout
+            w = QLabel(f"{name.title().replace('_', ' ')} : {value}")
+            self.add_widget(w)
+        else:
+            # TODO a full editable selector based on the type of value
+            pass
+
+    def remove_parameter(self, key: str):
+        """
+        Removes a parameter from both the gui and its instance in this object
+
+        Parameters
+        ----------
+        key : str
+            The key of the parameter to remove
+        """
+        # Remove the widget from the layout and delete it
+        self.layout.removeWidget(self.widgets_dict[key])
+        self.widgets_dict[key].deleteLater()
+        # Remove the parameter from the dictionaries
+        self.widgets_dict.pop(key)
+        self.current_dict.pop(key)
+
+    def update(self, new_dict: dict):
+        """
+        Update the current dict that the collapsible box represents
+
+        Parameters
+        ----------
+        new_dict : dict
+            The new dict to update the collapsible box with
+        """
+        # If the new dict is the same as the current dict, do nothing
+        if self.current_dict == new_dict:
+            return
+        # Remove any keys that are in the current dict but not in the new dict
+        for key in self.current_dict.keys() - new_dict.keys():
+            self.remove_parameter(key)
+        # Update existing keys and add new keys
+        for key, value in new_dict.items():
+            # Update the widget if the key already exists
+            if key in self.widgets_dict:
+                # If the value is the same as the current value, do nothing
+                if self.current_dict[key] == value:
+                    continue
+                # Update the current dict with the new value
+                self.current_dict[key] = value
+                if isinstance(value, dict):
+                    # If the item in the dict to be updated is a dict itself, use recursion to update it
+                    self.widgets_dict[key].update(value)
+                else:
+                    # If the item is not a dict, update the text of the corresponding widget
+                    self.widgets_dict[key].setText(f"{key.title().replace('_', ' ')} : {value}")
+            # Otherwise, add the new key and value as a new widget
+            else:
+                self.add_parameter(key, value)
+
+
+class SelectionDialog(QDialog):
+    """
+    Selection dialog to allow so list of items to be given then return selected items
+
+    Parameters
+    ----------
+    available_items : list
+        The list of items to display in the selection dialog.
+    text : str, optional
+        The title of the selection dialog (default is "Select items").
+    parent : QWidget, optional
+        The parent widget of the dialog (default is None).
+    """
+
+    def __init__(self, available_items: Iterable[str], text: str = "Select items", parent: QWidget | None = None):
+        """
+        Initializes the selection dialog.
+
+        Parameters
+        ----------
+        available_items : list
+            The list of items to display in the selection dialog.
+        text : str, optional
+            The title of the selection dialog (default is "Select items").
+        parent : QWidget, optional
+            The parent widget of the dialog (default is None).
+        """
+        super().__init__(parent)
+        self.setWindowTitle(text)
+        self.resize(300, 400)  # Width, Height
+
+        self.layout = QVBoxLayout()
+
+        self.list_widget = QListWidget()
+        self.list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.list_widget.addItems(available_items)
+        self.layout.addWidget(self.list_widget)
+
+        # Helper buttons for quick selection
+        self.helpers_layout = QHBoxLayout()
+        self.select_all_btn = QPushButton("Select All")
+        self.select_all_btn.clicked.connect(self.select_all)
+        self.clear_btn = QPushButton("Clear Selection")
+        self.clear_btn.clicked.connect(self.clear_selection)
+        self.helpers_layout.addWidget(self.select_all_btn)
+        self.helpers_layout.addWidget(self.clear_btn)
+        self.layout.addLayout(self.helpers_layout)
+
+        self.confirm_btn = QPushButton("Confirm")
+        self.confirm_btn.clicked.connect(self.accept)
+        self.layout.addWidget(self.confirm_btn)
+
+        self.setLayout(self.layout)
+
+    def select_all(self):
+        """Select all items in the list widget."""
+        for i in range(self.list_widget.count()):
+            self.list_widget.item(i).setSelected(True)
+
+    def clear_selection(self):
+        """Deselect all items in the list widget."""
+        for i in range(self.list_widget.count()):
+            self.list_widget.item(i).setSelected(False)
+
+    def get_selected_items(self) -> list[str]:
+        """
+        Helper method to return the text of the selected items.
+
+        Returns
+        -------
+        list[str]
+            Text values of the items selected in the dialog.
+        """
+        return [item.text() for item in self.list_widget.selectedItems()]
+
+
+class SelectionDropdown(QComboBox):
+    """
+    A dropdown with checkable items to allow multiple selection
+
+    Parameters
+    ----------
+    items : list
+        The list of items to display in the dropdown.
+    parent : QWidget, optional
+        The parent widget of the dropdown (default is None).
+    type_text : str, optional
+        The type of items being displayed (default is "items").
+    starting_items : list, optional
+        The list of items that should be initially checked (default is None).
+    on_change : callable, optional
+        A callback function to be called when the selection changes (default is None).
+    item_colors : dict, optional
+        A dictionary mapping items to their colors (default is None).
+    """
+
+    def __init__(
+        self,
+        items: list,
+        parent: QWidget = None,
+        type_text: str = "items",
+        starting_items: list = None,
+        on_change: callable = None,
+        item_colors: dict = None,
+    ):
+        """
+        Initializes the SelectionDropdown.
+
+        Parameters
+        ----------
+        items : list
+            The list of items to display in the dropdown.
+        parent : QWidget, optional
+            The parent widget of the dropdown (default is None).
+        type_text : str, optional
+            The type of items being displayed (default is "items").
+        starting_items : list, optional
+            The list of items that should be initially checked (default is None).
+        on_change : callable, optional
+            A callback function to be called when the selection changes (default is None).
+        item_colors : dict, optional
+            A dictionary mapping items to their colors (default is None).
+        """
+        super().__init__(parent)
+        self.selector_items = items
+        self.type_text = type_text
+        self.on_change = on_change
+        starting_items = starting_items or []
+
+        # Make it editable so we can display the selected text in the line edit
+        self.setEditable(True)
+        self.lineEdit().setReadOnly(True)
+        self.lineEdit().setText(f"Loading {self.type_text}...")
+        self.lineEdit().installEventFilter(self)
+        self._popup_container = self.view().parentWidget()
+        self._popup_container.installEventFilter(self)
+
+        self.model = QStandardItemModel(self)
+        self.setModel(self.model)
+
+        # Add checkable items
+        self.set_items(items, starting_items, item_colors)
+
+        # Update the text when a box is checked/unchecked
+        self.model.itemChanged.connect(self.on_selection_change)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.MouseButtonPress:
+            if obj is self.lineEdit():
+                self.showPopup()
+                return True
+            if obj is self._popup_container and self.rect().contains(self.mapFromGlobal(_global_pos(event))):
+                # Click landed back on the combo while open: let the popup close as normal,
+                # but stop Qt replaying the click to the line edit (which would reopen it).
+                obj.setAttribute(Qt.WA_NoMouseReplay)
+        return super().eventFilter(obj, event)
+
+    def set_items(self, items: list, starting_items: list = None, item_colors: dict = None):
+        """
+        Set the items in the dropdown and their checked state.
+
+        Parameters
+        ----------
+        items : list
+            The list of items to display in the dropdown.
+        starting_items : list, optional
+            The list of items that should be initially checked (default is None).
+        item_colors : dict, optional
+            A dictionary mapping items to their colors (default is None).
+        """
+        self.selector_items = items
+        self.model.clear()
+        starting_items = starting_items or []
+        for text in items:
+            item = QStandardItem(text)
+
+            # Set the item to be checkable and enabled, and set its initial check state based on starting_items
+            item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            item.setData(Qt.Checked if text in starting_items else Qt.Unchecked, Qt.CheckStateRole)
+
+            # Set the colour of the item if it is specified in the item_colors dictionary
+            if item_colors and text in item_colors:
+                item.setForeground(QColor(item_colors[text]))
+            self.model.appendRow(item)
+        self.update_text()
+
+    def on_selection_change(self):
+        """Handle changes in selection and update the displayed text accordingly."""
+        self.update_text()
+        if self.on_change:
+            self.on_change(self.get_checked_items())
+
+    def update_text(self):
+        """Update the text displayed in the line edit based on the current selection."""
+        checked = self.get_checked_items()
+        # Update the line edit text based on the number of checked items and the available items
+        if len(self.selector_items) == 0:
+            new_text = f"No {self.type_text} available"
+        elif len(checked) == 0:
+            new_text = f"No {self.type_text} selected"
+        elif len(checked) < 4:
+            new_text = f"{', '.join(checked)}"
+        else:
+            # If more than 3 items are selected, show the count of selected items instead of listing them all
+            new_text = f"{len(checked)} {self.type_text} selected" if checked else f"No {self.type_text} selected"
+        # Clears the current selection (a multiple selection dropdown shouldn't have a single selected item)
+        self.setCurrentIndex(-1)
+        self.lineEdit().setText(new_text)
+
+    def get_checked_items(self) -> list[str]:
+        """
+        Return a list of the currently checked items.
+
+        Returns
+        -------
+        list
+            A list of the currently checked items.
+        """
+        return [
+            self.model.item(i).text()
+            for i in range(self.model.rowCount())
+            if self.model.item(i).checkState() == Qt.Checked
+        ]
+
+    def set_checked_items(self, checked_items: list):
+        """
+        Manually set which items in the dropdown are checked.
+
+        Parameters
+        ----------
+        checked_items : list
+            The list of items that should be checked.
+        """
+        # Temporarily disable the on_change callback to avoid triggering it during updates
+        temp_on_change = self.on_change
+        self.on_change = None
+
+        # Update the check state of each item based on the provided list
+        for i in range(self.model.rowCount()):
+            item = self.model.item(i)
+            state = Qt.Checked if item.text() in checked_items else Qt.Unchecked
+            item.setData(state, Qt.CheckStateRole)
+
+        # Restore the on_change callback
+        self.on_change = temp_on_change
+
+        # Update the displayed text to reflect the new selection
+        self.update_text()
+
+
+class MultiPlotWidget(QWidget):
+    """
+    A widget to display multiple plots in a grid layout
+
+    Parameters
+    ----------
+    title : str
+        Title displayed above the plots.
+    parent : QWidget | None, optional
+        Parent widget for the plot widget.
+    """
+
+    def __init__(self, title: str, parent: QWidget | None = None):
+        """
+        Initializes the MultiPlotWidget.
+
+        Parameters
+        ----------
+        title : str
+            Title displayed above the plots.
+        parent : QWidget | None, optional
+            Parent widget for the plot widget.
+        """
+        super().__init__(parent=parent)
+        self.setLayout(QHBoxLayout())
+        self.layout().setContentsMargins(0, 0, 0, 0)
+
+        # Set size policy to expanding to prevent the widget from collapsing in layouts
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Set a minimum height to ensure the plots are readable and don't flatten
+        self.setMinimumHeight(200)
+
+        # Create the main plot widget container
+        self.graphics_widget = pg.GraphicsLayoutWidget()
+        self.graphics_widget.setBackground(None)
+        self.graphics_widget.ci.layout.setContentsMargins(
+            PROFILE_VIEWER_MARGIN, PROFILE_VIEWER_MARGIN, PROFILE_VIEWER_MARGIN, PROFILE_VIEWER_MARGIN
+        )
+        self.layout().addWidget(self.graphics_widget)
+
+        # Add the first plot
+        self.p1: pg.PlotItem = self.graphics_widget.addPlot(title=title)
+
+        # Create the secondary plot
+        self.p2_view = pg.ViewBox()
+        self.p2: pg.PlotItem = pg.PlotItem(viewBox=self.p2_view)
+
+        # Add the secondary plot to the graph and link their axes
+        self.p1.scene().addItem(self.p2_view)
+        self.p1.showAxis("right")
+        self.p1.getAxis("right").linkToView(self.p2_view)
+        self.p2_view.setXLink(self.p1)
+        self.p1.vb.sigResized.connect(self.update_views)
+
+        # Initialize data structures to keep track of plotted lines and their data
+        self.profile_lines: dict[str, dict[str, pg.PlotDataItem]] = {}
+        self.current_unit = None
+        self.previous_unit = None
+        self.line_data: dict[tuple[str, str], tuple[np.ndarray, np.ndarray]] = {}
+
+    def update_views(self):
+        """Forces the secondary ViewBox to match the primary's geometry."""
+        self.p2_view.setGeometry(self.p1.vb.sceneBoundingRect())
+        self.p2_view.linkedViewChanged(self.p1.vb, self.p2_view.XAxis)
+
+    def reset_view(self):
+        """Reset the primary and secondary profile plot axes to automatic scaling."""
+        self.update_views()
+        self.p1.vb.enableAutoRange(axis=self.p1.vb.XYAxes)
+        self.p2_view.enableAutoRange(axis=self.p2_view.YAxis)
+
+    def plot(self, channel: str, xdata: np.ndarray, ydata: np.ndarray, unit: str = "m"):
+        """
+        Plots the given data on the appropriate axis based on the unit.
+
+        Parameters
+        ----------
+        xdata : np.ndarray
+            The x-axis data.
+        ydata : np.ndarray
+            The y-axis data.
+        channel : str
+            The name of the channel.
+        unit : str, optional
+            The unit of the data, by default "m".
+        """
+        if unit not in self.profile_lines:
+            self.profile_lines[unit] = {}
+
+        line_key = (unit, channel)
+        cached_data = self.line_data.get(line_key)
+
+        # If the channel has not been plotted yet, create a new line for it
+        if unit not in self.profile_lines or (channel not in self.profile_lines[unit]):
+            self.profile_lines[unit][channel] = self.p1.plot(
+                xdata, ydata, pen=get_channel_colours()[channel], name=channel, unit=unit
+            )
+            self.line_data[line_key] = (xdata, ydata)
+
+            # Update the axis labels to reflect the current unit and channel
+            self.p1.setLabel("left", channel, units=unit)
+
+        # If the channel already exists, check if the data has changed before updating
+        elif cached_data is None or not (
+            np.array_equal(xdata, cached_data[0]) and np.array_equal(ydata, cached_data[1])
+        ):
+            self.profile_lines[unit][channel].setData(xdata, ydata)
+            self.line_data[line_key] = (xdata, ydata)
+
+        # If the data is the same, do nothing
+        else:
+            return
+
+        # TODO does this need to be split into unit so it matches structure of profile_lines?
+
+        # If the unit has changed, change the axis and move the lines to the appropriate plot
+        if unit != self.current_unit:
+            returning_to_previous_unit = unit == self.previous_unit
+            self.previous_unit = self.current_unit
+            self.current_unit = unit
+            if self.previous_unit and self.previous_unit in self.profile_lines:
+
+                # Move each line from the previous left axis unit to the secondary plot (right axis)
+                for line_channel in self.profile_lines[self.previous_unit]:
+                    line_item = self.profile_lines[self.previous_unit][line_channel]
+                    if line_item in self.p1.items:
+                        self.p1.removeItem(line_item)
+                    if line_item not in self.p2.items:
+                        self.p2.addItem(line_item)
+                    line_data = self.line_data[(self.previous_unit, line_channel)]
+                    line_item.setData(line_data[0], line_data[1])
+
+                # Update the right axis label to reflect the previous unit
+                self.p1.setLabel("right", "", units=self.previous_unit)
+
+                # If the new current unit was the right axis (secondary unit) before this plot, move the lines
+                # back to the left axis (primary unit)
+                if returning_to_previous_unit:
+                    for line_channel in self.profile_lines[self.current_unit]:
+                        line_item = self.profile_lines[self.current_unit][line_channel]
+                        if line_item in self.p2.items:
+                            self.p2.removeItem(line_item)
+                        if line_item not in self.p1.items:
+                            self.p1.addItem(line_item)
+                        line_data = self.line_data[(self.current_unit, line_channel)]
+                        line_item.setData(line_data[0], line_data[1])
+
+    def remove_unshown_lines(self) -> list[str]:
+        """
+        Remove plotted profile lines that are not shown on either axis.
+
+        Returns
+        -------
+        list[str]
+            A list of channels that were removed
+        """
+        removed = []
+        for profile_unit, lines in list(self.profile_lines.items()):
+            # If not the current (left) or previous (right) unit, remove the lines from both plots
+            if profile_unit not in [self.current_unit, self.previous_unit]:
+                for line_channel, line_item in list(lines.items()):
+                    # Line item should only be in one of the plots, but check both to be safe
+                    if line_item in self.p1.items:
+                        self.p1.removeItem(line_item)
+                    if line_item in self.p2.items:
+                        self.p2.removeItem(line_item)
+                    # Remove the line from the profile_lines dictionary
+                    lines.pop(line_channel, None)
+                    self.line_data.pop((profile_unit, line_channel), None)
+                    removed.append(line_channel)
+
+                # If there are no more lines for this unit, remove the unit from the profile_lines dictionary
+                if not lines:
+                    self.profile_lines.pop(profile_unit, None)
+        return removed
+
+    def get_profile_lines(self) -> dict[str, dict[str, pg.PlotDataItem]]:
+        """
+        Returns the current profile lines.
+
+        Returns
+        -------
+        dict[str, dict[str, pg.PlotDataItem]]
+            A dictionary
+        """
+        return self.profile_lines
+
+    def remove_profile_line(self, channel: str, unit: str):
+        """
+        Removes the profile line for the given channel.
+
+        Parameters
+        ----------
+        channel : str
+            Channel whose profile line should be removed.
+        unit : str
+            Unit group containing the profile line.
+        """
+        if unit in self.profile_lines and channel in self.profile_lines[unit]:
+            # Remove the line from the profile_lines dictionary
+            line_item = self.profile_lines[unit].pop(channel)
+            # Remove from the plots
+            if line_item in self.p2.items:
+                self.p2.removeItem(line_item)
+            if line_item in self.p1.items:
+                self.p1.removeItem(line_item)
+            self.line_data.pop((unit, channel), None)
+            # If there are no more lines for this unit, remove the unit from the profile_lines dictionary
+            if not self.profile_lines[unit]:
+                self.profile_lines.pop(unit, None)
+
+
+def _global_pos(event) -> QPoint:
+    """Qt6 renamed globalPos() to globalPosition() (returning QPointF)."""
+    if hasattr(event, "globalPosition"):
+        return event.globalPosition().toPoint()
+    return event.globalPos()
+
+
+def get_selected_layer(
+    viewer: Viewer,
+    of_type: list[type[Any]] | None = None,
+    requires_force_curves: bool = False,
+    silent_fallback: bool = False,
+    no_helper_layer: bool = True,
+) -> Layer | None:
+    """
+    Get a layer from the viewer which meets the specified requirements.
+
+    By default, return the selected non-helper layer. When ``silent_fallback`` is
+    enabled and the selected layer is unsuitable, return the first suitable
+    visible layer instead.
+
+    Parameters
+    ----------
+    viewer : Viewer
+        The napari viewer instance from which to get the selected layer.
+    of_type : list[type[Any]] | None, optional
+        Layer types which may be returned. If ``None``, accept any layer type.
+    requires_force_curves : bool, optional
+        Require the returned layer to contain force-curve data.
+    silent_fallback : bool, optional
+        Search visible layers when the selected layer does not meet the
+        requirements.
+    no_helper_layer : bool, optional
+        Exclude the profile-viewer helper layers.
+
+    Returns
+    -------
+    Layer | None
+        A suitable selected or visible layer, or ``None`` if none is available.
+    """
+    selected_layer = viewer.layers.selection.active
+
+    # Define constants for the different requirement check results
+    MATCHES_REQUIREMENTS = 0
+    NO_SELECTED = 1
+    TYPE_MISMATCH = 2
+    FORCE_CURVES_MISSING = 3
+    SELECTED_HELPER_LAYER = 4
+
+    # Check whether the layer meets the specified requirements and return the corresponding result code.
+    def check_requirements(layer: Layer | None) -> int:
+        """
+        Check requirements to see if the passed layer is valid as a selected layer
+
+        Parameters
+        ----------
+        layer : Layer | None
+            Candidate layer to validate against the requested requirements.
+
+        Returns
+        -------
+        int
+            Requirement status code for the candidate layer.
+        """
+        if not layer:
+            return NO_SELECTED
+        loaded_image = (
+            get_loaded_image(layer.metadata.get("afmreader_id")) if layer.metadata and requires_force_curves else None
+        )
+        if of_type is not None and layer.__class__ not in of_type:
+            return TYPE_MISMATCH
+        if requires_force_curves and (not loaded_image or not loaded_image.curves_data):
+            return FORCE_CURVES_MISSING
+        if no_helper_layer and layer.name in ("Profile Line", "Selected Curve"):
+            return SELECTED_HELPER_LAYER
+        return MATCHES_REQUIREMENTS
+
+    result = check_requirements(selected_layer)
+    if result == MATCHES_REQUIREMENTS:
+        return selected_layer
+
+    # Report errors if requirements are not met unless silent_fallback is True
+    if not silent_fallback:
+        if result == NO_SELECTED:
+            show_error_dialog("No layer selected. Select a layer and try again.", raise_exception=False)
+        elif result == TYPE_MISMATCH:
+            pretty_types = [t.__name__ for t in of_type]
+            show_error_dialog(
+                f"Selected layer is not of a required type: {', '.join(pretty_types)}.",
+                raise_exception=False,
+            )
+        elif result == FORCE_CURVES_MISSING:
+            show_error_dialog(
+                "Selected layer does not contain force curves. Select a layer with force curves.",
+                raise_exception=False,
+            )
+        elif result == SELECTED_HELPER_LAYER:
+            show_error_dialog(
+                "Selected layer is a helper layer and not valid for this function. Select a different layer.",
+                raise_exception=False,
+            )
+        return None
+
+    # If silent_fallback is True, return the first visible layer that meets the requirements
+    for layer in reversed(viewer.layers):
+        if layer.visible and check_requirements(layer) == MATCHES_REQUIREMENTS:
+            return layer
+
+    # If no fallback layer is found, show an error dialog and return None
+    show_error_dialog(
+        "No suitable layer found. Ensure a layer is selected or visible that is valid for this operation."
+    )
+    return None
+
+
+def get_selected_curves(viewer: Viewer, suppress_errors: bool = False) -> CurvesDataset | None:
+    """
+    Get the currently selected curves from the viewer.
+    This retrieves the curves from the LoadedImage object associated with the selected layer.
+
+    Parameters
+    ----------
+    viewer : Viewer
+        The napari viewer instance from which to get the selected curves.
+    suppress_errors : bool
+        Whether to return ``None`` silently when no curve data is available.
+
+    Returns
+    -------
+    CurvesDataset | None
+        The selected curves, or None if no layer is selected or if the selected layer does not have curves.
+    """
+    selected_layer = viewer.layers.selection.active
+
+    if not selected_layer:
+        if not suppress_errors:
+            show_error_dialog("No layer selected. Select a layer ")
+        return None
+
+    # Get the reader_id (the layer must have been loaded through napari-AFMReader to have this metadata)
+    reader_id = selected_layer.metadata.get("afmreader_id") if selected_layer.metadata else None
+    loaded_image = get_loaded_image(reader_id) if reader_id is not None else None
+
+    # Raise an error if the selected layer does not have curves data
+    if loaded_image is None or loaded_image.curves_data is None:
+        if not suppress_errors:
+            show_error_dialog("Selected layer does not contain curves", raise_exception=True)
+        return None
+
+    return loaded_image.curves_data
+
+
+def get_selected_loaded_image(viewer: Viewer) -> LoadedImage | None:
+    """
+    Get the currently selected loaded image from the viewer.
+
+    Returns
+    -------
+    LoadedImage | None
+        The selected loaded image, or None if no layer is selected or if the selected layer is not a LoadedImage.
+
+    Parameters
+    ----------
+    viewer : Viewer
+        Current napari viewer
+    """
+    selected_layer = get_selected_layer(viewer, silent_fallback=True)
+
+    # If no layer is selected, show an error dialog and return None
+    if selected_layer is None:
+        show_error_dialog("No layer selected. Select a layer loaded through napari-AFMReader")
+        return None
+
+    # Use afmreader_id from the selected layer's metadata to get the corresponding LoadedImage from napari-AFMReader
+    loaded_image = get_loaded_image(selected_layer.metadata.get("afmreader_id")) if selected_layer.metadata else None
+    if loaded_image is not None:
+        return loaded_image
+
+    # If no afmreader_id found in the selected layer's metadata, show an error dialog and return None
+    show_error_dialog("Selected layer was not loaded through napari-AFMReader", raise_exception=True)
+    return None
+
+
+class DynamicParameterDialog(QDialog):
+    """
+    A dialog that dynamically generates inputs based on parameters configuration using magicgui.
+
+    Parameters
+    ----------
+    parameters : dict[str, dict[str, Any]]
+        Parameter definitions used to construct the controls.
+    title : str, optional
+        Dialog window title.
+    warning_message : str | None, optional
+        Warning shown above the controls.
+    parent : QWidget | None, optional
+        Parent widget for the dialog.
+    """
+
+    def __init__(
+        self,
+        parameters: dict[str, dict[str, Any]],
+        title: str = "Parameters",
+        warning_message: str | None = None,
+        parent: QWidget | None = None,
+    ):
+        """
+        Initialises DynamicParameterDialog.
+
+        Parameters
+        ----------
+        parameters : dict[str, dict[str, Any]]
+            Parameter definitions used to construct the controls.
+        title : str, optional
+            Dialog window title.
+        warning_message : str | None, optional
+            Warning shown above the controls.
+        parent : QWidget | None, optional
+            Parent widget for the dialog.
+        """
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.layout = QVBoxLayout(self)
+
+        # Show a warning message at the top of the dialog if provided
+        if warning_message:
+            warning_label = QLabel(warning_message)
+            warning_label.setWordWrap(True)
+            warning_label.setStyleSheet(PARAMETER_WARNING_LABEL_STYLE)
+            self.layout.addWidget(warning_label)
+
+        self.container = Container()
+        self.widgets = {}
+        self.visibility_rules = {}
+
+        # Create widgets for each parameter based on its configuration
+        for param_name, config in parameters.items():
+
+            param_type = config.get("type")
+            default = config.get("default")
+            label_text = config.get("label", param_name)
+
+            if param_type is bool:
+                w = create_widget(value=default, annotation=bool, label=label_text, name=param_name)
+            elif isinstance(param_type, list):
+                w = create_widget(value=default, options={"choices": param_type}, label=label_text, name=param_name)
+            elif param_type is str:
+                w = create_widget(value=default, annotation=str, label=label_text, name=param_name)
+            else:
+                continue
+
+            self.container.append(w)
+            self.widgets[param_name] = w
+
+            # Store visibility rules for the widget if specified in the configuration
+            if config.get("visible_if") is not None:
+                self.visibility_rules[param_name] = config["visible_if"]
+
+        self._update_visibility()
+        for widget in self.widgets.values():
+            # Whenever the widget's value changes, update the visibility of all widgets (only effecting dependent ones)
+            widget.changed.connect(self._update_visibility)
+
+        self.layout.addWidget(self.container.native)
+
+        # OK / Cancel Buttons
+        button_layout = QHBoxLayout()
+        ok_button = QPushButton("OK")
+        ok_button.clicked.connect(self.accept)
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_button)
+        button_layout.addWidget(ok_button)
+        self.layout.addLayout(button_layout)
+
+    def _update_visibility(self, *_args: Any):
+        """
+        Update conditional widget visibility from current dialog values.
+
+        Parameters
+        ----------
+        *_args : Any
+            Placeholder parameters so function passes when an event is automatically passed from a connection
+        """
+        values = self.get_values()
+        for param_name, rule in self.visibility_rules.items():
+            # Each visibility rule is a callable that takes the current parameter values and returns a boolean
+            # indicating whether the widget should be visible
+            widget = self.widgets[param_name]
+            self._set_widget_visible(widget, bool(rule(values)))
+
+    @staticmethod
+    def _set_widget_visible(widget: Any, visible: bool):
+        """
+        Set visibility on the magicgui row so both label and control are hidden.
+
+        Parameters
+        ----------
+        widget : Any
+            Magicgui control whose labelled row is updated.
+        visible : bool
+            Whether the control and its label should be displayed.
+        """
+        labeled_widget_getter = getattr(widget, "_labeled_widget", None)
+        labeled_widget = labeled_widget_getter() if callable(labeled_widget_getter) else None
+        native = labeled_widget.native if labeled_widget is not None else widget.native
+        native.setVisible(visible)
+
+    def get_values(self) -> dict:
+        """
+        Get the current values of all parameters.
+
+        Returns
+        -------
+        dict
+            Dictionary mapping parameter names to their current widget values.
+        """
+        return {name: w.value for name, w in self.widgets.items()}
+
+
+def show_parameter_dialog(
+    parameters: dict[str, Any],
+    title: str = "Parameters",
+    warning_message: str | None = None,
+    parent: QWidget | None = None,
+) -> dict | None:
+    """
+    Helper function to show a DynamicParameterDialog and return values or None.
+
+    Parameters
+    ----------
+    parameters : dict[str, Any]
+        Parameters to be rendered in the dialog
+    title : str
+        Title of the dialog
+    warning_message : str | None
+        Warning message if any to show at the top of the widget
+    parent : QWidget | None
+        Parent widget.
+
+    Returns
+    -------
+    dict | None
+        Selected parameter values, or ``None`` when the dialog is cancelled.
+    """
+    dialog = DynamicParameterDialog(parameters, title, warning_message, parent)
+    if dialog.exec_() == QDialog.Accepted:
+        return dialog.get_values()
+    return None
