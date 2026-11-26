@@ -53,29 +53,32 @@ dependencies = [
   "pyqtgraph",
   "markdown",
   "topostats>=2.4.0",  # This should match MIN_TOPOSTATS_VERSION in src/napari_topostats/_state.py
-  "napari-AFMReader @ git+https://github.com/AFM-SPM/napari-AFMReader.git@ahobbs7/adjusting_volumes",
+  "napari-AFMReader",
   "AFMReader>=0.0.8",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 tests = [
   "pytest",
   "pytest-cov",
   "pytest-qt",
+  "pytest-xdist",
   "qtpy",
   "tox",
-]
-dev = [
-  "black",
-  # "codespell",
-  "pre-commit",
-  "pylint",
-  "ruff",
 ]
 pypi = [
   "build",
   "setuptools_scm[toml]",
   "wheel",
+]
+dev = [
+  {include-group = "tests"},
+  {include-group = "pypi"},
+  "black",
+  "codespell",
+  "pre-commit",
+  "pylint",
+  "ruff",
 ]
 
 [tool.setuptools_scm]
@@ -83,11 +86,11 @@ write_to = "_version.py"
 
 [tool.black]
 line-length = 120
-target-version = ['py310', 'py311']
+target-version = ['py311', 'py312']
 
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 120
 exclude = [
     ".bzr",
@@ -170,7 +173,7 @@ convention = "numpy"
 fixture-parentheses = true
 
 [tool.pytest.ini_options]
-minversion = "8.0"
+minversion = "9.0"
 addopts = ["--cov", "-ra", "--strict-config", "--strict-markers"]
 log_level = "INFO"
 log_cli = true
@@ -187,3 +190,6 @@ xfail_strict = true
 
 [project.entry-points."napari.manifest"]
 napari-TopoStats = "napari_topostats:napari.yaml"
+
+[tool.uv]
+exclude-newer = "6 days" # delay updating new packages to protect against supply chain vulnerabilities
