@@ -32,30 +32,31 @@ jobs:
       XDG_RUNTIME_DIR: /tmp
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Install and setup uv with python
+        uses: astral-sh/setup-uv@v10.4.0
+        with:
+          activate-environment: true
+          python-version: ${{ matrix.python-version }}
       - name: Setup PyVista headless display with Qt support
         uses: pyvista/setup-headless-display-action@v4
         with:
           qt: true
-      - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Upgrade pip/setuptools/virtualenv and install test dependencies
+      - name: Install package dependencies in activated environment
+        shell: bash
         run: |
-          pip install --upgrade pip setuptools virtualenv
-          virtualenv --upgrade-embed-wheels
-          # virtualenv --reset-app-data
-          pip install -e .[tests]
-      - name: Test with pytest
+          uv sync --frozen --all-extras --dev
+      - name: Pytest
         run: |
-          pytest --cov=src/napari_topostats -x
+          uv run pytest --cov=src --cov-branch --numprocesses=logical
       - name: Determine coverage
+        if: runner.os == 'Linux'
         run: |
           coverage xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        if: runner.os == 'Linux'
+        uses: codecov/codecov-action@v7
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

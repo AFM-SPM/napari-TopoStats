@@ -53,7 +53,7 @@ dependencies = [
   "pyqtgraph",
   "markdown",
   "topostats>=2.4.0",  # This should match MIN_TOPOSTATS_VERSION in src/napari_topostats/_state.py
-  "napari-AFMReader @ git+https://github.com/AFM-SPM/napari-AFMReader.git@ahobbs7/adjusting_volumes",
+  "napari-AFMReader>=0.0.3",
   "AFMReader>=0.0.8",
 ]
 
@@ -187,3 +187,6 @@ xfail_strict = true
 
 [project.entry-points."napari.manifest"]
 napari-TopoStats = "napari_topostats:napari.yaml"
+
+[tool.uv]
+exclude-newer = "6 days" # delay updating new packages to protect against supply chain vulnerabilities
